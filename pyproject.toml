@@ -44,4 +44,4 @@ where = ["."]
 include = ["fanalinux*"]
 
 [tool.setuptools.package-data]
-fanalinux = ["ui/*.css", "resources/icons/*.svg"]
+fanalinux = ["ui/*.css", "resources/icons/*.svg", "resources/icons/*.jpg", "resources/icons/*.png"]

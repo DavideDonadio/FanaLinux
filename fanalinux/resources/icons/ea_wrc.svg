@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <rect width="48" height="48" rx="10" fill="#091b2e"/>
-  <path d="M8 18 L18 18 L24 30 L30 18 L40 18 L30 36 L18 36 Z" fill="#00e5ff"/>
-  <text x="24" y="32" font-family="sans-serif" font-weight="900" font-size="14" fill="#ffffff" text-anchor="middle">WRC</text>
-</svg>

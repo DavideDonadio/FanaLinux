@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <rect width="48" height="48" rx="10" fill="#0b2238"/>
-  <path d="M6 14 L20 14 L14 34 L6 34 Z" fill="#00c853"/>
-  <path d="M22 14 L36 14 L30 34 L22 34 Z" fill="#ffd600"/>
-  <text x="24" y="30" font-family="sans-serif" font-weight="900" font-size="14" font-style="italic" fill="#ffffff" text-anchor="middle">AMS2</text>
-</svg>

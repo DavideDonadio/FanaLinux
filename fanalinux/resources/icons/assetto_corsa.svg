@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <rect width="48" height="48" rx="10" fill="#cc1417"/>
-  <path d="M10 38 L16 10 L22 10 L16 38 Z" fill="#ffffff" opacity="0.3"/>
-  <path d="M18 38 L24 10 L30 10 L24 38 Z" fill="#ffffff" opacity="0.6"/>
-  <text x="25" y="32" font-family="sans-serif" font-weight="900" font-size="20" font-style="italic" fill="#ffffff" text-anchor="middle">AC</text>
-</svg>

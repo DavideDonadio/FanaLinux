@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <rect width="48" height="48" rx="10" fill="#0d1b2a"/>
-  <rect x="2" y="2" width="44" height="44" rx="8" fill="none" stroke="#d4af37" stroke-width="2"/>
-  <path d="M14 14 L20 14 L14 34 L8 34 Z" fill="#d4af37"/>
-  <text x="26" y="30" font-family="sans-serif" font-weight="900" font-size="14" font-style="italic" fill="#ffffff" text-anchor="middle">LMU</text>
-  <text x="26" y="40" font-family="sans-serif" font-weight="700" font-size="8" fill="#d4af37" text-anchor="middle">24H</text>
-</svg>

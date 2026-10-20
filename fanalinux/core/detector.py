@@ -248,14 +248,19 @@ class GameDetector:
         return None
 
     def get_game_icon_path(self, game_id: str) -> Optional[str]:
-        """Return the filesystem path to the bundled SVG icon for a game."""
+        """Return the filesystem path to the official icon for a game."""
+        base_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
+        # Check for real official image (jpg / png) first, then vector svg
+        for ext in [".jpg", ".png", ".svg"]:
+            candidate = base_dir / f"{game_id}{ext}"
+            if candidate.exists():
+                return str(candidate)
+
         game = self.get_game_by_id(game_id)
-        icon_filename = game.get("icon") if game else f"{game_id}.svg"
-        if icon_filename:
-            base_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
-            svg_path = base_dir / icon_filename
-            if svg_path.exists():
-                return str(svg_path)
+        if game and game.get("icon"):
+            p = base_dir / game["icon"]
+            if p.exists():
+                return str(p)
         return None
 
     def start(self):
