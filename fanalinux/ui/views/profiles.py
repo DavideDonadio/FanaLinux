@@ -61,7 +61,9 @@ class ProfilesView(Adw.PreferencesPage):
         auto_toggle_row = Adw.ActionRow()
         auto_toggle_row.set_title("Enable Auto-Profile Switching")
         auto_toggle_row.set_subtitle("Automatically switch profiles and start telemetry on game launch")
-        auto_toggle_row.set_icon_name("emblem-synchronizing-symbolic")
+        auto_img = Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic")
+        auto_img.set_pixel_size(32)
+        auto_toggle_row.add_prefix(auto_img)
 
         self.auto_switch = Gtk.Switch()
         self.auto_switch.set_active(self.detector.enabled)
@@ -74,6 +76,9 @@ class ProfilesView(Adw.PreferencesPage):
         fallback_row = Adw.ActionRow()
         fallback_row.set_title("Desktop Fallback Preset")
         fallback_row.set_subtitle("Preset restored when simulators exit")
+        fallback_img = Gtk.Image.new_from_icon_name("user-home-symbolic")
+        fallback_img.set_pixel_size(32)
+        fallback_row.add_prefix(fallback_img)
 
         presets = list_presets()
         self.fallback_dropdown = Gtk.DropDown.new_from_strings(presets)
