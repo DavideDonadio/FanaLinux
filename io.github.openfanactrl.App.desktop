@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=OpenFana Control
+Comment=Native Linux Control Panel and Telemetry Suite for Fanatec Hardware
+Exec=open-fanactrl
+Icon=input-gaming
+Terminal=false
+Type=Application
+Categories=HardwareSettings;Settings;Game;
+StartupNotify=true
