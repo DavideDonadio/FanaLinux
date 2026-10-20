@@ -10,18 +10,13 @@ from gi.repository import Gtk, Adw, GLib
 from fanactrl.core.tuning import TuningProfile, TUNING_METADATA
 
 
-class TuningView(Gtk.Box):
+class TuningView(Adw.PreferencesPage):
     def __init__(self, device, on_toast_requested=None):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        super().__init__()
         self.device = device
         self.on_toast_requested = on_toast_requested
         self.profile = TuningProfile()
         self._controls = {}
-
-        self.set_margin_top(24)
-        self.set_margin_bottom(24)
-        self.set_margin_start(24)
-        self.set_margin_end(24)
 
         self._build_ui()
 
@@ -41,7 +36,7 @@ class TuningView(Gtk.Box):
         slot_row.add_suffix(self.slot_dropdown)
         slot_group.add(slot_row)
 
-        self.append(slot_group)
+        self.add(slot_group)
 
         # 2. Dynamic Categories from TUNING_METADATA
         categories = {}
@@ -51,27 +46,29 @@ class TuningView(Gtk.Box):
                 group = Adw.PreferencesGroup()
                 group.set_title(cat_name)
                 categories[cat_name] = group
-                self.append(group)
+                self.add(group)
 
             group = categories[cat_name]
             self._create_control_row(group, meta)
 
         # 3. Action Buttons (Apply / Reset)
-        actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        actions_box.set_halign(Gtk.Align.END)
-        actions_box.set_margin_top(12)
+        actions_group = Adw.PreferencesGroup()
+        actions_row = Adw.ActionRow()
+        actions_row.set_title("Hardware Synchronization")
+        actions_row.set_subtitle("Save current settings to selected wheelbase memory slot")
 
         reset_btn = Gtk.Button(label="Reset to Defaults")
         reset_btn.connect("clicked", self._on_reset_defaults)
-        actions_box.append(reset_btn)
+        actions_row.add_suffix(reset_btn)
 
-        apply_btn = Gtk.Button(label="Apply to Hardware Wheelbase")
+        apply_btn = Gtk.Button(label="Apply to Wheelbase")
         apply_btn.add_css_class("suggested-action")
         apply_btn.add_css_class("pill")
         apply_btn.connect("clicked", self._on_apply_clicked)
-        actions_box.append(apply_btn)
+        actions_row.add_suffix(apply_btn)
 
-        self.append(actions_box)
+        actions_group.add(actions_row)
+        self.add(actions_group)
 
     def _create_control_row(self, group, meta):
         row = Adw.ActionRow()
@@ -82,14 +79,12 @@ class TuningView(Gtk.Box):
         current_val = getattr(self.profile, param_id, meta.get("default", 0))
 
         if meta.get("type") == "toggle":
-            # Switch between Linear and Peak
             switch = Gtk.Switch()
             switch.set_active(bool(current_val))
             switch.set_valign(Gtk.Align.CENTER)
             row.add_suffix(switch)
             self._controls[param_id] = switch
         else:
-            # Slider
             val_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
             
             val_label = Gtk.Label(label=f"{current_val}{meta['unit']}")
@@ -105,7 +100,7 @@ class TuningView(Gtk.Box):
                 page_increment=meta.get("step", 1) * 5
             )
             scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj)
-            scale.set_size_request(180, -1)
+            scale.set_size_request(200, -1)
             scale.set_draw_value(False)
 
             def _on_val_changed(adjustment, lbl=val_label, unit=meta['unit']):
@@ -145,7 +140,6 @@ class TuningView(Gtk.Box):
                 ctrl.set_value(float(val))
 
     def _on_apply_clicked(self, btn):
-        # Read from UI into profile
         for meta in TUNING_METADATA:
             param_id = meta["id"]
             ctrl = self._controls.get(param_id)
@@ -156,7 +150,6 @@ class TuningView(Gtk.Box):
             elif isinstance(ctrl, Gtk.Adjustment):
                 setattr(self.profile, param_id, int(ctrl.get_value()))
 
-        # Write to physical device
         if self.device and self.device.connected:
             self.device.apply_tuning_profile(self.profile)
             if self.on_toast_requested:

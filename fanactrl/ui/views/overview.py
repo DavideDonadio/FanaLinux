@@ -8,15 +8,10 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 
 
-class OverviewView(Gtk.Box):
+class OverviewView(Adw.PreferencesPage):
     def __init__(self, device):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        super().__init__()
         self.device = device
-        self.set_margin_top(24)
-        self.set_margin_bottom(24)
-        self.set_margin_start(24)
-        self.set_margin_end(24)
-
         self._button_chips = {}
         self._build_ui()
 
@@ -42,7 +37,7 @@ class OverviewView(Gtk.Box):
         self.rim_row.set_icon_name("applications-games-symbolic")
         info_group.add(self.rim_row)
 
-        self.append(info_group)
+        self.add(info_group)
 
         # 2. Live Axes & Telemetry
         axes_group = Adw.PreferencesGroup()
@@ -58,7 +53,7 @@ class OverviewView(Gtk.Box):
 
         self.steer_bar = Gtk.ProgressBar()
         self.steer_bar.set_fraction(0.5)
-        self.steer_bar.set_size_request(200, 14)
+        self.steer_bar.set_size_request(240, 16)
         self.steer_row.add_suffix(self.steer_bar)
         axes_group.add(self.steer_row)
 
@@ -68,7 +63,7 @@ class OverviewView(Gtk.Box):
         self.throttle_bar = Gtk.ProgressBar()
         self.throttle_bar.set_fraction(0.0)
         self.throttle_bar.add_css_class("success")
-        self.throttle_bar.set_size_request(200, 14)
+        self.throttle_bar.set_size_request(240, 16)
         self.throttle_label = Gtk.Label(label="0%")
         self.throttle_row.add_suffix(self.throttle_label)
         self.throttle_row.add_suffix(self.throttle_bar)
@@ -80,7 +75,7 @@ class OverviewView(Gtk.Box):
         self.brake_bar = Gtk.ProgressBar()
         self.brake_bar.set_fraction(0.0)
         self.brake_bar.add_css_class("destructive")
-        self.brake_bar.set_size_request(200, 14)
+        self.brake_bar.set_size_request(240, 16)
         self.brake_label = Gtk.Label(label="0%")
         self.brake_row.add_suffix(self.brake_label)
         self.brake_row.add_suffix(self.brake_bar)
@@ -91,13 +86,13 @@ class OverviewView(Gtk.Box):
         self.clutch_row.set_title("Clutch")
         self.clutch_bar = Gtk.ProgressBar()
         self.clutch_bar.set_fraction(0.0)
-        self.clutch_bar.set_size_request(200, 14)
+        self.clutch_bar.set_size_request(240, 16)
         self.clutch_label = Gtk.Label(label="0%")
         self.clutch_row.add_suffix(self.clutch_label)
         self.clutch_row.add_suffix(self.clutch_bar)
         axes_group.add(self.clutch_row)
 
-        self.append(axes_group)
+        self.add(axes_group)
 
         # 3. Button Matrix Visualizer
         btn_group = Adw.PreferencesGroup()
@@ -110,7 +105,7 @@ class OverviewView(Gtk.Box):
 
         for btn_num in range(1, 25):
             lbl = Gtk.Label(label=f"B{btn_num}")
-            lbl.set_size_request(42, 32)
+            lbl.set_size_request(48, 36)
             lbl.add_css_class("card")
             lbl.set_margin_start(4)
             lbl.set_margin_end(4)
@@ -122,14 +117,14 @@ class OverviewView(Gtk.Box):
         btn_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         btn_card.add_css_class("card")
         btn_card.set_margin_top(8)
+        btn_card.set_margin_bottom(8)
         btn_card.append(btn_flow)
         btn_group.add(btn_card)
 
-        self.append(btn_group)
+        self.add(btn_group)
 
     def update_steering(self, norm_val: float, raw_val: int):
-        # norm_val: -1.0 to +1.0
-        deg = norm_val * 450.0 # assumption 900 deg total
+        deg = norm_val * 450.0
         frac = (norm_val + 1.0) / 2.0
         GLib.idle_add(self._apply_steering, deg, frac)
 
@@ -159,7 +154,6 @@ class OverviewView(Gtk.Box):
         self.clutch_label.set_text(f"{int(val * 100)}%")
 
     def update_button(self, code: int, is_pressed: bool):
-        # Evdev key codes: typically BTN_JOYSTICK is 0x120 (288) or similar
         btn_idx = (code - 288 + 1) if code >= 288 else (code % 24 + 1)
         GLib.idle_add(self._apply_button, btn_idx, is_pressed)
 

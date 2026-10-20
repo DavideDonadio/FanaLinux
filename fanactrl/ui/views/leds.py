@@ -10,16 +10,11 @@ import threading
 import time
 
 
-class LedsView(Gtk.Box):
+class LedsView(Adw.PreferencesPage):
     def __init__(self, device, on_toast_requested=None):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        super().__init__()
         self.device = device
         self.on_toast_requested = on_toast_requested
-
-        self.set_margin_top(24)
-        self.set_margin_bottom(24)
-        self.set_margin_start(24)
-        self.set_margin_end(24)
 
         self._build_ui()
 
@@ -49,7 +44,7 @@ class LedsView(Gtk.Box):
         disp_row.add_suffix(clear_btn)
 
         oled_group.add(disp_row)
-        self.append(oled_group)
+        self.add(oled_group)
 
         # 2. RevLEDs (9 Multi-Color LEDs) Group
         rev_group = Adw.PreferencesGroup()
@@ -65,7 +60,7 @@ class LedsView(Gtk.Box):
         rev_row.add_suffix(test_rev_btn)
         rev_group.add(rev_row)
 
-        self.append(rev_group)
+        self.add(rev_group)
 
         # 3. Flag LEDs (6 Multi-Color LEDs: 3 Left, 3 Right)
         flag_group = Adw.PreferencesGroup()
@@ -96,7 +91,7 @@ class LedsView(Gtk.Box):
         flag_row.add_suffix(btn_box)
         flag_group.add(flag_row)
 
-        self.append(flag_group)
+        self.add(flag_group)
 
     def _on_send_display(self, btn):
         text = self.disp_entry.get_text()
@@ -128,7 +123,6 @@ class LedsView(Gtk.Box):
                 self.device.set_revleds(current)
                 time.sleep(0.1)
 
-            # Flash all white
             for _ in range(2):
                 self.device.set_revleds([(255, 255, 255)] * 9)
                 time.sleep(0.12)

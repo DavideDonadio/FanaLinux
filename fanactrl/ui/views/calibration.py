@@ -8,16 +8,11 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 
 
-class CalibrationView(Gtk.Box):
+class CalibrationView(Adw.PreferencesPage):
     def __init__(self, device, on_toast_requested=None):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        super().__init__()
         self.device = device
         self.on_toast_requested = on_toast_requested
-
-        self.set_margin_top(24)
-        self.set_margin_bottom(24)
-        self.set_margin_start(24)
-        self.set_margin_end(24)
 
         self._build_ui()
 
@@ -40,7 +35,7 @@ class CalibrationView(Gtk.Box):
         cal_row.add_suffix(cal_btn)
         center_group.add(cal_row)
 
-        self.append(center_group)
+        self.add(center_group)
 
         # 2. Diagnostics & Raw Protocol Information
         diag_group = Adw.PreferencesGroup()
@@ -58,10 +53,10 @@ class CalibrationView(Gtk.Box):
 
         driver_row = Adw.ActionRow()
         driver_row.set_title("Active Kernel Driver")
-        driver_row.set_subtitle("hid-generic + userspace /dev/hidraw8 (Non-root uaccess)")
+        driver_row.set_subtitle("Native hidraw + evdev event stream (Zero kernel detach)")
         diag_group.add(driver_row)
 
-        self.append(diag_group)
+        self.add(diag_group)
 
     def _on_calibrate_clicked(self, btn):
         if not self.device or not self.device.connected:

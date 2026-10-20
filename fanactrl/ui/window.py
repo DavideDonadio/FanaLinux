@@ -19,7 +19,7 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.set_title("OpenFana Control")
-        self.set_default_size(900, 750)
+        self.set_default_size(960, 800)
 
         # Initialize Hardware & Evdev Monitor
         self.device = FanatecDevice()
@@ -38,6 +38,9 @@ class MainWindow(Adw.ApplicationWindow):
 
         # View Switcher in Header
         self.view_stack = Adw.ViewStack()
+        self.view_stack.set_vexpand(True)
+        self.view_stack.set_hexpand(True)
+
         view_switcher = Adw.ViewSwitcher()
         view_switcher.set_stack(self.view_stack)
         view_switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
@@ -45,30 +48,23 @@ class MainWindow(Adw.ApplicationWindow):
 
         main_box.append(header)
 
-        # Create Views
+        # Create Views (All are Adw.PreferencesPage with built-in scrolling & clamping)
         self.overview_view = OverviewView(self.device)
         self.tuning_view = TuningView(self.device, on_toast_requested=self.show_toast)
         self.leds_view = LedsView(self.device, on_toast_requested=self.show_toast)
         self.calibration_view = CalibrationView(self.device, on_toast_requested=self.show_toast)
 
-        # Wrap in ScrolledWindows
-        def make_scrolled(view):
-            sc = Gtk.ScrolledWindow()
-            sc.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-            sc.set_child(view)
-            return sc
-
         self.view_stack.add_titled_with_icon(
-            make_scrolled(self.overview_view), "overview", "Overview", "input-gaming-symbolic"
+            self.overview_view, "overview", "Overview", "input-gaming-symbolic"
         )
         self.view_stack.add_titled_with_icon(
-            make_scrolled(self.tuning_view), "tuning", "Tuning Menu", "preferences-system-symbolic"
+            self.tuning_view, "tuning", "Tuning Menu", "preferences-system-symbolic"
         )
         self.view_stack.add_titled_with_icon(
-            make_scrolled(self.leds_view), "leds", "LEDs & Display", "weather-clear-symbolic"
+            self.leds_view, "leds", "LEDs & Display", "weather-clear-symbolic"
         )
         self.view_stack.add_titled_with_icon(
-            make_scrolled(self.calibration_view), "calibration", "Calibration", "emblem-system-symbolic"
+            self.calibration_view, "calibration", "Calibration", "emblem-system-symbolic"
         )
 
         main_box.append(self.view_stack)
