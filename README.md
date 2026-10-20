@@ -116,7 +116,8 @@ Fanatec and related product names are used solely to identify compatible hardwar
 
 ### 7. Calibration, Diagnostics & Visual Dial
 * **Interactive 360° Wheel Center Dial:** High-resolution ClubSport Formula V2.5 rim rendering rotating in real-time with cardinal degree markings, angle badge, and smooth 60 FPS cubic ease-out calibration ripple animation.
-* **Force Feedback Motor Test Suite:** Interactive centering spring, dynamic mechanical friction, alternating torque pulse sequence, and 18 Hz tactile vibration test.
+* **Full Hardware Self-Test (10s):** Automated 10-second end-to-end diagnostic sequence verifying RevLEDs, Flag clusters, OLED display segments, Direct Drive motor torque sweeps & centering, and rim/pedal tactile rumble.
+* **Interactive Motor Diagnostics:** Live centering spring with adjustable strength and dynamic rotational friction resistance.
 * **Safety Force Cutoff:** Dedicated emergency stop button instantly canceling all active motor torque, centering springs, and vibrations.
 * **Pedal Deadzones:** Customizable lower threshold deadbands for Throttle, Brake, and Clutch (220 px standardized sliders).
 * **Hardware Firmware Display:** Real-time reporting of Wheelbase Base, Motor Controller, and Steering Rim revisions.

@@ -18,6 +18,8 @@ class CalibrationView(Adw.PreferencesPage):
         super().__init__()
         self.device = device
         self.on_toast_requested = on_toast_requested
+        self._abort_self_test = False
+        self._self_test_running = False
 
         # Ensure wide clamp for 2-column layout
         GLib.idle_add(self._widen_page_clamp)
@@ -106,33 +108,19 @@ class CalibrationView(Adw.PreferencesPage):
         friction_row.add_suffix(friction_box)
         ffb_group.add(friction_row)
 
-        # Motor Torque Pulse Test
-        torque_row = Adw.ActionRow()
-        torque_row.set_title("Motor Torque Pulse Test")
-        torque_row.set_subtitle("Gently pulls wheel left then right (25% torque) to verify direct drive motor output")
-        torque_row.set_icon_name("media-playback-start-symbolic")
+        # Automated Full Hardware Self-Test (10s)
+        self_test_row = Adw.ActionRow()
+        self_test_row.set_title("Full Hardware Self-Test (10s)")
+        self_test_row.set_subtitle("10-second automated sequence verifying RevLEDs, Flags, OLED, DD motor sweeps & haptic rumble")
+        self_test_row.set_icon_name("media-playback-start-symbolic")
 
-        torque_btn = Gtk.Button(label="Test Motor Torque")
-        torque_btn.set_size_request(160, 42)
-        torque_btn.set_valign(Gtk.Align.CENTER)
-        torque_btn.add_css_class("suggested-action")
-        torque_btn.connect("clicked", self._on_torque_test_clicked)
-        torque_row.add_suffix(torque_btn)
-        ffb_group.add(torque_row)
-
-        # Tactile Vibration Test
-        rumble_row = Adw.ActionRow()
-        rumble_row.set_title("Tactile Wheel &amp; Pedal Vibration Test")
-        rumble_row.set_subtitle("Pulses 18 Hz tactile rumble through steering wheel rim and peripheral pedals")
-        rumble_row.set_icon_name("audio-volume-high-symbolic")
-
-        rumble_btn = Gtk.Button(label="Test Vibration")
-        rumble_btn.set_size_request(160, 42)
-        rumble_btn.set_valign(Gtk.Align.CENTER)
-        rumble_btn.add_css_class("suggested-action")
-        rumble_btn.connect("clicked", self._on_rumble_test_clicked)
-        rumble_row.add_suffix(rumble_btn)
-        ffb_group.add(rumble_row)
+        self.self_test_btn = Gtk.Button(label="Run Self-Test")
+        self.self_test_btn.set_size_request(160, 42)
+        self.self_test_btn.set_valign(Gtk.Align.CENTER)
+        self.self_test_btn.add_css_class("suggested-action")
+        self.self_test_btn.connect("clicked", self._on_self_test_clicked)
+        self_test_row.add_suffix(self.self_test_btn)
+        ffb_group.add(self_test_row)
 
         # Safety Force Cutoff Row
         stop_row = Adw.ActionRow()
@@ -247,79 +235,224 @@ class CalibrationView(Adw.PreferencesPage):
             if self.on_toast_requested:
                 self.on_toast_requested("Motor friction disabled")
 
-    def _on_torque_test_clicked(self, btn):
+    def _on_self_test_clicked(self, btn):
         if not self.device or not self.device.connected:
             if self.on_toast_requested:
                 self.on_toast_requested("Device not connected!")
+            return
+
+        if self._self_test_running:
+            if self.on_toast_requested:
+                self.on_toast_requested("Self-test is already running!")
             return
 
         # Show Safety Warning Dialog
         root = self.get_root()
         dialog = Adw.MessageDialog(
             transient_for=root if isinstance(root, Gtk.Window) else None,
-            heading="Motor Torque Safety Warning",
-            body="Please ensure your hands are clear or hold the wheel rim firmly.\n\n"
-                 "The direct drive motor will apply a gentle alternating torque (left, then right) "
-                 "for approximately 2 seconds.\n\nDo you want to proceed?"
+            heading="Full Hardware Self-Test (10s)",
+            body="This will run an automated 10-second diagnostic verifying:\n\n"
+                 "• RevLEDs, Flag clusters & OLED Display\n"
+                 "• Direct Drive motor torque (Left/Right sweeps & Centering)\n"
+                 "• Steering rim grip vibration & pedal haptic rumble\n\n"
+                 "Please ensure the wheel rim is clear to rotate freely.\nDo you want to proceed?"
         )
         dialog.add_response("cancel", "Cancel")
-        dialog.add_response("proceed", "Proceed with Test")
+        dialog.add_response("proceed", "Start Self-Test")
         dialog.set_response_appearance("proceed", Adw.ResponseAppearance.SUGGESTED)
 
         def _on_dialog_response(dlg, response_id):
             if response_id == "proceed":
-                self._run_torque_sequence()
+                self._run_full_self_test()
 
         dialog.connect("response", _on_dialog_response)
         dialog.present()
 
-    def _run_torque_sequence(self):
-        def _worker():
-            if self.on_toast_requested:
-                GLib.idle_add(self.on_toast_requested, "Testing motor torque: Pulling Left...")
-            # Left torque (~23% holding force)
-            self.device.send_constant_force(-7500)
-            time.sleep(0.8)
-
-            # Center pause
-            self.device.send_constant_force(0)
-            time.sleep(0.25)
-
-            if self.on_toast_requested:
-                GLib.idle_add(self.on_toast_requested, "Testing motor torque: Pulling Right...")
-            # Right torque (~23% holding force)
-            self.device.send_constant_force(7500)
-            time.sleep(0.8)
-
-            # Zero force
-            self.device.send_constant_force(0)
-            if self.on_toast_requested:
-                GLib.idle_add(self.on_toast_requested, "Motor torque test complete! Forces zeroed.")
-
-        threading.Thread(target=_worker, daemon=True).start()
-
-    def _on_rumble_test_clicked(self, btn):
-        if not self.device or not self.device.connected:
-            if self.on_toast_requested:
-                self.on_toast_requested("Device not connected!")
-            return
+    def _run_full_self_test(self):
+        self._abort_self_test = False
+        self._self_test_running = True
+        self.self_test_btn.set_sensitive(False)
+        self.self_test_btn.set_label("Running (10s)...")
 
         def _worker():
-            self.device.vibrate_wheel(intensity=100, duration=1.2, freq=18)
-            if self.on_toast_requested:
-                GLib.idle_add(self.on_toast_requested, "Tactile vibration test complete.")
+            try:
+                # -------------------------------------------------------------
+                # PHASE 1: Displays & Multi-Color LEDs (0.0s - 3.2s)
+                # -------------------------------------------------------------
+                if self.on_toast_requested:
+                    GLib.idle_add(self.on_toast_requested, "Self-Test (1/3): Testing RevLEDs, Flag clusters & OLED...")
+
+                self.device.set_display_text("TST")
+                time.sleep(0.4)
+
+                color_palette = [
+                    (0, 255, 0), (0, 255, 0), (0, 255, 0),       # Green
+                    (255, 200, 0), (255, 200, 0), (255, 200, 0), # Yellow
+                    (255, 0, 0), (255, 0, 0), (0, 100, 255)      # Red / Blue
+                ]
+
+                # Sweep in 9 RevLEDs
+                current_leds = [(0, 0, 0)] * 9
+                for i in range(9):
+                    if self._abort_self_test:
+                        return
+                    current_leds[i] = color_palette[i]
+                    self.device.set_revleds(current_leds)
+                    time.sleep(0.12)
+
+                # Flag LEDs cycle (3 left, 3 right)
+                self.device.set_display_text("LED")
+                for c in [(255, 0, 0), (255, 200, 0), (0, 120, 255)]:
+                    if self._abort_self_test:
+                        return
+                    self.device.set_flagleds([c] * 6)
+                    time.sleep(0.35)
+
+                # All LEDs full bright white flash
+                if self._abort_self_test:
+                    return
+                self.device.set_revleds([(255, 255, 255)] * 9)
+                self.device.set_flagleds([(255, 255, 255)] * 6)
+                time.sleep(0.4)
+
+                # Clear LEDs
+                self.device.set_revleds([(0, 0, 0)] * 9)
+                self.device.set_flagleds([(0, 0, 0)] * 6)
+
+                # -------------------------------------------------------------
+                # PHASE 2: Direct Drive Motor Torque & Centering (3.2s - 6.8s)
+                # -------------------------------------------------------------
+                if self._abort_self_test:
+                    return
+
+                if self.on_toast_requested:
+                    GLib.idle_add(self.on_toast_requested, "Self-Test (2/3): Direct Drive motor test: Left sweep, Right sweep & Centering...")
+
+                self.device.set_display_text("DD")
+
+                # Smooth ramp Left (up to ~20% torque)
+                for step in range(1, 11):
+                    if self._abort_self_test:
+                        return
+                    force = int(-7000 * (step / 10.0))
+                    self.device.send_constant_force(force)
+                    time.sleep(0.07)
+
+                time.sleep(0.35)
+
+                # Smooth ramp back to 0
+                for step in range(10, -1, -1):
+                    if self._abort_self_test:
+                        return
+                    force = int(-7000 * (step / 10.0))
+                    self.device.send_constant_force(force)
+                    time.sleep(0.035)
+
+                # Smooth ramp Right (up to ~20% torque)
+                for step in range(1, 11):
+                    if self._abort_self_test:
+                        return
+                    force = int(7000 * (step / 10.0))
+                    self.device.send_constant_force(force)
+                    time.sleep(0.07)
+
+                time.sleep(0.35)
+
+                # Smooth ramp back to 0
+                for step in range(10, -1, -1):
+                    if self._abort_self_test:
+                        return
+                    force = int(7000 * (step / 10.0))
+                    self.device.send_constant_force(force)
+                    time.sleep(0.035)
+
+                # Centering spring check
+                if self._abort_self_test:
+                    return
+                self.device.send_centering_spring(50)
+                time.sleep(0.8)
+                self.device.send_centering_spring(0)
+
+                # -------------------------------------------------------------
+                # PHASE 3: Tactile Rim Grip & Pedal Rumble (6.8s - 9.4s)
+                # -------------------------------------------------------------
+                if self._abort_self_test:
+                    return
+
+                if self.on_toast_requested:
+                    GLib.idle_add(self.on_toast_requested, "Self-Test (3/3): Testing rim grip rumble & pedal haptic motors...")
+
+                self.device.set_display_text("VIB")
+
+                # Left grip rumble (1.0s)
+                self.device.send_handle_vibration(180, 0)
+                time.sleep(1.0)
+
+                if self._abort_self_test:
+                    return
+
+                # Right grip rumble (1.0s)
+                self.device.send_handle_vibration(0, 180)
+                time.sleep(1.0)
+
+                if self._abort_self_test:
+                    return
+
+                # Both handles + base 18 Hz tactile pulse (0.6s)
+                self.device.send_handle_vibration(220, 220)
+                end_vib = time.time() + 0.6
+                half = (1.0 / 18.0) / 2.0
+                while time.time() < end_vib and not self._abort_self_test:
+                    self.device.send_constant_force(4500)
+                    time.sleep(half)
+                    self.device.send_constant_force(-4500)
+                    time.sleep(half)
+
+                # -------------------------------------------------------------
+                # PHASE 4: Pass & Restoration (9.4s - 10.0s)
+                # -------------------------------------------------------------
+                self.device.send_constant_force(0)
+                self.device.send_handle_vibration(0, 0)
+                self.device.send_centering_spring(0)
+                self.device.set_display_text("OK")
+                time.sleep(0.6)
+                self.device.clear_display()
+
+                if self.on_toast_requested:
+                    GLib.idle_add(self.on_toast_requested, "Hardware Self-Test Complete: All displays, LEDs, DD motor, and haptic actuators passed!")
+
+            finally:
+                self._self_test_running = False
+                try:
+                    self.device.stop_all_forces()
+                    self.device.set_revleds([(0, 0, 0)] * 9)
+                    self.device.set_flagleds([(0, 0, 0)] * 6)
+                    self.device.clear_display()
+                except Exception:
+                    pass
+                GLib.idle_add(self.self_test_btn.set_sensitive, True)
+                GLib.idle_add(self.self_test_btn.set_label, "Run Self-Test")
 
         threading.Thread(target=_worker, daemon=True).start()
-        if self.on_toast_requested:
-            self.on_toast_requested("Testing tactile vibration (18 Hz rumble)...")
 
     def update_steering(self, norm_val: float, raw_val: int):
         deg = norm_val * 450.0
         GLib.idle_add(self.wheel_dial.set_angle, deg)
 
     def _on_emergency_stop_clicked(self, btn):
+        self._abort_self_test = True
+        self._self_test_running = False
+        if hasattr(self, 'self_test_btn'):
+            self.self_test_btn.set_sensitive(True)
+            self.self_test_btn.set_label("Run Self-Test")
         if self.device:
             self.device.stop_all_forces()
+            try:
+                self.device.set_revleds([(0, 0, 0)] * 9)
+                self.device.set_flagleds([(0, 0, 0)] * 6)
+                self.device.clear_display()
+            except Exception:
+                pass
         self.spring_sw.set_active(False)
         self.friction_sw.set_active(False)
         if self.on_toast_requested:

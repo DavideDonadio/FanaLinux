@@ -86,7 +86,7 @@ class VibrationView(Adw.PreferencesPage):
         reset_btn.connect("clicked", self._on_reset_clicked)
         actions_box.append(reset_btn)
 
-        test_btn = Gtk.Button(label="Test Vibration")
+        test_btn = Gtk.Button(label="Preview Haptics")
         test_btn.set_size_request(160, 42)
         test_btn.set_valign(Gtk.Align.CENTER)
         test_btn.add_css_class("suggested-action")
@@ -283,4 +283,4 @@ class VibrationView(Adw.PreferencesPage):
             self.device.vibrate_wheel(intensity=60, duration=0.25, freq=18)
 
         if self.on_toast_requested:
-            self.on_toast_requested("Testing tactile vibration pulse (18 Hz)...")
+            self.on_toast_requested("Previewing telemetry haptic pulse (18 Hz)...")
