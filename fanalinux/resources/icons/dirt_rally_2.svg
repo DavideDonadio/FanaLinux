@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <rect width="48" height="48" rx="10" fill="#212121"/>
+  <path d="M10 8 L32 8 L24 24 L8 24 Z" fill="#ff6d00"/>
+  <path d="M26 24 L42 24 L34 40 L18 40 Z" fill="#ff6d00"/>
+  <text x="24" y="32" font-family="sans-serif" font-weight="900" font-size="12" fill="#ffffff" text-anchor="middle">DiRT 2.0</text>
+</svg>

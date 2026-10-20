@@ -42,3 +42,6 @@ fanalinux = "fanalinux.main:run_app"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["fanalinux*"]
+
+[tool.setuptools.package-data]
+fanalinux = ["ui/*.css", "resources/icons/*.svg"]

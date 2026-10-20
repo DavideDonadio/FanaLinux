@@ -45,7 +45,9 @@ class ProfilesView(Adw.PreferencesPage):
         self.status_row = Adw.ActionRow()
         self.status_row.set_title("Active Simulator")
         self.status_row.set_subtitle("No racing simulator currently running (Idle)")
-        self.status_row.set_icon_name("applications-games-symbolic")
+        self.status_img = Gtk.Image.new_from_icon_name("applications-games-symbolic")
+        self.status_img.set_pixel_size(32)
+        self.status_row.add_prefix(self.status_img)
 
         self.status_badge = Gtk.Label(label="Idle")
         self.status_badge.set_valign(Gtk.Align.CENTER)
@@ -106,7 +108,14 @@ class ProfilesView(Adw.PreferencesPage):
             expander = Adw.ExpanderRow()
             expander.set_title(game["name"])
             expander.set_subtitle(f"Assigned Profile: {current_preset}")
-            expander.set_icon_name("input-gaming-symbolic")
+            
+            icon_path = self.detector.get_game_icon_path(gid)
+            if icon_path and os.path.exists(icon_path):
+                img = Gtk.Image.new_from_file(icon_path)
+                img.set_pixel_size(32)
+                expander.add_prefix(img)
+            else:
+                expander.set_icon_name("applications-games-symbolic")
 
             # Enable Toggle for this game
             enable_row = Adw.ActionRow()
@@ -225,12 +234,19 @@ class ProfilesView(Adw.PreferencesPage):
             self.status_badge.set_text("Running")
             self.status_badge.remove_css_class("status-pill-idle")
             self.status_badge.add_css_class("status-pill-running")
+
+            icon_path = self.detector.get_game_icon_path(game_info["id"])
+            if icon_path and os.path.exists(icon_path):
+                self.status_img.set_from_file(icon_path)
+            else:
+                self.status_img.set_from_icon_name("applications-games-symbolic")
         else:
             self.status_row.set_title("Active Simulator: None")
             self.status_row.set_subtitle(f"No game running — Baseline '{self.detector.fallback_preset}' active")
             self.status_badge.set_text("Idle")
             self.status_badge.remove_css_class("status-pill-running")
             self.status_badge.add_css_class("status-pill-idle")
+            self.status_img.set_from_icon_name("applications-games-symbolic")
 
     def _on_auto_switch_toggled(self, switch, state):
         self.detector.enabled = switch.get_active()

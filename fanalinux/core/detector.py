@@ -27,7 +27,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Assetto Corsa - GT3",
         "has_telemetry": True,
         "telemetry_type": "ac_udp",
-        "description": "Kunos Simulazioni Assetto Corsa (Proton / Wine / Content Manager)"
+        "description": "Kunos Simulazioni Assetto Corsa (Proton / Wine / Content Manager)",
+        "icon": "assetto_corsa.svg"
     },
     {
         "id": "acc",
@@ -36,25 +37,22 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Assetto Corsa - GT3",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "Official Fanatec GT World Challenge Simulator"
+        "description": "Official Fanatec GT World Challenge Simulator",
+        "icon": "acc.svg"
     },
     {
-        "id": "f1_24",
-        "name": "EA Sports F1 24",
-        "executables": ["f1_24.exe"],
+        "id": "ea_sports_f1",
+        "name": "EA Sports F1 Series",
+        "executables": [
+            "f1_25.exe", "f1_24.exe", "f1_23.exe", "f1_22.exe",
+            "f1_2021_dx12.exe", "f1_2020_dx12.exe", "f1_2019_dx12.exe",
+            "f1_25", "f1_24", "f1_23", "f1_22"
+        ],
         "default_preset": "F1 24",
         "has_telemetry": False,
         "telemetry_type": "f1_udp",
-        "description": "EA Sports Formula 1 2024"
-    },
-    {
-        "id": "f1_23",
-        "name": "EA Sports F1 23",
-        "executables": ["f1_23.exe"],
-        "default_preset": "F1 24",
-        "has_telemetry": False,
-        "telemetry_type": "f1_udp",
-        "description": "EA Sports Formula 1 2023"
+        "description": "EA Sports / Codemasters Formula 1 series (F1 25, F1 24, F1 23...)",
+        "icon": "ea_sports_f1.svg"
     },
     {
         "id": "iracing",
@@ -63,7 +61,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Default",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "iRacing Motorsport Simulations"
+        "description": "iRacing Motorsport Simulations",
+        "icon": "iracing.svg"
     },
     {
         "id": "ams2",
@@ -72,7 +71,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Default",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "Reiza Studios Automobilista 2"
+        "description": "Reiza Studios Automobilista 2",
+        "icon": "ams2.svg"
     },
     {
         "id": "dirt_rally_2",
@@ -81,7 +81,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Rally",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "Codemasters DiRT Rally 2.0"
+        "description": "Codemasters DiRT Rally 2.0",
+        "icon": "dirt_rally_2.svg"
     },
     {
         "id": "ea_wrc",
@@ -90,7 +91,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Rally",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "EA Sports World Rally Championship"
+        "description": "EA Sports World Rally Championship",
+        "icon": "ea_wrc.svg"
     },
     {
         "id": "beamng",
@@ -99,7 +101,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Default",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "Soft-body physics vehicle simulator"
+        "description": "Soft-body physics vehicle simulator",
+        "icon": "beamng.svg"
     },
     {
         "id": "rfactor2",
@@ -108,7 +111,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Default",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "Studio 397 rFactor 2"
+        "description": "Studio 397 rFactor 2",
+        "icon": "rfactor2.svg"
     },
     {
         "id": "lmu",
@@ -117,7 +121,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Default",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "Official FIA WEC / 24 Hours of Le Mans game"
+        "description": "Official FIA WEC / 24 Hours of Le Mans game",
+        "icon": "lmu.svg"
     },
     {
         "id": "forza_motorsport",
@@ -126,7 +131,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Default",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "Turn 10 Studios Forza Motorsport"
+        "description": "Turn 10 Studios Forza Motorsport",
+        "icon": "forza_motorsport.svg"
     },
     {
         "id": "ets2",
@@ -135,7 +141,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Default",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "SCS Software Euro Truck Simulator 2"
+        "description": "SCS Software Euro Truck Simulator 2",
+        "icon": "ets2.svg"
     },
     {
         "id": "ats",
@@ -144,7 +151,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "default_preset": "Default",
         "has_telemetry": False,
         "telemetry_type": None,
-        "description": "SCS Software American Truck Simulator"
+        "description": "SCS Software American Truck Simulator",
+        "icon": "ats.svg"
     }
 ]
 
@@ -193,6 +201,11 @@ class GameDetector:
                     self.poll_interval = float(data.get("poll_interval", 1.5))
                     self.fallback_preset = str(data.get("fallback_preset", "Default"))
                     self.game_mappings = data.get("game_mappings", {})
+                    # Migrate legacy f1 keys if present
+                    if "f1_24" in self.game_mappings and "ea_sports_f1" not in self.game_mappings:
+                        self.game_mappings["ea_sports_f1"] = self.game_mappings["f1_24"]
+                    elif "f1_23" in self.game_mappings and "ea_sports_f1" not in self.game_mappings:
+                        self.game_mappings["ea_sports_f1"] = self.game_mappings["f1_23"]
                     self.custom_games = data.get("custom_games", [])
             except Exception as e:
                 logger.error(f"Error loading game profiles config: {e}")
@@ -232,6 +245,17 @@ class GameDetector:
         for g in self.get_all_games():
             if g["id"] == game_id:
                 return g
+        return None
+
+    def get_game_icon_path(self, game_id: str) -> Optional[str]:
+        """Return the filesystem path to the bundled SVG icon for a game."""
+        game = self.get_game_by_id(game_id)
+        icon_filename = game.get("icon") if game else f"{game_id}.svg"
+        if icon_filename:
+            base_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
+            svg_path = base_dir / icon_filename
+            if svg_path.exists():
+                return str(svg_path)
         return None
 
     def start(self):

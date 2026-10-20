@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <rect width="48" height="48" rx="10" fill="#1b1e23"/>
+  <rect x="2" y="2" width="44" height="44" rx="8" fill="none" stroke="#e53935" stroke-width="2"/>
+  <path d="M8 12 L14 12 L10 36 L4 36 Z" fill="#e53935"/>
+  <text x="26" y="31" font-family="sans-serif" font-weight="900" font-size="16" font-style="italic" fill="#ffffff" text-anchor="middle">ACC</text>
+  <rect x="14" y="34" width="22" height="3" fill="#e53935"/>
+</svg>
