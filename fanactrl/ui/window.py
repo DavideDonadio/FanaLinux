@@ -1,5 +1,6 @@
 """
 Main Application Window using Libadwaita.
+Integrates Hardware Device, Evdev Listener, Telemetry Manager, and Auto-Profile Game Detector.
 """
 
 import os
@@ -11,9 +12,13 @@ from gi.repository import Gtk, Adw, Gdk, GLib
 
 from fanactrl.core.device import FanatecDevice
 from fanactrl.core.evdev_listener import EvdevListener
+from fanactrl.core.telemetry.manager import TelemetryManager
+from fanactrl.core.detector import GameDetector
+from fanactrl.core.presets import load_preset
 from fanactrl.ui.views.overview import OverviewView
 from fanactrl.ui.views.tuning import TuningView
 from fanactrl.ui.views.leds import LedsView
+from fanactrl.ui.views.profiles import ProfilesView
 from fanactrl.ui.views.calibration import CalibrationView
 
 
@@ -21,14 +26,21 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.set_title("OpenFana Control")
-        self.set_default_size(980, 820)
+        self.set_default_size(1020, 840)
 
         # Load Custom Stylesheet
         self._load_stylesheet()
 
-        # Initialize Hardware & Evdev Monitor
+        # Initialize Hardware & Telemetry Engine
         self.device = FanatecDevice()
         self.device.connect()
+        self.telemetry_mgr = TelemetryManager(self.device)
+
+        # Initialize Auto-Profile Detector
+        self.detector = GameDetector(
+            on_game_started=self._on_game_started,
+            on_game_stopped=self._on_game_stopped
+        )
 
         # Toast Overlay
         self.toast_overlay = Adw.ToastOverlay()
@@ -55,8 +67,23 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Create Views (All are Adw.PreferencesPage with built-in scrolling & clamping)
         self.overview_view = OverviewView(self.device)
-        self.tuning_view = TuningView(self.device, on_toast_requested=self.show_toast)
-        self.leds_view = LedsView(self.device, on_toast_requested=self.show_toast)
+        self.tuning_view = TuningView(
+            self.device,
+            on_toast_requested=self.show_toast,
+            on_presets_changed=self._on_presets_changed
+        )
+        self.leds_view = LedsView(
+            self.device,
+            telemetry_mgr=self.telemetry_mgr,
+            on_toast_requested=self.show_toast
+        )
+        self.profiles_view = ProfilesView(
+            self.device,
+            telemetry_mgr=self.telemetry_mgr,
+            detector=self.detector,
+            on_toast_requested=self.show_toast,
+            on_preset_applied=self._on_preset_applied
+        )
         self.calibration_view = CalibrationView(self.device, on_toast_requested=self.show_toast)
 
         self.view_stack.add_titled_with_icon(
@@ -67,6 +94,9 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self.view_stack.add_titled_with_icon(
             self.leds_view, "leds", "LEDs & Display", "weather-clear-symbolic"
+        )
+        self.view_stack.add_titled_with_icon(
+            self.profiles_view, "profiles", "Game Profiles", "applications-games-symbolic"
         )
         self.view_stack.add_titled_with_icon(
             self.calibration_view, "calibration", "Calibration", "emblem-system-symbolic"
@@ -85,6 +115,9 @@ class MainWindow(Adw.ApplicationWindow):
             on_button=self.overview_view.update_button,
         )
         self.evdev_listener.start()
+
+        # Start Auto-Profile Detector
+        self.detector.start()
 
         self.connect("close-request", self._on_close)
 
@@ -105,11 +138,62 @@ class MainWindow(Adw.ApplicationWindow):
             print(f"Notice: CSS provider error: {e}")
 
     def show_toast(self, message: str):
-        toast = Adw.Toast(title=message)
+        # Escape any raw ampersands for Pango markup safety
+        escaped = message.replace("&", "&amp;") if "&amp;" not in message else message
+        toast = Adw.Toast(title=escaped)
         toast.set_timeout(3)
         self.toast_overlay.add_toast(toast)
 
+    def _on_game_started(self, game_info, preset_name, auto_telem):
+        GLib.idle_add(self._apply_game_started, game_info, preset_name, auto_telem)
+
+    def _apply_game_started(self, game_info, preset_name, auto_telem):
+        profile = load_preset(preset_name)
+        if profile and self.device and self.device.connected:
+            self.device.apply_tuning_profile(profile)
+            self.tuning_view.set_active_profile(profile)
+
+        if auto_telem:
+            self.telemetry_mgr.start()
+            self.leds_view.set_telemetry_active(True)
+
+        self.profiles_view.update_status(game_info)
+        toast_msg = f"Game Detected: {game_info['name']} → Loaded '{preset_name}'"
+        if auto_telem:
+            toast_msg += " & Telemetry started"
+        self.show_toast(toast_msg)
+        return False
+
+    def _on_game_stopped(self, game_info, fallback_preset):
+        GLib.idle_add(self._apply_game_stopped, game_info, fallback_preset)
+
+    def _apply_game_stopped(self, game_info, fallback_preset):
+        if self.telemetry_mgr.enabled:
+            self.telemetry_mgr.stop()
+            self.leds_view.set_telemetry_active(False)
+
+        profile = load_preset(fallback_preset)
+        if profile and self.device and self.device.connected:
+            self.device.apply_tuning_profile(profile)
+            self.tuning_view.set_active_profile(profile)
+
+        self.profiles_view.update_status(None)
+        self.show_toast(f"{game_info['name']} exited → Restored '{fallback_preset}' preset")
+        return False
+
+    def _on_presets_changed(self):
+        self.profiles_view.refresh_preset_lists()
+
+    def _on_preset_applied(self, preset_name):
+        profile = load_preset(preset_name)
+        if profile:
+            self.tuning_view.set_active_profile(profile)
+
     def _on_close(self, *args):
+        if self.detector:
+            self.detector.stop()
+        if self.telemetry_mgr:
+            self.telemetry_mgr.stop()
         if self.evdev_listener:
             self.evdev_listener.stop()
         if self.device:

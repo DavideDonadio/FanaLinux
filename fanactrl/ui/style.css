@@ -46,3 +46,22 @@
     font-weight: 700;
     font-size: 1.05rem;
 }
+
+.status-pill-running {
+    background-color: #2ec27e;
+    color: #ffffff;
+    font-weight: bold;
+    border-radius: 9999px;
+    padding: 3px 12px;
+    font-size: 0.85rem;
+}
+
+.status-pill-idle {
+    background-color: alpha(currentColor, 0.1);
+    color: alpha(currentColor, 0.6);
+    font-weight: 500;
+    border-radius: 9999px;
+    padding: 3px 12px;
+    font-size: 0.85rem;
+}
+

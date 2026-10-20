@@ -21,27 +21,33 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 ## Architecture Overview
 
 ```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                   OpenFana Control UI (GTK4 + Libadwaita)              │
-│  [Overview & Gauges]  [1:1 Tuning Menu]  [LEDs & Display]  [Calibrate] │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Python GObject / Evdev
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                       Fanatec Device Controller                        │
-├───────────────────────────────────┬────────────────────────────────────┤
-│           Native Linux /dev/hidraw│        evdev (/dev/input/event*)   │
-│   • Multi-color RevLEDs (BGR565)  │   • Sub-ms 16-bit steering angle   │
-│   • Flag LEDs (Left/Right)        │   • 16-bit throttle / brake axes   │
-│   • OLED Display Segments         │   • Button matrix & shift paddles  │
-│   • EEPROM Tuning Parameter Write │                                    │
-├───────────────────────────────────┴────────────────────────────────────┤
-│              In-Game Telemetry Engine (FanaLab Equivalent)             │
-│   • Ingests Assetto Corsa UDP broadcasts on localhost port 9996        │
-│   • Computes live RPM percentage & drives Formula V2.5 RevLEDs         │
-│   • Renders active Gear (1, 2, 3, N, R) or Speed directly to OLED      │
-│   • Flashes Flag LEDs on ABS, Traction Control, or Pit Limiter         │
-└───────────────────────────────────┬────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        OpenFana Control UI (GTK4 + Libadwaita)                         │
+│  [Overview]  [1:1 Tuning Menu]  [LEDs & Display]  [Game Profiles]  [Calibration]       │
+└────────────────────────────────────────┬───────────────────────────────────────────────┘
+                                         │ Python GObject / Evdev
+                                         ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                               Fanatec Device Controller                                │
+├────────────────────────────────────────┬───────────────────────────────────────────────┤
+│           Native Linux /dev/hidraw     │        evdev (/dev/input/event*)              │
+│   • Multi-color RevLEDs (BGR565)       │   • Sub-ms 16-bit steering angle              │
+│   • Flag LEDs (Left/Right)             │   • 16-bit throttle / brake axes              │
+│   • OLED Display Segments              │   • Button matrix & shift paddles             │
+│   • EEPROM Tuning Parameter Write      │                                               │
+├────────────────────────────────────────┴───────────────────────────────────────────────┤
+│                   Auto-Profile Sim Game Detector (FanaLab Equivalent)                  │
+│   • Background /proc process scanner detecting Steam/Proton/Wine/native sims           │
+│   • Auto-switches wheelbase tuning presets (AC, ACC, F1, iRacing, AMS2, Rally, etc.)   │
+│   • Auto-launches in-game UDP telemetry engine (Assetto Corsa UDP 9996)                │
+│   • Restores baseline fallback profile upon simulator exit                             │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│                       In-Game Telemetry Engine (Live Telemetry)                        │
+│   • Ingests Assetto Corsa UDP broadcasts on localhost port 9996                        │
+│   • Computes live RPM percentage & drives Formula V2.5 RevLEDs                         │
+│   • Renders active Gear (1, 2, 3, N, R) or Speed directly to OLED                      │
+│   • Flashes Flag LEDs on ABS, Traction Control, or Pit Limiter                         │
+└────────────────────────────────────────┬───────────────────────────────────────────────┘
                                     │ USB (VID: 0x0EB7, PID: 0x0020)
                                     ▼
                  Fanatec CSL DD Wheelbase + Formula V2.5 Rim
@@ -63,7 +69,15 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 * **Hardware Profile Slots:** Save / switch directly across Base Memory Slots 1 through 5.
 * **Car / Game Preset Manager:** Save and load custom tuning configurations to disk (`~/.config/open-fanactrl/presets/`).
 
-### 2. Live In-Game Telemetry Engine (FanaLab Equivalent)
+### 2. Auto-Profile Game Detection & Preset Management (FanaLab Equivalent)
+* **Background Process Scanner:** Non-intrusive Linux `/proc` scanner (<5ms overhead) actively monitoring for running racing simulators.
+* **Proton / Wine / Native Interoperability:** Automatically detects games whether launched natively or via Steam Proton / Wine / Content Manager (e.g., `acs.exe`, `acc.exe`, `iRacingSim64DX11.exe`, `F1_24.exe`, `AMS2AVX.exe`, `BeamNG.drive.x64.exe`, `dirtrally2.exe`, `wrc.exe`, `eurotrucks2.exe`, `lemansultimate.exe`).
+* **Instant Profile Switching:** Automatically applies associated tuning profile to wheelbase EEPROM memory on game start.
+* **Auto Telemetry Launch:** Automatically starts background telemetry listeners (e.g. Assetto Corsa UDP port 9996) when a compatible sim starts.
+* **Fallback & Recovery:** Seamlessly reverts to desktop fallback profile (e.g. `Default`) and stops telemetry when the simulator process exits.
+* **Factory Preset Catalog:** Pre-seeded with optimized profiles (`Default`, `Assetto Corsa - GT3`, `Assetto Corsa - Formula`, `F1 24`, `Drift`, `Rally`) in `~/.config/open-fanactrl/presets/`.
+
+### 3. Live In-Game Telemetry Engine (FanaLab Equivalent)
 * **Assetto Corsa Native UDP Integration:** Listens to Assetto Corsa on `127.0.0.1:9996` with zero configuration needed.
 * **Dynamic RevLEDs:** Real-time RPM climb across the 9 Formula V2.5 multi-color LEDs with shift point strobe.
 * **In-Game OLED Display:** Automatically renders live Gear (`1`, `2`, `3`, `N`, `R`) or Vehicle Speed (KM/H).

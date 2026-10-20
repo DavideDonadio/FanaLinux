@@ -14,14 +14,14 @@ from fanactrl.core.telemetry.manager import TelemetryManager
 
 
 class LedsView(Adw.PreferencesPage):
-    def __init__(self, device, on_toast_requested=None):
+    def __init__(self, device, telemetry_mgr=None, on_toast_requested=None):
         super().__init__()
         self.device = device
         self.on_toast_requested = on_toast_requested
         self._led_dots = []
 
         # Initialize In-Game Telemetry Manager
-        self.telemetry_mgr = TelemetryManager(self.device)
+        self.telemetry_mgr = telemetry_mgr if telemetry_mgr is not None else TelemetryManager(self.device)
 
         self._build_ui()
 
@@ -205,6 +205,16 @@ class LedsView(Adw.PreferencesPage):
         flag_row.add_suffix(btn_box)
         flag_group.add(flag_row)
         self.add(flag_group)
+
+    def set_telemetry_active(self, active: bool):
+        """Programmatically toggle telemetry switch & status label."""
+        self.telem_switch.set_active(active)
+        if active:
+            self.telem_status_label.set_text("Listening (UDP 9996)")
+            self.telem_status_label.add_css_class("success")
+        else:
+            self.telem_status_label.set_text("Disabled")
+            self.telem_status_label.remove_css_class("success")
 
     def _on_telemetry_toggled(self, switch, state):
         if state:
