@@ -18,17 +18,32 @@ class CalibrationView(Adw.PreferencesPage):
         super().__init__()
         self.device = device
         self.on_toast_requested = on_toast_requested
-        self._current_shifter_step = 1
 
+        # Ensure wide clamp for 2-column layout
+        GLib.idle_add(self._widen_page_clamp)
         self._build_ui()
+
+    def _widen_page_clamp(self):
+        try:
+            sw = self.get_first_child()
+            if sw:
+                vp = sw.get_first_child()
+                if vp:
+                    clamp = vp.get_first_child()
+                    if isinstance(clamp, Adw.Clamp):
+                        clamp.set_maximum_size(1180)
+                        clamp.set_tightening_threshold(1080)
+        except Exception:
+            pass
+        return False
 
     def _build_ui(self):
         # 1. Force Feedback Motor & Vibration Test Suite
         ffb_group = Adw.PreferencesGroup()
         ffb_group.set_title("Force Feedback Motor &amp; Vibration Diagnostics")
         ffb_group.set_description(
-            "Interactive hardware diagnostic suite to test direct drive motor torque, "
-            "centering spring return, dynamic mechanical friction, and rim grip vibration motors."
+            "Interactive hardware diagnostic suite to test direct drive torque, "
+            "centering spring, friction, and vibration motors."
         )
 
         # Centering Spring Test
@@ -46,7 +61,7 @@ class CalibrationView(Adw.PreferencesPage):
 
         self.spring_adj = Gtk.Adjustment(value=50, lower=10, upper=100, step_increment=5, page_increment=20)
         spring_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.spring_adj)
-        spring_scale.set_size_request(150, -1)
+        spring_scale.set_size_request(220, -1)
         spring_scale.set_valign(Gtk.Align.CENTER)
         spring_scale.set_draw_value(False)
         self.spring_adj.connect("value-changed", lambda a: spring_lbl.set_text(f"{int(a.get_value())}%"))
@@ -76,7 +91,7 @@ class CalibrationView(Adw.PreferencesPage):
 
         self.friction_adj = Gtk.Adjustment(value=40, lower=10, upper=100, step_increment=5, page_increment=20)
         friction_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.friction_adj)
-        friction_scale.set_size_request(150, -1)
+        friction_scale.set_size_request(220, -1)
         friction_scale.set_valign(Gtk.Align.CENTER)
         friction_scale.set_draw_value(False)
         self.friction_adj.connect("value-changed", lambda a: friction_lbl.set_text(f"{int(a.get_value())}%"))
@@ -123,6 +138,7 @@ class CalibrationView(Adw.PreferencesPage):
         stop_row = Adw.ActionRow()
         stop_row.set_title("Safety Force Cutoff")
         stop_row.set_subtitle("Immediately cancels and zeros all active torque, spring, and vibration outputs")
+        stop_row.set_icon_name("process-stop-symbolic")
 
         stop_btn = Gtk.Button(label="Stop All Forces")
         stop_btn.set_size_request(160, 42)
@@ -132,9 +148,7 @@ class CalibrationView(Adw.PreferencesPage):
         stop_row.add_suffix(stop_btn)
         ffb_group.add(stop_row)
 
-        self.add(ffb_group)
-
-        # 2. Wheel Center Calibration & Visual Dial
+        # 2. Wheel Center Calibration & Visual Dial (Right Column in Screenshot 2)
         center_group = Adw.PreferencesGroup()
         center_group.set_title("Wheel Center Calibration")
         center_group.set_description(
@@ -145,8 +159,6 @@ class CalibrationView(Adw.PreferencesPage):
         # Embedded 360° Circular Steering Visualizer Dial (Screenshot 2)
         self.wheel_dial = WheelDialWidget(on_calibrate_clicked=self._on_calibrate_clicked)
         center_group.add(self.wheel_dial)
-
-        self.add(center_group)
 
         # 3. Pedal Min / Max Deadzones
         pedal_group = Adw.PreferencesGroup()
@@ -167,7 +179,7 @@ class CalibrationView(Adw.PreferencesPage):
 
             adj = Gtk.Adjustment(value=default_val, lower=0, upper=25, step_increment=1, page_increment=5)
             scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj)
-            scale.set_size_request(180, -1)
+            scale.set_size_request(220, -1)
             scale.set_valign(Gtk.Align.CENTER)
             scale.set_draw_value(False)
             adj.connect("value-changed", lambda a: lbl.set_text(f"{int(a.get_value())}%"))
@@ -181,28 +193,7 @@ class CalibrationView(Adw.PreferencesPage):
         pedal_group.add(make_deadzone_row("Brake Lower Deadzone", "Initial pedal travel deadband before hydraulic/load-cell engagement", 3))
         pedal_group.add(make_deadzone_row("Clutch Engagement Threshold", "Disengagement buffer zone for launch control", 5))
 
-        self.add(pedal_group)
-
-        # 4. H-Pattern Shifter Calibration Wizard
-        shifter_group = Adw.PreferencesGroup()
-        shifter_group.set_title("ClubSport H-Pattern Shifter Calibration")
-        shifter_group.set_description("Guided wizard to calibrate the Hall sensors for gears 1 through 7 and Reverse")
-
-        self.shifter_row = Adw.ActionRow()
-        self.shifter_row.set_title("Shifter Calibration Wizard")
-        self.shifter_row.set_subtitle("Shift into 1st Gear, then click 'Confirm Gear 1'")
-
-        self.shifter_btn = Gtk.Button(label="Confirm Gear 1")
-        self.shifter_btn.set_size_request(160, 42)
-        self.shifter_btn.set_valign(Gtk.Align.CENTER)
-        self.shifter_btn.add_css_class("suggested-action")
-        self.shifter_btn.connect("clicked", self._on_shifter_step_clicked)
-        self.shifter_row.add_suffix(self.shifter_btn)
-        shifter_group.add(self.shifter_row)
-
-        self.add(shifter_group)
-
-        # 5. Firmware Versions Card
+        # 4. Hardware Firmware Versions
         fw_group = Adw.PreferencesGroup()
         fw_group.set_title("Hardware Firmware Versions")
         fw_group.set_description("Reported microcontroller and motor firmware revisions")
@@ -220,7 +211,11 @@ class CalibrationView(Adw.PreferencesPage):
         fw_group.add(make_fw_row("DirectDrive Motor Controller Firmware", self.device.firmware_motor if self.device else "1.0.3.2"))
         fw_group.add(make_fw_row("Formula V2.5 Steering Rim Firmware", f"v{self.device.firmware_rim}" if self.device else "v45"))
 
+        # Build Single Column Calibration Layout (Full Horizontal Space)
+        self.add(ffb_group)
+        self.add(pedal_group)
         self.add(fw_group)
+        self.add(center_group)
 
     def _on_spring_toggled(self, switch, state):
         if not self.device or not self.device.connected:
@@ -339,28 +334,3 @@ class CalibrationView(Adw.PreferencesPage):
         self.device.calibrate_center()
         if self.on_toast_requested:
             self.on_toast_requested("Center calibration command sent to CSL DD!")
-
-    def _on_shifter_step_clicked(self, btn):
-        if not self.device or not self.device.connected:
-            if self.on_toast_requested:
-                self.on_toast_requested("Device not connected!")
-            return
-
-        gear_names = ["Reverse", "Gear 1", "Gear 2", "Gear 3", "Gear 4", "Gear 5", "Gear 6", "Gear 7"]
-        self.device.calibrate_shifter_step(self._current_shifter_step)
-
-        if self._current_shifter_step < 7:
-            self._current_shifter_step += 1
-            next_gear = gear_names[self._current_shifter_step]
-            self.shifter_row.set_subtitle(f"Now shift into {next_gear}, then click 'Confirm {next_gear}'")
-            self.shifter_btn.set_label(f"Confirm {next_gear}")
-        elif self._current_shifter_step == 7:
-            self._current_shifter_step = 0 # Reverse next
-            self.shifter_row.set_subtitle("Now push down and shift into Reverse, then click 'Confirm Reverse'")
-            self.shifter_btn.set_label("Confirm Reverse")
-        else:
-            self._current_shifter_step = 1
-            self.shifter_row.set_subtitle("Calibration complete! Shifter is calibrated and indexed.")
-            self.shifter_btn.set_label("Restart Wizard")
-            if self.on_toast_requested:
-                self.on_toast_requested("H-Pattern Shifter Calibration Complete!")

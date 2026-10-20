@@ -21,61 +21,81 @@ class VibrationView(Adw.PreferencesPage):
         self.settings: VibrationSettings = self.haptic_engine.settings if self.haptic_engine else load_vibration_settings()
 
         self._controls = {}
+        # Ensure page clamp utilizes available window space
+        GLib.idle_add(self._widen_page_clamp)
         self._build_ui()
 
+    def _widen_page_clamp(self):
+        try:
+            sw = self.get_first_child()
+            if sw:
+                vp = sw.get_first_child()
+                if vp:
+                    clamp = vp.get_first_child()
+                    if isinstance(clamp, Adw.Clamp):
+                        clamp.set_maximum_size(1180)
+                        clamp.set_tightening_threshold(1080)
+        except Exception:
+            pass
+        return False
+
     def _build_ui(self):
-        # 1. Top Controls: Reset & Quick Test
-        top_group = Adw.PreferencesGroup()
-        top_group.set_title("Vibration Values")
-        top_group.set_description(
-            "Configure real-time haptic feedback sent to the direct drive motor, rim grips, "
-            "and peripheral pedals based on in-game vehicle telemetry."
-        )
-
-        top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        top_box.set_halign(Gtk.Align.END)
-        top_box.set_margin_top(4)
-        top_box.set_margin_bottom(8)
-
-        reset_btn = Gtk.Button(label="Reset Defaults")
-        reset_btn.set_size_request(130, 38)
-        reset_btn.set_valign(Gtk.Align.CENTER)
-        reset_btn.connect("clicked", self._on_reset_clicked)
-        top_box.append(reset_btn)
-
-        test_btn = Gtk.Button(label="Test Vibration")
-        test_btn.set_size_request(130, 38)
-        test_btn.set_valign(Gtk.Align.CENTER)
-        test_btn.add_css_class("suggested-action")
-        test_btn.connect("clicked", self._on_test_clicked)
-        top_box.append(test_btn)
-
-        top_group.add(top_box)
-        self.add(top_group)
-
-        # 2. Column 1: Braking & Engine Dynamics
+        # 1. Section: Braking & Engine Dynamics
         col1_group = Adw.PreferencesGroup()
-        col1_group.set_title("Braking &amp; Engine")
+        col1_group.set_title("Braking &amp; Engine Dynamics")
+        col1_group.set_description("Haptic rumble triggered by wheel braking lockups and engine RPM thresholds.")
         self._build_abs_section(col1_group)
         self._build_engine_section(col1_group)
         self._build_rev_limiter_section(col1_group)
         self.add(col1_group)
 
-        # 3. Column 2: Suspension & Chassis Dynamics
+        # 3. Section: Suspension & Rough Surface
         col2_group = Adw.PreferencesGroup()
-        col2_group.set_title("Suspension &amp; Chassis Dynamics")
+        col2_group.set_title("Suspension &amp; Curb Strikes")
+        col2_group.set_description("Simulates track curb strikes, rumblestrips, and surface displacements.")
         self._build_suspension_section(col2_group)
-        self._build_understeer_section(col2_group)
-        self._build_oversteer_section(col2_group)
         self.add(col2_group)
 
-        # 4. Column 3: Traction & Tire Grip
+        # 4. Section: Traction & Tire Slip
         col3_group = Adw.PreferencesGroup()
-        col3_group.set_title("Traction &amp; Tire Grip")
+        col3_group.set_title("Traction &amp; Wheel Slip")
+        col3_group.set_description("Tactile alerts when driven wheels spin or tires lock up under deceleration.")
         self._build_tc_section(col3_group)
         self._build_wheel_lock_section(col3_group)
         self._build_wheel_spin_section(col3_group)
         self.add(col3_group)
+
+        # 5. Section: Chassis Balance
+        col4_group = Adw.PreferencesGroup()
+        col4_group.set_title("Chassis Balance (Slip Angles)")
+        col4_group.set_description("Alerts when front or rear slip angles exceed optimal friction limits.")
+        self._build_understeer_section(col4_group)
+        self._build_oversteer_section(col4_group)
+        self.add(col4_group)
+
+        # 6. Actions at the end of Vibration tab (no header text)
+        actions_group = Adw.PreferencesGroup()
+        actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        actions_box.set_halign(Gtk.Align.END)
+        actions_box.set_margin_top(8)
+        actions_box.set_margin_bottom(16)
+
+        reset_btn = Gtk.Button(label="Reset Defaults")
+        reset_btn.set_size_request(140, 42)
+        reset_btn.set_valign(Gtk.Align.CENTER)
+        reset_btn.connect("clicked", self._on_reset_clicked)
+        actions_box.append(reset_btn)
+
+        test_btn = Gtk.Button(label="Test Vibration")
+        test_btn.set_size_request(160, 42)
+        test_btn.set_valign(Gtk.Align.CENTER)
+        test_btn.add_css_class("suggested-action")
+        test_btn.add_css_class("pill")
+        test_btn.connect("clicked", self._on_test_clicked)
+        actions_box.append(test_btn)
+
+        actions_group.add(actions_box)
+        self.add(actions_group)
 
     # ----------------- Section Builders -----------------
 

@@ -252,14 +252,6 @@ class FanatecDevice:
         payload = [REPORT_ID_LEGACY_CMD, 0xF8, 0x09, 0x01, 0x06, 0x01, 0x00, 0x00]
         self.write_report(payload)
 
-    def calibrate_shifter_step(self, gear_index: int):
-        """
-        Trigger shifter gear calibration step.
-        gear_index: 0=Reverse, 1=1st, 2=2nd, ... 7=7th.
-        """
-        payload = [REPORT_ID_LEGACY_CMD, 0xF8, 0x09, 0x01, 0x05, gear_index & 0xFF, 0x00, 0x00]
-        self.write_report(payload)
-
     def send_constant_force(self, level: int):
         """
         Send constant torque command to direct drive motor.

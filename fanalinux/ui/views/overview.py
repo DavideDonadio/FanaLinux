@@ -112,13 +112,17 @@ class OverviewView(Adw.PreferencesPage):
         btn_flow.set_max_children_per_line(8)
         btn_flow.set_selection_mode(Gtk.SelectionMode.NONE)
         btn_flow.set_homogeneous(True)
-        btn_flow.set_row_spacing(8)
-        btn_flow.set_column_spacing(8)
+        btn_flow.set_row_spacing(10)
+        btn_flow.set_column_spacing(10)
+        btn_flow.set_margin_top(16)
+        btn_flow.set_margin_bottom(16)
+        btn_flow.set_margin_start(16)
+        btn_flow.set_margin_end(16)
 
         for btn_num in range(1, 25):
             lbl = Gtk.Label(label=f"B{btn_num:02d}")
             lbl.add_css_class("btn-chip")
-            lbl.set_size_request(52, 38)
+            lbl.set_size_request(56, 42)
             lbl.set_valign(Gtk.Align.CENTER)
             lbl.set_halign(Gtk.Align.CENTER)
             self._button_chips[btn_num] = lbl
@@ -126,10 +130,11 @@ class OverviewView(Adw.PreferencesPage):
 
         matrix_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         matrix_box.add_css_class("card")
-        matrix_box.set_margin_top(4)
-        matrix_box.set_margin_bottom(4)
-        matrix_box.set_margin_start(4)
-        matrix_box.set_margin_end(4)
+        matrix_box.add_css_class("matrix-card")
+        matrix_box.set_margin_top(8)
+        matrix_box.set_margin_bottom(8)
+        matrix_box.set_margin_start(2)
+        matrix_box.set_margin_end(2)
         matrix_box.append(btn_flow)
 
         btn_group.add(matrix_box)

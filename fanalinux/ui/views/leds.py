@@ -23,7 +23,23 @@ class LedsView(Adw.PreferencesPage):
         # Initialize In-Game Telemetry Manager
         self.telemetry_mgr = telemetry_mgr if telemetry_mgr is not None else TelemetryManager(self.device)
 
+        # Ensure wide clamp so RevLEDs and descriptions have ample horizontal room
+        GLib.idle_add(self._widen_page_clamp)
         self._build_ui()
+
+    def _widen_page_clamp(self):
+        try:
+            sw = self.get_first_child()
+            if sw:
+                vp = sw.get_first_child()
+                if vp:
+                    clamp = vp.get_first_child()
+                    if isinstance(clamp, Adw.Clamp):
+                        clamp.set_maximum_size(1180)
+                        clamp.set_tightening_threshold(1080)
+        except Exception:
+            pass
+        return False
 
     def _build_ui(self):
         # 1. Live In-Game Telemetry Configuration

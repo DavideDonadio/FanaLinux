@@ -33,10 +33,29 @@ class TuningView(Adw.PreferencesPage):
         # Ensure default presets exist
         init_default_presets()
 
+        # Ensure page clamp utilizes available window space
+        GLib.idle_add(self._widen_page_clamp)
+
         self._build_ui()
 
+    def _widen_page_clamp(self):
+        try:
+            sw = self.get_first_child()
+            if sw:
+                vp = sw.get_first_child()
+                if vp:
+                    clamp = vp.get_first_child()
+                    if isinstance(clamp, Adw.Clamp):
+                        clamp.set_maximum_size(1180)
+                        clamp.set_tightening_threshold(1080)
+        except Exception:
+            pass
+        return False
+
     def _build_ui(self):
-        # 1. Profile Slot & Preset Switcher
+        meta_by_id = {m["id"]: m for m in TUNING_METADATA}
+
+        # 1. Profile Slot & Preset Switcher (Sections with fewer elements stay in 1 column)
         slot_group = Adw.PreferencesGroup()
         slot_group.set_title("Hardware Memory Slots &amp; Presets")
         slot_group.set_description("Select hardware memory slots or save custom per-car game presets")
@@ -100,25 +119,79 @@ class TuningView(Adw.PreferencesPage):
 
         save_row.add_suffix(save_box)
         slot_group.add(save_row)
-
         self.add(slot_group)
 
-        # 2. Dynamic Categories from TUNING_METADATA
-        categories = {}
-        for meta in TUNING_METADATA:
-            cat_name = meta["category"]
-            if cat_name not in categories:
-                group = Adw.PreferencesGroup()
-                group.set_title(cat_name)
-                categories[cat_name] = group
-                self.add(group)
+        # 2. Section with MORE elements: Motor Dynamics & Steering (Divided into 2 columns of elements)
+        motor_group = Adw.PreferencesGroup()
+        motor_group.set_title("Direct-Drive Motor &amp; Steering Dynamics")
+        motor_group.set_description("Master torque strength, rotation limit, and dynamic mechanical resistance.")
 
-            group = categories[cat_name]
-            self._create_control_row(group, meta)
+        motor_two_col = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        motor_two_col.set_hexpand(True)
+        motor_two_col.set_homogeneous(True)
 
-        # 3. Action Buttons (Apply / Reset)
+        motor_left_list = Gtk.ListBox()
+        motor_left_list.add_css_class("boxed-list")
+        motor_left_list.set_hexpand(True)
+
+        motor_right_list = Gtk.ListBox()
+        motor_right_list.add_css_class("boxed-list")
+        motor_right_list.set_hexpand(True)
+
+        for param_id in ["sen", "ff", "ffs"]:
+            if param_id in meta_by_id:
+                self._create_control_row(motor_left_list, meta_by_id[param_id], compact=True)
+
+        for param_id in ["ndp", "nfr", "nin"]:
+            if param_id in meta_by_id:
+                self._create_control_row(motor_right_list, meta_by_id[param_id], compact=True)
+
+        motor_two_col.append(motor_left_list)
+        motor_two_col.append(motor_right_list)
+        motor_group.add(motor_two_col)
+        self.add(motor_group)
+
+        # 3. Section with MORE elements: Filters & Force Multipliers (Divided into 2 columns of elements)
+        effects_group = Adw.PreferencesGroup()
+        effects_group.set_title("Signal Filters &amp; Game Force Multipliers")
+        effects_group.set_description("Interpolation smoothing, curb strike intensity, and game physics force scaling.")
+
+        effects_two_col = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        effects_two_col.set_hexpand(True)
+        effects_two_col.set_homogeneous(True)
+
+        effects_left_list = Gtk.ListBox()
+        effects_left_list.add_css_class("boxed-list")
+        effects_left_list.set_hexpand(True)
+
+        effects_right_list = Gtk.ListBox()
+        effects_right_list.add_css_class("boxed-list")
+        effects_right_list.set_hexpand(True)
+
+        for param_id in ["int_filter", "fei", "for_mult"]:
+            if param_id in meta_by_id:
+                self._create_control_row(effects_left_list, meta_by_id[param_id], compact=True)
+
+        for param_id in ["spr_mult", "dpr_mult"]:
+            if param_id in meta_by_id:
+                self._create_control_row(effects_right_list, meta_by_id[param_id], compact=True)
+
+        effects_two_col.append(effects_left_list)
+        effects_two_col.append(effects_right_list)
+        effects_group.add(effects_two_col)
+        self.add(effects_group)
+
+        # 4. Section with FEWER elements: Hardware Feedback (Leaves in 1 single column)
+        feedback_group = Adw.PreferencesGroup()
+        feedback_group.set_title("Hardware Feedback &amp; Pedals")
+        feedback_group.set_description("Wheel rim vibration motor level and load-cell brake pressure sensitivity.")
+        for param_id in ["sho", "brf"]:
+            if param_id in meta_by_id:
+                self._create_control_row(feedback_group, meta_by_id[param_id], compact=False)
+        self.add(feedback_group)
+
+        # 5. Actions at the end of Tuning tab (no header text)
         actions_group = Adw.PreferencesGroup()
-        actions_group.set_title("Hardware Synchronization")
 
         actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         actions_box.set_halign(Gtk.Align.END)
@@ -142,10 +215,13 @@ class TuningView(Adw.PreferencesPage):
         actions_group.add(actions_box)
         self.add(actions_group)
 
-    def _create_control_row(self, group, meta):
+    def _create_control_row(self, container, meta, compact=False):
         row = Adw.ActionRow()
         row.set_title(meta["name"])
-        row.set_subtitle(meta["desc"])
+        if compact:
+            row.set_tooltip_text(meta["desc"])
+        else:
+            row.set_subtitle(meta["desc"])
 
         param_id = meta["id"]
         current_val = getattr(self.profile, param_id, meta.get("default", 0))
@@ -172,7 +248,7 @@ class TuningView(Adw.PreferencesPage):
             row.add_suffix(switch_box)
             self._controls[param_id] = switch
         else:
-            val_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+            val_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
             val_box.set_valign(Gtk.Align.CENTER)
 
             val_label = Gtk.Label(label=f"{current_val}{meta['unit']}")
@@ -188,7 +264,8 @@ class TuningView(Adw.PreferencesPage):
                 page_increment=meta.get("step", 1) * 5
             )
             scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj)
-            scale.set_size_request(240, -1)
+            scale_w = 180 if compact else 220
+            scale.set_size_request(scale_w, -1)
             scale.set_valign(Gtk.Align.CENTER)
             scale.set_draw_value(False)
 
@@ -202,7 +279,10 @@ class TuningView(Adw.PreferencesPage):
             row.add_suffix(val_box)
             self._controls[param_id] = adj
 
-        group.add(row)
+        if hasattr(container, "add"):
+            container.add(row)
+        else:
+            container.append(row)
 
     def _on_slot_changed(self, dropdown, param):
         slot_num = dropdown.get_selected() + 1

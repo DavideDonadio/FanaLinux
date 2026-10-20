@@ -2,7 +2,7 @@
 Name=FanaLinux
 Comment=Native Linux Control Panel and Telemetry Suite for Fanatec Hardware
 Exec=fanalinux
-Icon=input-gaming
+Icon=io.github.davidedonadio.fanalinux
 Terminal=false
 Type=Application
 Categories=HardwareSettings;Settings;Game;

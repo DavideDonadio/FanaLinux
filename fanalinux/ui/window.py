@@ -27,7 +27,9 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.set_title("FanaLinux")
-        self.set_default_size(1020, 840)
+        self.set_icon_name("io.github.davidedonadio.fanalinux")
+        self.set_default_size(1220, 880)
+        self.maximize()
 
         # Load Custom Stylesheet
         self._load_stylesheet()
@@ -137,7 +139,33 @@ class MainWindow(Adw.ApplicationWindow):
         self.overview_view.set_connection_status(self._hardware_online)
         GLib.timeout_add_seconds(1, self._check_hardware_connection)
 
+        # Ensure all preference pages utilize the full window width (1040px)
+        GLib.idle_add(self._widen_all_clamps)
+
         self.connect("close-request", self._on_close)
+
+    def _widen_all_clamps(self):
+        views = [
+            self.overview_view,
+            self.tuning_view,
+            self.vibration_view,
+            self.leds_view,
+            self.profiles_view,
+            self.calibration_view,
+        ]
+        for page in views:
+            try:
+                sw = page.get_first_child()
+                if sw:
+                    vp = sw.get_first_child()
+                    if vp:
+                        clamp = vp.get_first_child()
+                        if isinstance(clamp, Adw.Clamp):
+                            clamp.set_maximum_size(1180)
+                            clamp.set_tightening_threshold(1080)
+            except Exception:
+                pass
+        return False
 
     def _load_stylesheet(self):
         try:
