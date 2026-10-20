@@ -10,6 +10,7 @@ from typing import Optional, Callable
 from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
 from fanalinux.core.haptics import HapticEngine
 from fanalinux.core.vibration import load_vibration_settings
+from fanalinux.core.dynamic_ffb_engine import DynamicFFBEngine
 
 logger = logging.getLogger("fanalinux.telemetry.manager")
 
@@ -39,6 +40,7 @@ class TelemetryManager:
             on_car_detected=self.set_car_name
         )
         self.haptic_engine = HapticEngine(self.device)
+        self.dynamic_ffb_engine = DynamicFFBEngine(self.device)
         self._last_gear = None
         self._limiter_strobe = False
 
@@ -51,6 +53,7 @@ class TelemetryManager:
         self.enabled = False
         self.ac_client.stop()
         self.haptic_engine.stop()
+        self.dynamic_ffb_engine.reset()
         if self.device and self.device.connected:
             self.device.set_revleds([(0, 0, 0)] * 9)
             self.device.clear_display()
@@ -141,3 +144,6 @@ class TelemetryManager:
             suspension=suspension,
             steer_angle=steer_angle
         )
+
+        # 5. Execute Dynamic FFB Damper Overlay (Speed-Sensitive & Reverse Driving Damper)
+        self.dynamic_ffb_engine.update_telemetry(speed_kmh, gear, steer_angle)

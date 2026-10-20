@@ -208,6 +208,7 @@ class FanatecDevice:
             "SPR": profile.spr_mult // 10,
             "DPR": profile.dpr_mult // 10,
             "SHO": profile.sho // 10,
+            "BLI": profile.bli,
             "BRF": profile.brf,
         }
 

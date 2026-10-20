@@ -31,6 +31,7 @@ class TuningProfile:
     dpr_mult: int = 100     # Damper Effect multiplier (0 - 120%)
     # Wheel and Pedals Feedback
     sho: int = 100          # Wheel vibration / shock (0 = Off, 10 - 100%)
+    bli: int = 0            # Brake Level Indicator (0 = Off, 1 - 100%)
     brf: int = 50           # Brake Force for load-cell pedals (0 - 100%)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -192,6 +193,18 @@ TUNING_METADATA = [
         "step": 10,
         "unit": "%",
         "default": 100,
+        "category": "Hardware Feedback"
+    },
+    {
+        "id": "bli",
+        "reg": "BLI",
+        "name": "Brake Level Indicator (BLI)",
+        "desc": "Triggers pedal/wheel vibration when brake pedal reaches this threshold (0 = Off).",
+        "min": 0,
+        "max": 100,
+        "step": 5,
+        "unit": "%",
+        "default": 0,
         "category": "Hardware Feedback"
     },
     {

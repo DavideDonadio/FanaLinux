@@ -18,6 +18,7 @@ from fanalinux.core.presets import load_preset
 from fanalinux.ui.views.overview import OverviewView
 from fanalinux.ui.views.tuning import TuningView
 from fanalinux.ui.views.vibration import VibrationView
+from fanalinux.ui.views.dynamic_ffb import DynamicFFBView
 from fanalinux.ui.views.leds import LedsView
 from fanalinux.ui.views.profiles import ProfilesView
 from fanalinux.ui.views.calibration import CalibrationView
@@ -80,6 +81,11 @@ class MainWindow(Adw.ApplicationWindow):
             haptic_engine=self.telemetry_mgr.haptic_engine,
             on_toast_requested=self.show_toast
         )
+        self.dynamic_ffb_view = DynamicFFBView(
+            self.device,
+            telemetry_mgr=self.telemetry_mgr,
+            on_toast_requested=self.show_toast
+        )
         self.leds_view = LedsView(
             self.device,
             telemetry_mgr=self.telemetry_mgr,
@@ -102,6 +108,9 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self.view_stack.add_titled_with_icon(
             self.vibration_view, "vibration", "Vibration", "audio-volume-high-symbolic"
+        )
+        self.view_stack.add_titled_with_icon(
+            self.dynamic_ffb_view, "dynamic_ffb", "Dynamic FFB", "power-profile-performance-symbolic"
         )
         self.view_stack.add_titled_with_icon(
             self.leds_view, "leds", "LEDs & Display", "weather-clear-symbolic"

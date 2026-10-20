@@ -185,7 +185,7 @@ class TuningView(Adw.PreferencesPage):
         feedback_group = Adw.PreferencesGroup()
         feedback_group.set_title("Hardware Feedback &amp; Pedals")
         feedback_group.set_description("Wheel rim vibration motor level and load-cell brake pressure sensitivity.")
-        for param_id in ["sho", "brf"]:
+        for param_id in ["sho", "bli", "brf"]:
             if param_id in meta_by_id:
                 self._create_control_row(feedback_group, meta_by_id[param_id], compact=False)
         self.add(feedback_group)
