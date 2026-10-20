@@ -10,11 +10,17 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 
 ---
 
-## Legal & Intellectual Property Disclaimer
+## Legal & Intellectual Property Notice
 
-> **Notice:** This is an independent, clean-room open-source project created strictly for hardware interoperability. It is **not** endorsed by, affiliated with, or associated with **Endor AG**, **Fanatec**, or **Corsair**.
->
-> All protocol research was conducted via black-box hardware analysis and USB packet monitoring under **Directive 2009/24/EC (Art. 5(3) & Art. 6)** of the European Parliament and Council on the legal protection of computer programs, and **17 U.S.C. § 1201(f)** (reverse engineering for interoperability). No proprietary source code, copyrighted firmware binaries, or trademarked graphical assets are distributed within this repository.
+FanaLinux is an independent, open-source project developed to enable interoperability between Linux systems and compatible Fanatec hardware. It is not affiliated with, endorsed by, or sponsored by Endor AG, Fanatec, Corsair, or their respective affiliates.
+
+The project's implementation is independently authored. No Fanatec proprietary source code, Windows application binaries, firmware images, or proprietary graphical assets are intentionally incorporated into or distributed with this project.
+
+Hardware protocol behaviour is investigated through direct device testing and USB communication analysis for compatibility purposes. The Fanatec Windows application has not been decompiled or disassembled as part of this project's development.
+
+The project is intended to enable interoperability with lawfully possessed hardware while respecting applicable intellectual-property laws. This notice describes the project's development approach and intended scope; it does not constitute a legal determination or guarantee of compliance in every jurisdiction.
+
+Fanatec and related product names are used solely to identify compatible hardware. All trademarks remain the property of their respective owners. FanaLinux is an independent community project and is not an official Fanatec product.
 
 ---
 
@@ -58,7 +64,7 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 ## Features (1:1 Parity Status)
 
 ### 1. Hardware Tuning Menu (1:1 with Wheelbase EEPROM)
-* **SEN:** Wheel Sensitivity / Rotation degrees (90° to 2520°, 0 = Auto).
+* **SEN:** Wheel Sensitivity / Rotation degrees (90° to 2520°, 0 = Auto) with toggleable Auto mode and direct numeric input for exact degree precision.
 * **FF:** Overall Force Feedback Master Strength (0% to 100%).
 * **FFS:** Force Feedback Scaling (Linear mode vs Peak torque mode).
 * **NDP / NFR / NIN:** Natural Damper, Natural Friction, and Natural Inertia.
@@ -92,8 +98,8 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 * **Hardware Centering Spring:** Dynamically engages the direct-drive autocenter spring pulling the wheel toward 0.0° with adjustable strength slider.
 * **Mechanical Friction & Damping:** Interactive resistance test simulating direct drive natural damping and internal mechanical friction.
 * **Motor Torque Pulse Test:** Gentle alternating left/right torque pulse sequence (~23% holding force) with safety confirmation dialog to verify motor output.
-* **Rim Handle Vibration:** Tests Formula V2.5 left and right handle rumble motors with alternating and synchronized pulses.
-* **Emergency Force Cutoff:** Dedicated safety button instantly canceling all active motor torque, centering springs, and vibrations.
+* **Tactile Wheel & Pedal Vibration:** Pulses 18 Hz tactile rumble through the steering wheel rim (symmetric zero net rotation) and peripheral pedals concurrently.
+* **Safety Force Cutoff:** Dedicated emergency stop button instantly canceling all active motor torque, centering springs, and vibrations.
 
 ### 6. Calibration & Hardware Diagnostics
 * **Center Calibration:** One-click optical/magnetic motor index zero-point calibration.
