@@ -12,11 +12,12 @@ import threading
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Callable
 
-from fanactrl.core.presets import list_presets, load_preset, init_default_presets
+from fanalinux.core.presets import list_presets, load_preset, init_default_presets
 
-logger = logging.getLogger("fanactrl.detector")
+logger = logging.getLogger("fanalinux.detector")
 
-CONFIG_PATH = Path.home() / ".config" / "open-fanactrl" / "game_profiles.json"
+CONFIG_PATH = Path.home() / ".config" / "fanalinux" / "game_profiles.json"
+OLD_CONFIG_PATH = Path.home() / ".config" / "open-fanactrl" / "game_profiles.json"
 
 BUILTIN_GAMES: List[Dict[str, Any]] = [
     {
@@ -177,6 +178,13 @@ class GameDetector:
 
     def _load_config(self):
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        if not CONFIG_PATH.exists() and OLD_CONFIG_PATH.exists():
+            try:
+                import shutil
+                shutil.copy2(OLD_CONFIG_PATH, CONFIG_PATH)
+            except Exception:
+                pass
+
         if CONFIG_PATH.exists():
             try:
                 with open(CONFIG_PATH, "r", encoding="utf-8") as f:

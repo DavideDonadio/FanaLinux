@@ -1,10 +1,10 @@
-# OpenFana Control (Fanatec Linux Suite)
+# FanaLinux (Fanatec Linux Suite)
 
 [![Linux Compatible](https://img.shields.io/badge/Platform-Linux%20(Fedora%20%2F%20Arch%20%2F%20Ubuntu)-blue.svg)]()
 [![License](https://img.shields.io/badge/License-GPLv3-green.svg)]()
 [![Hardware](https://img.shields.io/badge/Hardware-Fanatec%20CSL%20DD%20%2F%20Formula%20V2.5-orange.svg)]()
 
-**OpenFana Control** is a native, modern Linux GUI control suite designed to provide 1:1 parity with the Windows **Fanatec Control Panel** and **FanaLab** applications for Fanatec wheelbases and steering wheels.
+**FanaLinux** is a native, modern Linux GUI control suite designed to provide 1:1 parity with the Windows **Fanatec Control Panel** and **FanaLab** applications for Fanatec wheelbases and steering wheels.
 
 Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evdev`** driver engine, it eliminates the need for proprietary Windows software or Wine wrappers to configure and tune Fanatec sim racing hardware.
 
@@ -22,7 +22,7 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        OpenFana Control UI (GTK4 + Libadwaita)                         │
+│                          FanaLinux UI (GTK4 + Libadwaita)                              │
 │  [Overview]  [1:1 Tuning Menu]  [LEDs & Display]  [Game Profiles]  [Calibration]       │
 └────────────────────────────────────────┬───────────────────────────────────────────────┘
                                          │ Python GObject / Evdev
@@ -48,14 +48,14 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 │   • Renders active Gear (1, 2, 3, N, R) or Speed directly to OLED                      │
 │   • Flashes Flag LEDs on ABS, Traction Control, or Pit Limiter                         │
 └────────────────────────────────────────┬───────────────────────────────────────────────┘
-                                    │ USB (VID: 0x0EB7, PID: 0x0020)
-                                    ▼
-                 Fanatec CSL DD Wheelbase + Formula V2.5 Rim
+                                         │ USB (VID: 0x0EB7, PID: 0x0020)
+                                         ▼
+                    Fanatec CSL DD Wheelbase + Formula V2.5 Rim
 ```
 
 ---
 
-## Features Implemented (1:1 Parity Status)
+## Features (1:1 Parity Status)
 
 ### 1. Hardware Tuning Menu (1:1 with Wheelbase EEPROM)
 * **SEN:** Wheel Sensitivity / Rotation degrees (90° to 2520°, 0 = Auto).
@@ -67,7 +67,7 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 * **SHO:** Wheel rim handle vibration / shock motor intensity.
 * **BRF:** Load-cell brake force sensitivity.
 * **Hardware Profile Slots:** Save / switch directly across Base Memory Slots 1 through 5.
-* **Car / Game Preset Manager:** Save and load custom tuning configurations to disk (`~/.config/open-fanactrl/presets/`).
+* **Car / Game Preset Manager:** Save and load custom tuning configurations to disk (`~/.config/fanalinux/presets/`).
 
 ### 2. Auto-Profile Game Detection & Preset Management (FanaLab Equivalent)
 * **Background Process Scanner:** Non-intrusive Linux `/proc` scanner (<5ms overhead) actively monitoring for running racing simulators.
@@ -75,7 +75,7 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 * **Instant Profile Switching:** Automatically applies associated tuning profile to wheelbase EEPROM memory on game start.
 * **Auto Telemetry Launch:** Automatically starts background telemetry listeners (e.g. Assetto Corsa UDP port 9996) when a compatible sim starts.
 * **Fallback & Recovery:** Seamlessly reverts to desktop fallback profile (e.g. `Default`) and stops telemetry when the simulator process exits.
-* **Factory Preset Catalog:** Pre-seeded with optimized profiles (`Default`, `Assetto Corsa - GT3`, `Assetto Corsa - Formula`, `F1 24`, `Drift`, `Rally`) in `~/.config/open-fanactrl/presets/`.
+* **Factory Preset Catalog:** Pre-seeded with optimized profiles (`Default`, `Assetto Corsa - GT3`, `Assetto Corsa - Formula`, `F1 24`, `Drift`, `Rally`) in `~/.config/fanalinux/presets/`.
 
 ### 3. Live In-Game Telemetry Engine (FanaLab Equivalent)
 * **Assetto Corsa Native UDP Integration:** Listens to Assetto Corsa on `127.0.0.1:9996` with zero configuration needed.
@@ -83,12 +83,12 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 * **In-Game OLED Display:** Automatically renders live Gear (`1`, `2`, `3`, `N`, `R`) or Vehicle Speed (KM/H).
 * **Flag Alerts:** Flashes side Flag clusters on ABS activation or Traction Control intervention.
 
-### 3. Overview & Input Visualizer
+### 4. Overview & Input Visualizer
 * **16-bit Steering Angle Gauge:** Sub-millisecond evdev reading with degrees readout.
 * **Pedal Travel Bars:** Color-coded gauges for Throttle (Green), Brake (Red), Clutch (Blue).
 * **24-Button Matrix:** Monospace pill chips highlighting live button clicks and shifter paddle pulls.
 
-### 4. Calibration & Diagnostics
+### 5. Calibration & Diagnostics
 * **Center Calibration:** One-click optical/magnetic motor index zero-point calibration.
 * **Pedal Deadzones:** Customizable lower deadbands for Throttle, Brake, and Clutch.
 * **ClubSport Shifter Wizard:** Step-by-step guided wizard for 1st–7th gear and Reverse indexing.
@@ -96,7 +96,7 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 
 ---
 
-## Technical Protocol Specification (For Maintainers & LLM Agents)
+## Technical Protocol Specification (For Maintainers & Developers)
 
 ### 1. USB Identification
 * **Vendor ID:** `0x0EB7` (Endor AG / Fanatec)
@@ -121,12 +121,27 @@ $$\text{BGR565} = ((\text{Blue} \gg 3) \ll 11) \mid ((\text{Green} \gg 2) \ll 5)
 
 ## Installation & Launch
 
-```bash
-# Clone and enter repo
-cd ~/Documents/Projects/open-fanactrl
+### Prerequisites
+* Fedora Linux, Arch Linux, Ubuntu, or Debian
+* Python >= 3.10
+* GTK4 & Libadwaita (`libadwaita`, `python3-gobject`)
 
-# Launch application
-.venv/bin/open-fanactrl
+### Quick Setup
+
+```bash
+# Clone repository
+git clone https://github.com/DavideDonadio/fanalinux.git
+cd fanalinux
+
+# Create virtual environment with system packages (for PyGObject/GTK4)
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+
+# Install dependencies and package
+pip install -e .
+
+# Launch FanaLinux
+fanalinux
 ```
 
-Or press the **Super (Windows) key** in GNOME and search for **"OpenFana Control"**!
+Or press the **Super (Windows) key** in your desktop environment and search for **"FanaLinux"**!

@@ -9,8 +9,8 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 from typing import Optional, Dict, Any, Callable
 
-from fanactrl.core.presets import list_presets, load_preset
-from fanactrl.core.detector import GameDetector
+from fanalinux.core.presets import list_presets, load_preset
+from fanalinux.core.detector import GameDetector
 
 
 class ProfilesView(Adw.PreferencesPage):

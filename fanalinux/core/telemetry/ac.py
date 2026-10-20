@@ -13,7 +13,7 @@ import time
 import logging
 from typing import Callable, Optional
 
-logger = logging.getLogger("fanactrl.telemetry.ac")
+logger = logging.getLogger("fanalinux.telemetry.ac")
 
 
 class AssettoCorsaTelemetry:

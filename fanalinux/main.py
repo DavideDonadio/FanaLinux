@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-OpenFana Control - Main Entrypoint
+FanaLinux - Main Entrypoint
 """
 
 import sys
@@ -12,7 +12,7 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from fanactrl.ui.app import run_app
+from fanalinux.ui.app import run_app
 
 if __name__ == "__main__":
     sys.exit(run_app())

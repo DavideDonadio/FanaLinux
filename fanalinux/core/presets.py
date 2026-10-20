@@ -1,19 +1,21 @@
 """
-Preset Management for OpenFana Control.
+Preset Management for FanaLinux.
 Handles listing, loading, saving, and auto-seeding baseline tuning presets.
 """
 
 import os
 import json
+import shutil
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from fanactrl.core.tuning import TuningProfile
+from fanalinux.core.tuning import TuningProfile
 
-logger = logging.getLogger("fanactrl.presets")
+logger = logging.getLogger("fanalinux.presets")
 
-PRESETS_DIR = Path.home() / ".config" / "open-fanactrl" / "presets"
+PRESETS_DIR = Path.home() / ".config" / "fanalinux" / "presets"
+OLD_PRESETS_DIR = Path.home() / ".config" / "open-fanactrl" / "presets"
 
 # Factory baseline profiles tailored for common sim setups on CSL DD
 DEFAULT_FACTORY_PRESETS: Dict[str, Dict[str, Any]] = {
@@ -125,6 +127,14 @@ DEFAULT_FACTORY_PRESETS: Dict[str, Dict[str, Any]] = {
 def init_default_presets() -> None:
     """Ensure preset directory exists and seed factory presets if not present."""
     PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+    # Migrate from old directory if present
+    if OLD_PRESETS_DIR.exists() and not any(PRESETS_DIR.iterdir()):
+        for f in OLD_PRESETS_DIR.glob("*.json"):
+            try:
+                shutil.copy2(f, PRESETS_DIR / f.name)
+            except Exception:
+                pass
+
     for name, data in DEFAULT_FACTORY_PRESETS.items():
         filepath = PRESETS_DIR / f"{name}.json"
         if not filepath.exists():

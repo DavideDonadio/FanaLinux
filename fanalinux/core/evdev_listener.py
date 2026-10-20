@@ -13,7 +13,7 @@ import threading
 import logging
 from typing import Callable, Optional, Dict
 
-logger = logging.getLogger("fanactrl.evdev")
+logger = logging.getLogger("fanalinux.evdev")
 
 # struct input_event { timeval time; __u16 type; __u16 code; __s32 value; }
 EVENT_FORMAT = 'qqHHi'

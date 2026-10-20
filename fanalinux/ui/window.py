@@ -10,22 +10,22 @@ gi.require_version('Adw', '1')
 gi.require_version('Gdk', '4.0')
 from gi.repository import Gtk, Adw, Gdk, GLib
 
-from fanactrl.core.device import FanatecDevice
-from fanactrl.core.evdev_listener import EvdevListener
-from fanactrl.core.telemetry.manager import TelemetryManager
-from fanactrl.core.detector import GameDetector
-from fanactrl.core.presets import load_preset
-from fanactrl.ui.views.overview import OverviewView
-from fanactrl.ui.views.tuning import TuningView
-from fanactrl.ui.views.leds import LedsView
-from fanactrl.ui.views.profiles import ProfilesView
-from fanactrl.ui.views.calibration import CalibrationView
+from fanalinux.core.device import FanatecDevice
+from fanalinux.core.evdev_listener import EvdevListener
+from fanalinux.core.telemetry.manager import TelemetryManager
+from fanalinux.core.detector import GameDetector
+from fanalinux.core.presets import load_preset
+from fanalinux.ui.views.overview import OverviewView
+from fanalinux.ui.views.tuning import TuningView
+from fanalinux.ui.views.leds import LedsView
+from fanalinux.ui.views.profiles import ProfilesView
+from fanalinux.ui.views.calibration import CalibrationView
 
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.set_title("OpenFana Control")
+        self.set_title("FanaLinux")
         self.set_default_size(1020, 840)
 
         # Load Custom Stylesheet
@@ -50,7 +50,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Header Bar
         header = Adw.HeaderBar()
-        title_widget = Adw.WindowTitle(title="OpenFana Control", subtitle="Fanatec Linux Suite")
+        title_widget = Adw.WindowTitle(title="FanaLinux", subtitle="Fanatec Control Suite &amp; Telemetry")
         header.set_title_widget(title_widget)
 
         # View Switcher in Header

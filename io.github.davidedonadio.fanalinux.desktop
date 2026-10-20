@@ -1,7 +1,7 @@
 [Desktop Entry]
-Name=OpenFana Control
+Name=FanaLinux
 Comment=Native Linux Control Panel and Telemetry Suite for Fanatec Hardware
-Exec=open-fanactrl
+Exec=fanalinux
 Icon=input-gaming
 Terminal=false
 Type=Application

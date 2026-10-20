@@ -7,9 +7,9 @@ import os
 import json
 import logging
 from typing import Optional, Callable
-from fanactrl.core.telemetry.ac import AssettoCorsaTelemetry
+from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
 
-logger = logging.getLogger("fanactrl.telemetry.manager")
+logger = logging.getLogger("fanalinux.telemetry.manager")
 
 # Load car database if available
 CAR_DATA_PATH = os.path.join(os.path.dirname(__file__), "car_data.json")

@@ -12,7 +12,7 @@ import select
 import logging
 from typing import Optional, List, Tuple, Dict, Any
 
-from fanactrl.core.protocol import (
+from fanalinux.core.protocol import (
     FANATEC_VENDOR_ID,
     PID_CSL_DD,
     CMD_INIT,
@@ -28,9 +28,9 @@ from fanactrl.core.protocol import (
     TUNING_REGISTERS,
     RIM_TYPES,
 )
-from fanactrl.core.tuning import TuningProfile
+from fanalinux.core.tuning import TuningProfile
 
-logger = logging.getLogger("fanactrl.device")
+logger = logging.getLogger("fanalinux.device")
 
 
 class FanatecDevice:

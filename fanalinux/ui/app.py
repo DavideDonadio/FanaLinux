@@ -8,13 +8,13 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, Gio
 
-from fanactrl.ui.window import MainWindow
+from fanalinux.ui.window import MainWindow
 
 
-class OpenFanaApp(Adw.Application):
+class FanaLinuxApp(Adw.Application):
     def __init__(self):
         super().__init__(
-            application_id="io.github.openfanactrl.App",
+            application_id="io.github.davidedonadio.fanalinux",
             flags=Gio.ApplicationFlags.FLAGS_NONE
         )
 
@@ -26,5 +26,5 @@ class OpenFanaApp(Adw.Application):
 
 
 def run_app():
-    app = OpenFanaApp()
+    app = FanaLinuxApp()
     return app.run(sys.argv)

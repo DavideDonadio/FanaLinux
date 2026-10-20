@@ -10,7 +10,7 @@ from gi.repository import Gtk, Adw, GLib
 import threading
 import time
 
-from fanactrl.core.telemetry.manager import TelemetryManager
+from fanalinux.core.telemetry.manager import TelemetryManager
 
 
 class LedsView(Adw.PreferencesPage):

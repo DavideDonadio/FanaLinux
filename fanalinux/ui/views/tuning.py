@@ -12,8 +12,8 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 from typing import Optional, Callable
 
-from fanactrl.core.tuning import TuningProfile, TUNING_METADATA
-from fanactrl.core.presets import list_presets, load_preset, save_preset, delete_preset, init_default_presets
+from fanalinux.core.tuning import TuningProfile, TUNING_METADATA
+from fanalinux.core.presets import list_presets, load_preset, save_preset, delete_preset, init_default_presets
 
 
 class TuningView(Adw.PreferencesPage):
