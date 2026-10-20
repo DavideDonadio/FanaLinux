@@ -1,14 +1,15 @@
 """
 Fanatec Hardware Device Abstraction.
 
-Wraps low-level HID communication, initialization handshakes,
-telemetry dispatches, and tuning parameter synchronization.
+Native Linux hidraw implementation that does not detach the kernel driver.
+Maintains concurrent compatibility with evdev gaming inputs.
 """
 
+import os
+import glob
 import time
 import logging
 from typing import Optional, List, Tuple
-import hid
 
 from fanactrl.core.protocol import (
     FANATEC_VENDOR_ID,
@@ -35,57 +36,83 @@ class FanatecDevice:
     def __init__(self, vendor_id: int = FANATEC_VENDOR_ID, product_id: int = PID_CSL_DD):
         self.vendor_id = vendor_id
         self.product_id = product_id
-        self._dev: Optional[hid.device] = None
+        self._fd: Optional[int] = None
+        self.hidraw_path: Optional[str] = None
         self.connected = False
-        self.product_name = "Fanatec Wheelbase"
-        self.rim_name = "Formula V2.5"
+        self.product_name = "Fanatec CSL DD"
+        self.rim_name = "ClubSport Steering Wheel Formula V2.5"
+
+    def find_hidraw_path(self) -> Optional[str]:
+        """Locate the Fanatec hidraw device node."""
+        # Check by-id symlinks first
+        by_id_matches = glob.glob("/dev/input/by-id/*Fanatec*-hidraw*")
+        if by_id_matches:
+            return os.path.realpath(by_id_matches[0])
+
+        # Scan /sys/class/hidraw entries
+        for entry in glob.glob("/sys/class/hidraw/hidraw*"):
+            uevent_path = os.path.join(entry, "device", "uevent")
+            if os.path.exists(uevent_path):
+                try:
+                    with open(uevent_path, "r") as f:
+                        content = f.read()
+                        if f"{self.vendor_id:04X}" in content.upper() and f"{self.product_id:04X}" in content.upper():
+                            dev_name = os.path.basename(entry)
+                            return f"/dev/{dev_name}"
+                except Exception:
+                    pass
+        return None
 
     def connect(self) -> bool:
-        """Find and open the Fanatec device."""
+        """Find and open the native Fanatec hidraw node."""
+        path = self.find_hidraw_path()
+        if not path or not os.path.exists(path):
+            logger.warning("No Fanatec hidraw node found.")
+            self.connected = False
+            return False
+
         try:
-            devices = hid.enumerate(self.vendor_id, self.product_id)
-            if not devices:
-                logger.warning(f"No Fanatec device found matching VID: 0x{self.vendor_id:04x}, PID: 0x{self.product_id:04x}")
-                self.connected = False
-                return False
-
-            dev_info = devices[0]
-            self.product_name = dev_info.get("product_string", "Fanatec Wheel")
-            
-            self._dev = hid.device()
-            self._dev.open(self.vendor_id, self.product_id)
-            self._dev.set_nonblocking(True)
+            self._fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+            self.hidraw_path = path
             self.connected = True
-            logger.info(f"Connected to {self.product_name} (VID: 0x{self.vendor_id:04x}, PID: 0x{self.product_id:04x})")
+            logger.info(f"Connected to Fanatec on {path}")
 
-            # Run initialization sequence
+            # Send initialization handshake
             self.initialize_hardware()
             return True
         except Exception as e:
-            logger.error(f"Failed to connect to device: {e}")
+            logger.error(f"Failed to open hidraw node {path}: {e}")
             self.connected = False
-            self._dev = None
+            self._fd = None
             return False
 
     def disconnect(self):
         """Close connection to device."""
-        if self._dev:
+        if self._fd is not None:
             try:
                 self.clear_display()
                 self.set_revleds([(0, 0, 0)] * 9)
                 self.set_flagleds([(0, 0, 0)] * 6)
-                self._dev.close()
+                os.close(self._fd)
             except Exception:
                 pass
-            self._dev = None
+            self._fd = None
         self.connected = False
+
+    def write_report(self, data: List[int]) -> int:
+        """Write raw HID report buffer directly to hidraw."""
+        if self._fd is None or not self.connected:
+            return 0
+        try:
+            return os.write(self._fd, bytes(data))
+        except Exception as e:
+            logger.error(f"Error writing report to hidraw: {e}")
+            return 0
 
     def initialize_hardware(self):
         """Send standard initialization handshake."""
-        if not self._dev:
-            return
         payload = [REPORT_ID_LEGACY_CMD] + CMD_INIT
-        self._dev.write(payload)
+        self.write_report(payload)
         time.sleep(0.02)
 
     def set_revleds(self, colors: List[Tuple[int, int, int]]):
@@ -93,58 +120,46 @@ class FanatecDevice:
         Set the 9 multi-color RevLEDs on the rim.
         colors: list of 9 (r, g, b) tuples, each component 0..255.
         """
-        if not self._dev or not self.connected:
-            return
         buf = [REPORT_ID_DIRECT_DRIVE, CMD_LED_MC, LED_SUB_RPM]
         for r, g, b in colors[:9]:
             val = encode_bgr565(r, g, b)
             buf.append((val >> 8) & 0xFF)
             buf.append(val & 0xFF)
-        # Pad to 64 bytes
         buf.extend([0x00] * (64 - len(buf)))
-        self._dev.write(buf)
+        self.write_report(buf)
 
     def set_flagleds(self, colors: List[Tuple[int, int, int]]):
         """
         Set the 6 multi-color Flag LEDs on the rim (3 left, 3 right).
         colors: list of 6 (r, g, b) tuples.
         """
-        if not self._dev or not self.connected:
-            return
         buf = [REPORT_ID_DIRECT_DRIVE, CMD_LED_MC, LED_SUB_FLAGS]
         for r, g, b in colors[:6]:
             val = encode_bgr565(r, g, b)
             buf.append((val >> 8) & 0xFF)
             buf.append(val & 0xFF)
         buf.extend([0x00] * (64 - len(buf)))
-        self._dev.write(buf)
+        self.write_report(buf)
 
     def set_display_text(self, text: str):
         """Send up to 3 characters to the rim's 7-segment / OLED display."""
-        if not self._dev or not self.connected:
-            return
         s1, s2, s3 = text_to_segment_bytes(text)
         payload = [REPORT_ID_LEGACY_CMD] + CMD_DISPLAY_PREFIX + [s1, s2, s3]
-        self._dev.write(payload)
+        self.write_report(payload)
 
     def clear_display(self):
         """Clear the rim display back to blank."""
-        if not self._dev or not self.connected:
-            return
         payload = [REPORT_ID_LEGACY_CMD] + CMD_DISPLAY_PREFIX + [0x00, 0x00, 0x00]
-        self._dev.write(payload)
+        self.write_report(payload)
 
     def apply_tuning_profile(self, profile: TuningProfile):
         """Write all tuning attributes from the profile into the hardware registers."""
-        if not self._dev or not self.connected:
-            return
-
-        # Write slot selection first
+        # 1. Select Slot
         buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, profile.slot & 0xFF] + [0x00] * 60
-        self._dev.write(buf)
+        self.write_report(buf)
         time.sleep(0.01)
 
-        # Mapping profile fields to tuning registers
+        # 2. Map profile values to registers
         reg_values = {
             "SEN": profile.sen // 10 if profile.sen <= 1080 else (0xED + ((profile.sen - 1080) // 10)),
             "FF": profile.ff,
@@ -166,13 +181,10 @@ class FanatecDevice:
                 addr = TUNING_REGISTERS[reg_name]
                 out_buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x00] + [0x00] * 61
                 out_buf[addr + 1] = int(raw_val) & 0xFF
-                self._dev.write(out_buf)
+                self.write_report(out_buf)
                 time.sleep(0.005)
 
     def calibrate_center(self):
         """Trigger center calibration sequence in hardware."""
-        if not self._dev or not self.connected:
-            return
-        # Center calibration trigger payload: [0x01, 0xF8, 0x09, 0x01, 0x06, 0x01, 0x00, 0x00]
         payload = [REPORT_ID_LEGACY_CMD, 0xF8, 0x09, 0x01, 0x06, 0x01, 0x00, 0x00]
-        self._dev.write(payload)
+        self.write_report(payload)

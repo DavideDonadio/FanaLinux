@@ -48,14 +48,33 @@ class EvdevListener:
         self.device_node: Optional[str] = None
 
     def find_device_node(self) -> Optional[str]:
-        """Locate the Fanatec joystick event node."""
-        matches = glob.glob("/dev/input/by-id/*Fanatec*-event-joystick")
-        if matches:
-            return matches[0]
-        # Fallback to any Fanatec event node
-        matches = glob.glob("/dev/input/by-id/*Fanatec*-event*")
-        if matches:
-            return matches[0]
+        """Locate the Fanatec joystick event node with auto-probing."""
+        # Check by-id symlinks first
+        patterns = [
+            "/dev/input/by-id/*Fanatec*-event-joystick",
+            "/dev/input/by-id/*FANATEC*-event-joystick",
+            "/dev/input/by-id/*Fanatec*-event*",
+            "/dev/input/by-id/*FANATEC*-event*",
+        ]
+        for pat in patterns:
+            matches = glob.glob(pat)
+            if matches:
+                return matches[0]
+
+        # Scan all /dev/input/event* nodes by querying hardware name
+        import fcntl
+        EVIOCGNAME = 0x82004506
+        for node in glob.glob("/dev/input/event*"):
+            try:
+                fd = os.open(node, os.O_RDONLY | os.O_NONBLOCK)
+                buf = bytearray(256)
+                fcntl.ioctl(fd, EVIOCGNAME, buf)
+                os.close(fd)
+                name = buf.split(b'\x00')[0].decode('utf-8', errors='ignore')
+                if "FANATEC" in name.upper():
+                    return node
+            except Exception:
+                pass
         return None
 
     def start(self) -> bool:

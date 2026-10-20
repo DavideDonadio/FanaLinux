@@ -44,7 +44,7 @@ class CalibrationView(Gtk.Box):
 
         # 2. Diagnostics & Raw Protocol Information
         diag_group = Adw.PreferencesGroup()
-        diag_group.set_title("Diagnostics & Protocol")
+        diag_group.set_title("Diagnostics and Protocol")
 
         vid_row = Adw.ActionRow()
         vid_row.set_title("USB Vendor / Product ID")

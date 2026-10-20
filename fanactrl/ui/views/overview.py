@@ -46,7 +46,7 @@ class OverviewView(Gtk.Box):
 
         # 2. Live Axes & Telemetry
         axes_group = Adw.PreferencesGroup()
-        axes_group.set_title("Live Axes & Inputs")
+        axes_group.set_title("Live Axes &amp; Inputs")
 
         # Steering
         self.steer_row = Adw.ActionRow()

@@ -62,7 +62,7 @@ TUNING_METADATA = [
         "step": 10,
         "unit": "°",
         "default": 900,
-        "category": "Steering & Output"
+        "category": "Steering and Output"
     },
     {
         "id": "ff",
@@ -74,7 +74,7 @@ TUNING_METADATA = [
         "step": 1,
         "unit": "%",
         "default": 100,
-        "category": "Steering & Output"
+        "category": "Steering and Output"
     },
     {
         "id": "ffs",
@@ -84,7 +84,7 @@ TUNING_METADATA = [
         "type": "toggle",
         "options": ["Linear", "Peak"],
         "default": 1,
-        "category": "Steering & Output"
+        "category": "Steering and Output"
     },
     {
         "id": "ndp",
@@ -96,7 +96,7 @@ TUNING_METADATA = [
         "step": 1,
         "unit": "%",
         "default": 20,
-        "category": "Damping & Inertia"
+        "category": "Damping and Inertia"
     },
     {
         "id": "nfr",
@@ -108,7 +108,7 @@ TUNING_METADATA = [
         "step": 1,
         "unit": "%",
         "default": 5,
-        "category": "Damping & Inertia"
+        "category": "Damping and Inertia"
     },
     {
         "id": "nin",
@@ -120,7 +120,7 @@ TUNING_METADATA = [
         "step": 1,
         "unit": "%",
         "default": 0,
-        "category": "Damping & Inertia"
+        "category": "Damping and Inertia"
     },
     {
         "id": "int_filter",
@@ -132,7 +132,7 @@ TUNING_METADATA = [
         "step": 1,
         "unit": "",
         "default": 3,
-        "category": "Filters & Effects"
+        "category": "Filters and Effects"
     },
     {
         "id": "fei",
@@ -144,7 +144,7 @@ TUNING_METADATA = [
         "step": 5,
         "unit": "%",
         "default": 100,
-        "category": "Filters & Effects"
+        "category": "Filters and Effects"
     },
     {
         "id": "for_mult",
