@@ -1,13 +1,25 @@
 """
 Telemetry Manager: Bridges sim games to Fanatec LEDs and OLED Display.
+Includes Adaptive Peak RPM Auto-Calibration and Car Database.
 """
 
-import time
+import os
+import json
 import logging
 from typing import Optional, Callable
 from fanactrl.core.telemetry.ac import AssettoCorsaTelemetry
 
 logger = logging.getLogger("fanactrl.telemetry.manager")
+
+# Load car database if available
+CAR_DATA_PATH = os.path.join(os.path.dirname(__file__), "car_data.json")
+CAR_DATABASE = {}
+if os.path.exists(CAR_DATA_PATH):
+    try:
+        with open(CAR_DATA_PATH, "r") as f:
+            CAR_DATABASE = json.load(f)
+    except Exception:
+        pass
 
 
 class TelemetryManager:
@@ -16,9 +28,14 @@ class TelemetryManager:
         self.on_status_change = on_status_change
         self.enabled = False
         self.display_mode = "gear"  # "gear", "speed", or "custom"
-        self.max_rpm = 9000
+        self.max_rpm = 6500         # Sane baseline (adaptive tracking will refine)
+        self.peak_rpm_seen = 0
+        self.auto_detect_rpm = True
 
-        self.ac_client = AssettoCorsaTelemetry(on_telemetry=self._handle_telemetry)
+        self.ac_client = AssettoCorsaTelemetry(
+            on_telemetry=self._handle_telemetry,
+            on_car_detected=self.set_car_name
+        )
         self._last_gear = None
         self._limiter_strobe = False
 
@@ -33,9 +50,37 @@ class TelemetryManager:
             self.device.set_revleds([(0, 0, 0)] * 9)
             self.device.clear_display()
 
+    def set_car_name(self, car_name: str):
+        """Lookup car in database or adapt."""
+        cleaned = car_name.lower().strip()
+        if cleaned in CAR_DATABASE:
+            try:
+                self.max_rpm = int(CAR_DATABASE[cleaned])
+                logger.info(f"Loaded car database redline for '{cleaned}': {self.max_rpm} RPM")
+                return
+            except Exception:
+                pass
+        
+        # Heuristics for common car classes
+        if "formula4" in cleaned or "f4" in cleaned or "tatuus" in cleaned:
+            self.max_rpm = 6500
+        elif "gt3" in cleaned or "gt4" in cleaned:
+            self.max_rpm = 7500
+        elif "formula" in cleaned or "f1" in cleaned:
+            self.max_rpm = 13500
+        else:
+            self.max_rpm = 6500
+
     def _handle_telemetry(self, rpm: int, gear: int, speed_kmh: float, abs_active: bool, tc_active: bool):
         if not self.enabled or not self.device or not self.device.connected:
             return
+
+        # Adaptive Peak Tracking: learn the car's actual rev ceiling live
+        if self.auto_detect_rpm:
+            if rpm > self.peak_rpm_seen:
+                self.peak_rpm_seen = rpm
+                if self.peak_rpm_seen > 4000:
+                    self.max_rpm = self.peak_rpm_seen
 
         # 1. Update OLED Display
         if self.display_mode == "gear":
@@ -48,7 +93,9 @@ class TelemetryManager:
             self.device.set_display_text(f"{speed_int:03d}")
 
         # 2. Update 9 RevLEDs
-        pct = max(0.0, min(1.0, rpm / max(1000, self.max_rpm)))
+        # Scale: rev lights start at 60% of redline and reach full at 96%
+        effective_max = max(3000, self.max_rpm)
+        pct = max(0.0, min(1.0, rpm / effective_max))
         
         # Shift spectrum: Green (LED 1..3), Yellow (4..6), Red (7..8), Blue (9)
         colors = [
@@ -57,13 +104,13 @@ class TelemetryManager:
             (255, 0, 0), (255, 0, 0), (0, 0, 255)
         ]
 
-        if pct >= 0.98:
+        if pct >= 0.96:
             # Shift limit reached: Strobe all blue/white
             self._limiter_strobe = not self._limiter_strobe
             active_colors = [(0, 150, 255)] * 9 if self._limiter_strobe else [(0, 0, 0)] * 9
-        elif pct >= 0.65:
-            # Map 65%..98% range across the 9 LEDs
-            active_count = int(((pct - 0.65) / 0.33) * 9)
+        elif pct >= 0.55:
+            # Map 55%..96% range linearly across the 9 LEDs
+            active_count = int(((pct - 0.55) / 0.41) * 9)
             active_count = max(1, min(9, active_count))
             active_colors = colors[:active_count] + [(0, 0, 0)] * (9 - active_count)
         else:

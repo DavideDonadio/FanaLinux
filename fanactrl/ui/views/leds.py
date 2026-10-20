@@ -60,6 +60,36 @@ class LedsView(Adw.PreferencesPage):
         mode_row.add_suffix(self.mode_dropdown)
         telem_group.add(mode_row)
 
+        redline_row = Adw.ActionRow()
+        redline_row.set_title("Shift Point / Redline RPM")
+        redline_row.set_subtitle("Automatically adapts to car redline (Formula 4: ~6,300 RPM)")
+
+        redline_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        redline_box.set_valign(Gtk.Align.CENTER)
+
+        self.redline_label = Gtk.Label(label="6,500 RPM")
+        self.redline_label.set_width_chars(9)
+        self.redline_label.add_css_class("val-badge")
+
+        redline_adj = Gtk.Adjustment(value=6500, lower=4000, upper=18000, step_increment=100, page_increment=500)
+        redline_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=redline_adj)
+        redline_scale.set_size_request(200, -1)
+        redline_scale.set_valign(Gtk.Align.CENTER)
+        redline_scale.set_draw_value(False)
+
+        def _on_redline_changed(adj):
+            val = int(adj.get_value())
+            self.redline_label.set_text(f"{val:,} RPM")
+            self.telemetry_mgr.max_rpm = val
+            self.telemetry_mgr.auto_detect_rpm = False
+
+        redline_adj.connect("value-changed", _on_redline_changed)
+
+        redline_box.append(self.redline_label)
+        redline_box.append(redline_scale)
+        redline_row.add_suffix(redline_box)
+        telem_group.add(redline_row)
+
         sim_row = Adw.ActionRow()
         sim_row.set_title("Simulate AC Race Lap (Demo Mode)")
         sim_row.set_subtitle("Runs a realistic 12-second acceleration, shifting, and braking sequence without needing pedals")

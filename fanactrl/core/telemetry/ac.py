@@ -27,11 +27,13 @@ class AssettoCorsaTelemetry:
 
     def __init__(self,
                  on_telemetry: Optional[Callable[[int, int, float, bool, bool], None]] = None,
-                 default_max_rpm: int = 9000):
+                 on_car_detected: Optional[Callable[[str], None]] = None,
+                 default_max_rpm: int = 6500):
         """
         on_telemetry callback: (rpm, gear, speed_kmh, abs_active, tc_active)
         """
         self.on_telemetry = on_telemetry
+        self.on_car_detected = on_car_detected
         self.default_max_rpm = default_max_rpm
         self.max_rpm = default_max_rpm
         self.car_name = "Unknown"
@@ -91,6 +93,8 @@ class AssettoCorsaTelemetry:
                             if car_str:
                                 self.car_name = car_str
                                 logger.info(f"Connected to Assetto Corsa session: Car={self.car_name}")
+                                if self.on_car_detected:
+                                    self.on_car_detected(self.car_name)
                         self._send_command(self.SUBSCRIBE_UPDATE)
                         self.is_connected = True
                         break
