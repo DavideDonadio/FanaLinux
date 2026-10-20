@@ -103,15 +103,16 @@ class CalibrationView(Adw.PreferencesPage):
         torque_row.add_suffix(torque_btn)
         ffb_group.add(torque_row)
 
-        # Handle Grip Vibration Test
+        # Tactile Vibration Test
         rumble_row = Adw.ActionRow()
-        rumble_row.set_title("Rim Handle Vibration Test")
-        rumble_row.set_subtitle("Fires test pulses on Formula V2.5 left and right handle vibration motors")
+        rumble_row.set_title("Tactile Wheel &amp; Pedal Vibration Test")
+        rumble_row.set_subtitle("Pulses 18 Hz tactile rumble through steering wheel rim and peripheral pedals")
         rumble_row.set_icon_name("audio-volume-high-symbolic")
 
-        rumble_btn = Gtk.Button(label="Test Grip Rumble")
-        rumble_btn.set_size_request(150, 42)
+        rumble_btn = Gtk.Button(label="Test Vibration")
+        rumble_btn.set_size_request(160, 42)
         rumble_btn.set_valign(Gtk.Align.CENTER)
+        rumble_btn.add_css_class("suggested-action")
         rumble_btn.connect("clicked", self._on_rumble_test_clicked)
         rumble_row.add_suffix(rumble_btn)
         ffb_group.add(rumble_row)
@@ -315,23 +316,13 @@ class CalibrationView(Adw.PreferencesPage):
             return
 
         def _worker():
-            # Left grip
-            self.device.send_handle_vibration(left=190, right=0)
-            time.sleep(0.4)
-            # Right grip
-            self.device.send_handle_vibration(left=0, right=190)
-            time.sleep(0.4)
-            # Both grips
-            self.device.send_handle_vibration(left=220, right=220)
-            time.sleep(0.5)
-            # Stop
-            self.device.send_handle_vibration(left=0, right=0)
+            self.device.vibrate_wheel(intensity=100, duration=1.2, freq=18)
             if self.on_toast_requested:
-                GLib.idle_add(self.on_toast_requested, "Rim grip vibration test completed.")
+                GLib.idle_add(self.on_toast_requested, "Tactile vibration test complete.")
 
         threading.Thread(target=_worker, daemon=True).start()
         if self.on_toast_requested:
-            self.on_toast_requested("Testing Formula V2.5 handle grip vibration motors...")
+            self.on_toast_requested("Testing tactile vibration (18 Hz rumble)...")
 
     def _on_emergency_stop_clicked(self, btn):
         if self.device:

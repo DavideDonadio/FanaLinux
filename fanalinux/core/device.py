@@ -45,6 +45,7 @@ class FanatecDevice:
         self.firmware_base = "1.1.8.4"
         self.firmware_motor = "1.0.3.2"
         self.firmware_rim = "45"
+        self._abort_vibration = False
 
     def find_hidraw_path(self) -> Optional[str]:
         """Locate the Fanatec hidraw device node."""
@@ -161,8 +162,9 @@ class FanatecDevice:
         self.write_report(buf)
         time.sleep(0.01)
 
-        # 2. Map profile values to registers
+        # 2. Build full tuning report buffer with all registers populated
         reg_values = {
+            "SLOT": profile.slot,
             "SEN": profile.sen // 10 if profile.sen <= 1080 else (0xED + ((profile.sen - 1080) // 10)),
             "FF": profile.ff,
             "FFS": profile.ffs,
@@ -178,13 +180,13 @@ class FanatecDevice:
             "BRF": profile.brf,
         }
 
+        out_buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x00] + [0x00] * 61
         for reg_name, raw_val in reg_values.items():
             if reg_name in TUNING_REGISTERS:
                 addr = TUNING_REGISTERS[reg_name]
-                out_buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x00] + [0x00] * 61
                 out_buf[addr + 1] = int(raw_val) & 0xFF
-                self.write_report(out_buf)
-                time.sleep(0.005)
+        self.write_report(out_buf)
+        time.sleep(0.01)
 
     def read_tuning_profile(self, slot: int = 1) -> Optional[TuningProfile]:
         """Request and parse the active tuning report from the wheel base."""
@@ -274,7 +276,7 @@ class FanatecDevice:
 
     def send_handle_vibration(self, left: int = 0, right: int = 0):
         """
-        Trigger rim grip vibration motors.
+        Trigger rim grip vibration motors and peripheral pedal rumble motors.
         left, right: 0 to 255 intensity.
         """
         if self._fd is None or not self.connected:
@@ -288,8 +290,48 @@ class FanatecDevice:
         ]
         self.write_report(payload)
 
+    def vibrate_wheel(self, intensity: int = 100, duration: float = 1.0, freq: int = 18):
+        """
+        Execute symmetric zero-rotation tactile rumble through the direct drive motor
+        and peripheral pedal rumble motors concurrently.
+        intensity: 0 to 100%.
+        duration: duration in seconds.
+        freq: oscillation frequency in Hz (optimal 18 Hz for wheel mechanical inertia).
+        """
+        if self._fd is None or not self.connected:
+            return
+
+        self._abort_vibration = False
+        clamped_intensity = max(0, min(100, int(intensity)))
+        amp = int((clamped_intensity / 100.0) * 6000)
+
+        # Trigger peripheral pedal/handle rumble packet concurrently
+        pedal_val = int((clamped_intensity / 100.0) * 255)
+        self.send_handle_vibration(pedal_val, pedal_val)
+
+        if amp <= 0:
+            self.send_constant_force(0)
+            self.send_handle_vibration(0, 0)
+            return
+
+        period = 1.0 / max(1, freq)
+        half = period / 2.0
+        end_time = time.time() + duration
+
+        while time.time() < end_time and not self._abort_vibration:
+            self.send_constant_force(amp)
+            time.sleep(half)
+            if self._abort_vibration:
+                break
+            self.send_constant_force(-amp)
+            time.sleep(half)
+
+        self.send_constant_force(0)
+        self.send_handle_vibration(0, 0)
+
     def stop_all_forces(self):
         """Emergency stop: zero and disable all active motor effects and vibrations."""
+        self._abort_vibration = True
         self.send_constant_force(0)
         self.send_centering_spring(0)
         self.send_damper_friction(0)
