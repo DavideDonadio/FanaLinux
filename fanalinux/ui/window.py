@@ -119,6 +119,11 @@ class MainWindow(Adw.ApplicationWindow):
         # Start Auto-Profile Detector
         self.detector.start()
 
+        # Hardware connection state & live hotplug/unplug monitor (1 sec interval)
+        self._hardware_online = self.device.connected if self.device else False
+        self.overview_view.set_connection_status(self._hardware_online)
+        GLib.timeout_add_seconds(1, self._check_hardware_connection)
+
         self.connect("close-request", self._on_close)
 
     def _load_stylesheet(self):
@@ -183,6 +188,27 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_presets_changed(self):
         self.profiles_view.refresh_preset_lists()
+
+    def _check_hardware_connection(self) -> bool:
+        """Periodic hardware health monitor: handles unplug and hotplug reconnect."""
+        was_online = self._hardware_online
+        is_online = self.device.check_connection() if self.device else False
+        self._hardware_online = is_online
+
+        if was_online != is_online:
+            self.overview_view.set_connection_status(is_online)
+            if is_online:
+                if not self.evdev_listener.is_running():
+                    self.evdev_listener.start()
+                self.show_toast("Fanatec CSL DD connected and online!")
+                active_profile = getattr(self.tuning_view, "active_profile", None)
+                if active_profile and self.device:
+                    self.device.apply_tuning_profile(active_profile)
+            else:
+                self.evdev_listener.stop()
+                self.show_toast("Fanatec hardware disconnected!")
+
+        return True
 
     def _on_preset_applied(self, preset_name):
         profile = load_preset(preset_name)

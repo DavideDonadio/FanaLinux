@@ -28,9 +28,9 @@ class OverviewView(Adw.PreferencesPage):
         status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         status_box.set_valign(Gtk.Align.CENTER)
 
-        status_dot = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-        status_dot.add_css_class("success")
-        status_box.append(status_dot)
+        self.status_dot = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+        self.status_dot.add_css_class("success")
+        status_box.append(self.status_dot)
 
         self.conn_badge = Gtk.Label(label="Online")
         self.conn_badge.add_css_class("success")
@@ -134,6 +134,36 @@ class OverviewView(Adw.PreferencesPage):
 
         btn_group.add(matrix_box)
         self.add(btn_group)
+
+    def set_connection_status(self, is_online: bool):
+        """Update hardware status badge and cards based on connection state."""
+        if is_online:
+            self.status_dot.set_from_icon_name("emblem-ok-symbolic")
+            self.status_dot.remove_css_class("error")
+            self.status_dot.add_css_class("success")
+            self.conn_badge.set_text("Online")
+            self.conn_badge.remove_css_class("error")
+            self.conn_badge.add_css_class("success")
+            self.status_row.set_title(self.device.product_name if self.device else "Fanatec CSL DD")
+            self.status_row.set_subtitle("Vendor ID: 0x0EB7 | Product ID: 0x0020 | PC Mode (Red)")
+            self.rim_row.set_subtitle(f"{self.device.rim_name if self.device else 'Formula V2.5'} (15 Multi-Color LEDs)")
+        else:
+            self.status_dot.set_from_icon_name("network-offline-symbolic")
+            self.status_dot.remove_css_class("success")
+            self.status_dot.add_css_class("error")
+            self.conn_badge.set_text("Offline")
+            self.conn_badge.remove_css_class("success")
+            self.conn_badge.add_css_class("error")
+            self.status_row.set_title("Fanatec CSL DD (Disconnected)")
+            self.status_row.set_subtitle("Hardware disconnected — connect USB or power on wheelbase")
+            self.rim_row.set_subtitle("No steering wheel rim detected")
+            # Reset live input gauges
+            self.update_steering(0.0, 32768)
+            self.update_throttle(0.0)
+            self.update_brake(0.0)
+            self.update_clutch(0.0)
+            for btn_id, chip in self._button_chips.items():
+                chip.remove_css_class("active")
 
     def update_steering(self, norm_val: float, raw_val: int):
         deg = norm_val * 450.0

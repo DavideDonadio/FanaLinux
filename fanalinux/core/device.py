@@ -102,12 +102,43 @@ class FanatecDevice:
             self._fd = None
         self.connected = False
 
+    def check_connection(self) -> bool:
+        """
+        Verify device node presence and active connection.
+        Returns True if connected and healthy, False otherwise.
+        Automatically reconnects if the hardware is plugged back in.
+        """
+        if not self.connected or self._fd is None:
+            path = self.find_hidraw_path()
+            if path and os.path.exists(path):
+                return self.connect()
+            return False
+
+        if not self.hidraw_path or not os.path.exists(self.hidraw_path):
+            self.disconnect()
+            return False
+
+        try:
+            _, _, x = select.select([self._fd], [], [self._fd], 0)
+            if x:
+                self.disconnect()
+                return False
+        except (OSError, ValueError):
+            self.disconnect()
+            return False
+
+        return True
+
     def write_report(self, data: List[int]) -> int:
         """Write raw HID report buffer directly to hidraw."""
         if self._fd is None or not self.connected:
             return 0
         try:
             return os.write(self._fd, bytes(data))
+        except (OSError, ValueError) as e:
+            logger.warning(f"Device error during write (disconnected): {e}")
+            self.disconnect()
+            return 0
         except Exception as e:
             logger.error(f"Error writing report to hidraw: {e}")
             return 0

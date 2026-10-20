@@ -96,6 +96,10 @@ class EvdevListener:
             logger.error(f"Failed to open evdev node {node}: {e}")
             return False
 
+    def is_running(self) -> bool:
+        """Check if listener is actively running with an open event node."""
+        return self._running and self._fd is not None
+
     def stop(self):
         """Stop the background polling thread."""
         self._running = False
@@ -125,7 +129,14 @@ class EvdevListener:
                         self._process_event(etype, code, value)
             except Exception as e:
                 if self._running:
-                    logger.error(f"Error reading evdev events: {e}")
+                    logger.info(f"Evdev device disconnected: {e}")
+                self._running = False
+                if self._fd is not None:
+                    try:
+                        os.close(self._fd)
+                    except Exception:
+                        pass
+                    self._fd = None
                 break
 
     def _process_event(self, etype: int, code: int, value: int):
