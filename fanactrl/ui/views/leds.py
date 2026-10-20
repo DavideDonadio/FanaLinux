@@ -60,6 +60,19 @@ class LedsView(Adw.PreferencesPage):
         mode_row.add_suffix(self.mode_dropdown)
         telem_group.add(mode_row)
 
+        sim_row = Adw.ActionRow()
+        sim_row.set_title("Simulate AC Race Lap (Demo Mode)")
+        sim_row.set_subtitle("Runs a realistic 12-second acceleration, shifting, and braking sequence without needing pedals")
+
+        sim_btn = Gtk.Button(label="Simulate Race Lap")
+        sim_btn.set_size_request(160, 42)
+        sim_btn.set_valign(Gtk.Align.CENTER)
+        sim_btn.add_css_class("suggested-action")
+        sim_btn.add_css_class("pill")
+        sim_btn.connect("clicked", self._on_simulate_lap)
+        sim_row.add_suffix(sim_btn)
+        telem_group.add(sim_row)
+
         self.add(telem_group)
 
         # 2. 1-inch OLED Display Manual Controls
@@ -185,6 +198,63 @@ class LedsView(Adw.PreferencesPage):
     def _on_mode_changed(self, dropdown, param):
         idx = dropdown.get_selected()
         self.telemetry_mgr.display_mode = "gear" if idx == 0 else "speed"
+
+    def _on_simulate_lap(self, btn):
+        if not self.device or not self.device.connected:
+            if self.on_toast_requested:
+                self.on_toast_requested("Device not connected!")
+            return
+
+        def _sim_worker():
+            self.telemetry_mgr.enabled = True
+
+            # 1. Idle in Neutral
+            self.telemetry_mgr._handle_telemetry(rpm=1800, gear=0, speed_kmh=0, abs_active=False, tc_active=False)
+            GLib.idle_add(self._set_gui_dots, 0)
+            time.sleep(1.2)
+
+            # 2. Acceleration Gear 1
+            for r in range(2500, 8950, 160):
+                pct = r / 9000.0
+                dots = max(0, min(9, int(((pct - 0.65) / 0.33) * 9))) if pct >= 0.65 else 0
+                self.telemetry_mgr._handle_telemetry(rpm=r, gear=1, speed_kmh=r * 0.012, abs_active=False, tc_active=False)
+                GLib.idle_add(self._set_gui_dots, dots)
+                time.sleep(0.04)
+
+            time.sleep(0.25)
+
+            # 3. Acceleration Gear 2
+            for r in range(6200, 8950, 170):
+                pct = r / 9000.0
+                dots = max(0, min(9, int(((pct - 0.65) / 0.33) * 9))) if pct >= 0.65 else 0
+                self.telemetry_mgr._handle_telemetry(rpm=r, gear=2, speed_kmh=r * 0.018, abs_active=False, tc_active=False)
+                GLib.idle_add(self._set_gui_dots, dots)
+                time.sleep(0.04)
+
+            time.sleep(0.25)
+
+            # 4. Acceleration Gear 3
+            for r in range(6400, 8950, 170):
+                pct = r / 9000.0
+                dots = max(0, min(9, int(((pct - 0.65) / 0.33) * 9))) if pct >= 0.65 else 0
+                self.telemetry_mgr._handle_telemetry(rpm=r, gear=3, speed_kmh=r * 0.024, abs_active=False, tc_active=False)
+                GLib.idle_add(self._set_gui_dots, dots)
+                time.sleep(0.04)
+
+            # 5. Heavy Braking into Hairpin (ABS Yellow Flag Trigger)
+            self.telemetry_mgr._handle_telemetry(rpm=5200, gear=2, speed_kmh=90, abs_active=True, tc_active=False)
+            time.sleep(0.8)
+            self.telemetry_mgr._handle_telemetry(rpm=3200, gear=1, speed_kmh=45, abs_active=True, tc_active=False)
+            time.sleep(0.8)
+
+            # 6. Idle in Neutral & Clear Flags
+            self.telemetry_mgr._handle_telemetry(rpm=1800, gear=0, speed_kmh=0, abs_active=False, tc_active=False)
+            self.device.set_flagleds([(0, 0, 0)] * 6)
+            GLib.idle_add(self._set_gui_dots, 0)
+
+        threading.Thread(target=_sim_worker, daemon=True).start()
+        if self.on_toast_requested:
+            self.on_toast_requested("Running Simulated AC Race Lap...")
 
     def _on_send_display(self, btn):
         text = self.disp_entry.get_text()
