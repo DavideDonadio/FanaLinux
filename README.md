@@ -27,10 +27,10 @@ Fanatec and related product names are used solely to identify compatible hardwar
 ## Architecture Overview
 
 ```text
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                   FanaLinux UI (GTK4 + Libadwaita)                                     │
-│  [Overview]  [1:1 Tuning Menu]  [Vibration & Haptics]  [LEDs & Display]  [Game Profiles]  [Calibration]│
-└───────────────────────────────────────────────────┬────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                            FanaLinux UI (GTK4 + Libadwaita)                            │
+│     [Overview]  [Tuning]  [Vibration]  [LED & Display]  [Profiles]  [Calibration]      │
+└────────────────────────────────────────┬───────────────────────────────────────────────┘
                                          │ Python GObject / Evdev
                                          ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
