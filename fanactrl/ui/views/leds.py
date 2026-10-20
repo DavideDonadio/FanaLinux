@@ -62,31 +62,26 @@ class LedsView(Adw.PreferencesPage):
 
         redline_row = Adw.ActionRow()
         redline_row.set_title("Shift Point / Redline RPM")
-        redline_row.set_subtitle("Automatically adapts to car redline (Formula 4: ~6,300 RPM)")
+        redline_row.set_subtitle("Type exact RPM limit or click +/- (Formula 4: ~6,300 RPM)")
 
         redline_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         redline_box.set_valign(Gtk.Align.CENTER)
 
-        self.redline_label = Gtk.Label(label="6,500 RPM")
-        self.redline_label.set_width_chars(9)
-        self.redline_label.add_css_class("val-badge")
+        redline_adj = Gtk.Adjustment(value=6500, lower=2000, upper=22000, step_increment=50, page_increment=500)
+        self.redline_spin = Gtk.SpinButton(adjustment=redline_adj, climb_rate=50, digits=0)
+        self.redline_spin.set_valign(Gtk.Align.CENTER)
+        self.redline_spin.set_numeric(True)
+        self.redline_spin.set_size_request(130, 38)
+        self.redline_spin.add_css_class("val-badge")
 
-        redline_adj = Gtk.Adjustment(value=6500, lower=4000, upper=18000, step_increment=100, page_increment=500)
-        redline_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=redline_adj)
-        redline_scale.set_size_request(200, -1)
-        redline_scale.set_valign(Gtk.Align.CENTER)
-        redline_scale.set_draw_value(False)
-
-        def _on_redline_changed(adj):
-            val = int(adj.get_value())
-            self.redline_label.set_text(f"{val:,} RPM")
+        def _on_redline_changed(spin):
+            val = int(spin.get_value())
             self.telemetry_mgr.max_rpm = val
             self.telemetry_mgr.auto_detect_rpm = False
 
-        redline_adj.connect("value-changed", _on_redline_changed)
+        self.redline_spin.connect("value-changed", _on_redline_changed)
 
-        redline_box.append(self.redline_label)
-        redline_box.append(redline_scale)
+        redline_box.append(self.redline_spin)
         redline_row.add_suffix(redline_box)
         telem_group.add(redline_row)
 
