@@ -27,10 +27,10 @@ Fanatec and related product names are used solely to identify compatible hardwar
 ## Architecture Overview
 
 ```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                          FanaLinux UI (GTK4 + Libadwaita)                              │
-│  [Overview]  [1:1 Tuning Menu]  [LEDs & Display]  [Game Profiles]  [Calibration]       │
-└────────────────────────────────────────┬───────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   FanaLinux UI (GTK4 + Libadwaita)                                     │
+│  [Overview]  [1:1 Tuning Menu]  [Vibration & Haptics]  [LEDs & Display]  [Game Profiles]  [Calibration]│
+└───────────────────────────────────────────────────┬────────────────────────────────────────────────────┘
                                          │ Python GObject / Evdev
                                          ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -89,23 +89,30 @@ Fanatec and related product names are used solely to identify compatible hardwar
 * **In-Game OLED Display:** Automatically renders live Gear (`1`, `2`, `3`, `N`, `R`) or Vehicle Speed (KM/H).
 * **Flag Alerts:** Flashes side Flag clusters on ABS activation or Traction Control intervention.
 
-### 4. Overview & Input Visualizer
-* **16-bit Steering Angle Gauge:** Sub-millisecond evdev reading with degrees readout.
+### 4. Vibration & Dynamic Haptics (FanaLab Parity)
+* **Braking & Engine Dynamics:**
+  * **ABS Vibration:** Programmable tactile pulse frequency (18 Hz) and duration upon brake lockups.
+  * **Engine Vibration:** Continuous subtle motor and rim vibration dynamically scaled with engine RPM.
+  * **Rev Limiter Vibration:** Sharp rhythmic shudder when bumping against maximum redline revs.
+* **Suspension & Surface Displacement:**
+  * **Curb Strikes:** Simulates rough rumble strips and kerb strikes through steering rim haptics.
+* **Traction & Tire Slip:**
+  * **Traction Control Intervention:** Haptic alerts when ECU traction control engages under acceleration.
+  * **Wheel Lock & Spin:** Directional vibration warnings when driven wheels break traction or tires lock.
+* **Chassis Balance:**
+  * **Understeer & Oversteer Alerts:** Tactile warnings when front scrub or rear yaw exceed optimal slip angles.
+
+### 5. Overview & Input Visualizer
+* **16-bit Steering Angle Gauge:** Sub-millisecond evdev reading with live degrees readout.
 * **Pedal Travel Bars:** Color-coded gauges for Throttle (Green), Brake (Red), Clutch (Blue).
-* **24-Button Matrix:** Monospace pill chips highlighting live button clicks and shifter paddle pulls.
+* **24-Button Matrix:** Monospace pill chips highlighting live button clicks and shifter paddle pulls with generous padding.
 
-### 5. Interactive Force Feedback & Motor Test Suite
-* **Hardware Centering Spring:** Dynamically engages the direct-drive autocenter spring pulling the wheel toward 0.0° with adjustable strength slider.
-* **Mechanical Friction & Damping:** Interactive resistance test simulating direct drive natural damping and internal mechanical friction.
-* **Motor Torque Pulse Test:** Gentle alternating left/right torque pulse sequence (~23% holding force) with safety confirmation dialog to verify motor output.
-* **Tactile Wheel & Pedal Vibration:** Pulses 18 Hz tactile rumble through the steering wheel rim (symmetric zero net rotation) and peripheral pedals concurrently.
+### 6. Calibration, Diagnostics & Visual Dial
+* **Interactive 360° Wheel Center Dial:** High-resolution ClubSport Formula V2.5 rim rendering rotating in real-time with cardinal degree markings, angle badge, and smooth 60 FPS cubic ease-out calibration ripple animation.
+* **Force Feedback Motor Test Suite:** Interactive centering spring, dynamic mechanical friction, alternating torque pulse sequence, and 18 Hz tactile vibration test.
 * **Safety Force Cutoff:** Dedicated emergency stop button instantly canceling all active motor torque, centering springs, and vibrations.
-
-### 6. Calibration & Hardware Diagnostics
-* **Center Calibration:** One-click optical/magnetic motor index zero-point calibration.
-* **Pedal Deadzones:** Customizable lower deadbands for Throttle, Brake, and Clutch.
-* **ClubSport Shifter Wizard:** Step-by-step guided wizard for 1st–7th gear and Reverse indexing.
-* **Firmware Version Display:** Reports Base, Motor Controller, and Steering Rim revisions.
+* **Pedal Deadzones:** Customizable lower threshold deadbands for Throttle, Brake, and Clutch (220 px standardized sliders).
+* **Hardware Firmware Display:** Real-time reporting of Wheelbase Base, Motor Controller, and Steering Rim revisions.
 
 ---
 
