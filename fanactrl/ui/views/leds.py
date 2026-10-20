@@ -26,29 +26,13 @@ class LedsView(Adw.PreferencesPage):
         self._build_ui()
 
     def _build_ui(self):
-        # 1. Live In-Game Telemetry Engine (Assetto Corsa & Sim Games)
+        # 1. Live In-Game Telemetry Configuration
         telem_group = Adw.PreferencesGroup()
-        telem_group.set_title("Live In-Game Telemetry (Assetto Corsa / FanaLab)")
+        telem_group.set_title("In-Game Telemetry &amp; Shift Indicators")
         telem_group.set_description(
-            "Captures live RPM, gear, speed, flags, and ABS directly from Assetto Corsa "
-            "over UDP port 9996 and drives the Formula V2.5 RevLEDs and OLED display."
+            "Configure OLED rim display mode and RPM shift points driven automatically "
+            "by the background telemetry engine during racing sessions."
         )
-
-        telem_toggle_row = Adw.ActionRow()
-        telem_toggle_row.set_title("Assetto Corsa Telemetry Engine")
-        telem_toggle_row.set_subtitle("Listening on localhost UDP port 9996")
-        telem_toggle_row.set_icon_name("media-record-symbolic")
-
-        self.telem_status_label = Gtk.Label(label="Disabled")
-        self.telem_status_label.set_valign(Gtk.Align.CENTER)
-        self.telem_status_label.add_css_class("val-badge")
-        telem_toggle_row.add_suffix(self.telem_status_label)
-
-        self.telem_switch = Gtk.Switch()
-        self.telem_switch.set_valign(Gtk.Align.CENTER)
-        self.telem_switch.connect("state-set", self._on_telemetry_toggled)
-        telem_toggle_row.add_suffix(self.telem_switch)
-        telem_group.add(telem_toggle_row)
 
         mode_row = Adw.ActionRow()
         mode_row.set_title("OLED In-Game Display Mode")
@@ -207,28 +191,8 @@ class LedsView(Adw.PreferencesPage):
         self.add(flag_group)
 
     def set_telemetry_active(self, active: bool):
-        """Programmatically toggle telemetry switch & status label."""
-        self.telem_switch.set_active(active)
-        if active:
-            self.telem_status_label.set_text("Listening (UDP 9996)")
-            self.telem_status_label.add_css_class("success")
-        else:
-            self.telem_status_label.set_text("Disabled")
-            self.telem_status_label.remove_css_class("success")
-
-    def _on_telemetry_toggled(self, switch, state):
-        if state:
-            self.telemetry_mgr.start()
-            self.telem_status_label.set_text("Listening (UDP 9996)")
-            self.telem_status_label.add_css_class("success")
-            if self.on_toast_requested:
-                self.on_toast_requested("Assetto Corsa Telemetry Engine active! Waiting for session...")
-        else:
-            self.telemetry_mgr.stop()
-            self.telem_status_label.set_text("Disabled")
-            self.telem_status_label.remove_css_class("success")
-            if self.on_toast_requested:
-                self.on_toast_requested("Telemetry engine stopped")
+        """Telemetry engine state is managed autonomously by Auto-Profile."""
+        pass
 
     def _on_mode_changed(self, dropdown, param):
         idx = dropdown.get_selected()

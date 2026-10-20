@@ -52,11 +52,6 @@ class ProfilesView(Adw.PreferencesPage):
         self.status_badge.add_css_class("status-pill-idle")
         self.status_row.add_suffix(self.status_badge)
 
-        scan_btn = Gtk.Button(label="Scan Now")
-        scan_btn.set_valign(Gtk.Align.CENTER)
-        scan_btn.connect("clicked", self._on_scan_now_clicked)
-        self.status_row.add_suffix(scan_btn)
-
         status_group.add(self.status_row)
 
         # Global Auto-Switching Toggle
@@ -110,8 +105,7 @@ class ProfilesView(Adw.PreferencesPage):
 
             expander = Adw.ExpanderRow()
             expander.set_title(game["name"])
-            execs_str = ", ".join(game.get("executables", []))
-            expander.set_subtitle(f"Binaries: {execs_str}")
+            expander.set_subtitle(f"Assigned Profile: {current_preset}")
             expander.set_icon_name("input-gaming-symbolic")
 
             # Enable Toggle for this game
@@ -140,12 +134,13 @@ class ProfilesView(Adw.PreferencesPage):
             preset_dd.set_size_request(200, -1)
             self._select_dropdown_text(preset_dd, current_preset)
 
-            def _on_preset_picked(dd, param, g_id=gid):
+            def _on_preset_picked(dd, param, g_id=gid, exp=expander):
                 idx = dd.get_selected()
                 if idx >= 0:
                     chosen = dd.get_model().get_string(idx)
                     self.detector.game_mappings.setdefault(g_id, {})["preset"] = chosen
                     self.detector.save_config()
+                    exp.set_subtitle(f"Assigned Profile: {chosen}")
 
             preset_dd.connect("notify::selected", _on_preset_picked)
             preset_row.add_suffix(preset_dd)
@@ -250,17 +245,3 @@ class ProfilesView(Adw.PreferencesPage):
             name = dropdown.get_model().get_string(idx)
             self.detector.fallback_preset = name
             self.detector.save_config()
-
-    def _on_scan_now_clicked(self, btn):
-        match = self.detector.scan_once()
-        if match:
-            g = match["game"]
-            mapping = self.detector.game_mappings.get(g["id"], {})
-            p = mapping.get("preset") or g.get("default_preset", "Default")
-            self.update_status(g)
-            if self.on_toast_requested:
-                self.on_toast_requested(f"Detected: {g['name']} (Binary: {match['exe']}, PID: {match['pid']})")
-        else:
-            self.update_status(None)
-            if self.on_toast_requested:
-                self.on_toast_requested("No active racing simulators detected in /proc")
