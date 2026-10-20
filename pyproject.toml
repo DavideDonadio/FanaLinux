@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-fanactrl"
+version = "0.1.0"
+description = "Native Linux Control Panel and Telemetry Suite for Fanatec Hardware"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "GPL-3.0-or-later"}
+dependencies = [
+    "hidapi>=0.14.0",
+]
+
+[project.scripts]
+open-fanactrl = "fanactrl.main:run_app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fanactrl*"]
