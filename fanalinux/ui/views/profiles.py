@@ -46,7 +46,7 @@ class ProfilesView(Adw.PreferencesPage):
         self.status_row = Adw.ActionRow()
         self.status_row.set_title("Active Simulator")
         self.status_row.set_subtitle("No racing simulator currently running (Idle)")
-        self.status_img = Gtk.Image.new_from_icon_name("applications-games-symbolic")
+        self.status_img = Gtk.Image.new_from_icon_name("input-gaming-symbolic")
         self.status_img.set_pixel_size(32)
         self.status_row.add_prefix(self.status_img)
 
@@ -116,7 +116,7 @@ class ProfilesView(Adw.PreferencesPage):
                 img.set_pixel_size(32)
                 expander.add_prefix(img)
             else:
-                expander.set_icon_name("applications-games-symbolic")
+                expander.set_icon_name("input-gaming-symbolic")
 
             # Enable Toggle for this game
             enable_row = Adw.ActionRow()
