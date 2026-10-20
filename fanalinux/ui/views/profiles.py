@@ -7,6 +7,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
+import os
 from typing import Optional, Dict, Any, Callable
 
 from fanalinux.core.presets import list_presets, load_preset
