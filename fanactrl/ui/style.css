@@ -1,0 +1,48 @@
+/* OpenFana Control Custom Styles */
+
+.btn-chip {
+    min-width: 44px;
+    min-height: 38px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 0.85rem;
+    font-family: monospace;
+    background-color: alpha(currentColor, 0.06);
+    border: 1px solid alpha(currentColor, 0.12);
+    transition: all 150ms ease-in-out;
+}
+
+.btn-chip.active {
+    background-color: var(--accent-bg-color, #3584e4);
+    color: var(--accent-fg-color, #ffffff);
+    border-color: var(--accent-bg-color, #3584e4);
+    box-shadow: 0 0 10px alpha(#3584e4, 0.6);
+}
+
+.led-preview-dot {
+    min-width: 22px;
+    min-height: 22px;
+    border-radius: 9999px;
+    border: 2px solid alpha(currentColor, 0.2);
+    background-color: #222222;
+    transition: all 100ms ease-out;
+}
+
+.gauge-throttle progress {
+    background-color: #2ec27e;
+}
+
+.gauge-brake progress {
+    background-color: #e01b24;
+}
+
+.gauge-clutch progress {
+    background-color: #3584e4;
+}
+
+.val-badge {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 1.05rem;
+}

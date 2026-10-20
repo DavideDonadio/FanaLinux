@@ -24,14 +24,17 @@ class TuningView(Adw.PreferencesPage):
         # 1. Profile Slot Switcher
         slot_group = Adw.PreferencesGroup()
         slot_group.set_title("Onboard Hardware Memory Slot")
+        slot_group.set_description("Directly loads/stores tuning settings in the wheelbase non-volatile memory")
 
         slot_row = Adw.ActionRow()
         slot_row.set_title("Active Hardware Profile")
-        slot_row.set_subtitle("Stored directly on the wheelbase EEPROM (Slots 1 to 5)")
+        slot_row.set_subtitle("Select which hardware preset slot to view or configure")
 
         self.slot_dropdown = Gtk.DropDown.new_from_strings([
             "Slot 1 (S_1)", "Slot 2 (S_2)", "Slot 3 (S_3)", "Slot 4 (S_4)", "Slot 5 (S_5)"
         ])
+        self.slot_dropdown.set_valign(Gtk.Align.CENTER)
+        self.slot_dropdown.set_size_request(160, -1)
         self.slot_dropdown.connect("notify::selected", self._on_slot_changed)
         slot_row.add_suffix(self.slot_dropdown)
         slot_group.add(slot_row)
@@ -53,21 +56,28 @@ class TuningView(Adw.PreferencesPage):
 
         # 3. Action Buttons (Apply / Reset)
         actions_group = Adw.PreferencesGroup()
-        actions_row = Adw.ActionRow()
-        actions_row.set_title("Hardware Synchronization")
-        actions_row.set_subtitle("Save current settings to selected wheelbase memory slot")
+        actions_group.set_title("Hardware Synchronization")
 
-        reset_btn = Gtk.Button(label="Reset to Defaults")
+        actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        actions_box.set_halign(Gtk.Align.END)
+        actions_box.set_margin_top(8)
+        actions_box.set_margin_bottom(16)
+
+        reset_btn = Gtk.Button(label="Reset Defaults")
+        reset_btn.set_size_request(140, 42)
+        reset_btn.set_valign(Gtk.Align.CENTER)
         reset_btn.connect("clicked", self._on_reset_defaults)
-        actions_row.add_suffix(reset_btn)
+        actions_box.append(reset_btn)
 
         apply_btn = Gtk.Button(label="Apply to Wheelbase")
+        apply_btn.set_size_request(180, 42)
+        apply_btn.set_valign(Gtk.Align.CENTER)
         apply_btn.add_css_class("suggested-action")
         apply_btn.add_css_class("pill")
         apply_btn.connect("clicked", self._on_apply_clicked)
-        actions_row.add_suffix(apply_btn)
+        actions_box.append(apply_btn)
 
-        actions_group.add(actions_row)
+        actions_group.add(actions_box)
         self.add(actions_group)
 
     def _create_control_row(self, group, meta):
@@ -79,18 +89,34 @@ class TuningView(Adw.PreferencesPage):
         current_val = getattr(self.profile, param_id, meta.get("default", 0))
 
         if meta.get("type") == "toggle":
+            switch_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            switch_box.set_valign(Gtk.Align.CENTER)
+
+            mode_label = Gtk.Label(label="Peak" if current_val else "Linear")
+            mode_label.set_width_chars(6)
+            mode_label.add_css_class("val-badge")
+
             switch = Gtk.Switch()
             switch.set_active(bool(current_val))
             switch.set_valign(Gtk.Align.CENTER)
-            row.add_suffix(switch)
+
+            def _on_switch_changed(sw, state):
+                mode_label.set_text("Peak" if sw.get_active() else "Linear")
+
+            switch.connect("state-set", _on_switch_changed)
+
+            switch_box.append(mode_label)
+            switch_box.append(switch)
+            row.add_suffix(switch_box)
             self._controls[param_id] = switch
         else:
-            val_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-            
+            val_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+            val_box.set_valign(Gtk.Align.CENTER)
+
             val_label = Gtk.Label(label=f"{current_val}{meta['unit']}")
-            val_label.set_size_request(60, -1)
-            val_label.add_css_class("numeric")
-            val_label.add_css_class("heading")
+            val_label.set_width_chars(6)
+            val_label.set_xalign(1.0)
+            val_label.add_css_class("val-badge")
 
             adj = Gtk.Adjustment(
                 value=current_val,
@@ -100,7 +126,8 @@ class TuningView(Adw.PreferencesPage):
                 page_increment=meta.get("step", 1) * 5
             )
             scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj)
-            scale.set_size_request(200, -1)
+            scale.set_size_request(240, -1)
+            scale.set_valign(Gtk.Align.CENTER)
             scale.set_draw_value(False)
 
             def _on_val_changed(adjustment, lbl=val_label, unit=meta['unit']):

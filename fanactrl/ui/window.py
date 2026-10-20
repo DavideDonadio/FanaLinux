@@ -2,10 +2,12 @@
 Main Application Window using Libadwaita.
 """
 
+import os
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
+gi.require_version('Gdk', '4.0')
+from gi.repository import Gtk, Adw, Gdk, GLib
 
 from fanactrl.core.device import FanatecDevice
 from fanactrl.core.evdev_listener import EvdevListener
@@ -19,7 +21,10 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.set_title("OpenFana Control")
-        self.set_default_size(960, 800)
+        self.set_default_size(980, 820)
+
+        # Load Custom Stylesheet
+        self._load_stylesheet()
 
         # Initialize Hardware & Evdev Monitor
         self.device = FanatecDevice()
@@ -82,6 +87,22 @@ class MainWindow(Adw.ApplicationWindow):
         self.evdev_listener.start()
 
         self.connect("close-request", self._on_close)
+
+    def _load_stylesheet(self):
+        try:
+            css_provider = Gtk.CssProvider()
+            css_path = os.path.join(os.path.dirname(__file__), "style.css")
+            if os.path.exists(css_path):
+                css_provider.load_from_path(css_path)
+                display = Gdk.Display.get_default()
+                if display:
+                    Gtk.StyleContext.add_provider_for_display(
+                        display,
+                        css_provider,
+                        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                    )
+        except Exception as e:
+            print(f"Notice: CSS provider error: {e}")
 
     def show_toast(self, message: str):
         toast = Adw.Toast(title=message)
