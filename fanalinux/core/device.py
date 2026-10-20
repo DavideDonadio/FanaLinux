@@ -226,3 +226,71 @@ class FanatecDevice:
         """
         payload = [REPORT_ID_LEGACY_CMD, 0xF8, 0x09, 0x01, 0x05, gear_index & 0xFF, 0x00, 0x00]
         self.write_report(payload)
+
+    def send_constant_force(self, level: int):
+        """
+        Send constant torque command to direct drive motor.
+        level: signed integer from -32768 (full left) to +32767 (full right). 0 = no force.
+        """
+        if self._fd is None or not self.connected:
+            return
+        if level == 0:
+            # Disable slot 0
+            payload = [REPORT_ID_LEGACY_CMD, 0x03, 0x08, 0x00, 0x80, 0x00, 0x00, 0x01]
+        else:
+            clamped = max(-32768, min(32767, int(level)))
+            val = (clamped + 0x8000) & 0xFFFF
+            payload = [REPORT_ID_LEGACY_CMD, 0x01, 0x08, val & 0xFF, (val >> 8) & 0xFF, 0x00, 0x00, 0x01]
+        self.write_report(payload)
+
+    def send_centering_spring(self, strength: int = 50):
+        """
+        Engage hardware autocenter spring effect.
+        strength: 0 to 100% (0 disables the spring).
+        """
+        if self._fd is None or not self.connected:
+            return
+        if strength <= 0:
+            payload = [REPORT_ID_LEGACY_CMD, 0x13, 0x0B, 0x80, 0x80, 0x00, 0x00, 0x00]
+        else:
+            coeff = max(1, min(15, int((strength / 100.0) * 15)))
+            k = (coeff << 4) | coeff
+            payload = [REPORT_ID_LEGACY_CMD, 0x11, 0x0B, 0x80, 0x80, k, 0x00, 0xFF]
+        self.write_report(payload)
+
+    def send_damper_friction(self, friction: int = 50):
+        """
+        Apply mechanical friction/damper resistance to wheel rotation.
+        friction: 0 to 100% (0 disables friction).
+        """
+        if self._fd is None or not self.connected:
+            return
+        if friction <= 0:
+            payload = [REPORT_ID_LEGACY_CMD, 0x43, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00]
+        else:
+            coeff = max(1, min(255, int((friction / 100.0) * 255)))
+            payload = [REPORT_ID_LEGACY_CMD, 0x41, 0x0C, coeff, 0x00, coeff, 0x00, 0xFF]
+        self.write_report(payload)
+
+    def send_handle_vibration(self, left: int = 0, right: int = 0):
+        """
+        Trigger rim grip vibration motors.
+        left, right: 0 to 255 intensity.
+        """
+        if self._fd is None or not self.connected:
+            return
+        payload = [
+            REPORT_ID_LEGACY_CMD,
+            0xF8, 0x09, 0x01, 0x03,
+            max(0, min(255, int(left))),
+            max(0, min(255, int(right))),
+            0x00
+        ]
+        self.write_report(payload)
+
+    def stop_all_forces(self):
+        """Emergency stop: zero and disable all active motor effects and vibrations."""
+        self.send_constant_force(0)
+        self.send_centering_spring(0)
+        self.send_damper_friction(0)
+        self.send_handle_vibration(0, 0)

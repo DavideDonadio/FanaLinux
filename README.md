@@ -88,7 +88,14 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 * **Pedal Travel Bars:** Color-coded gauges for Throttle (Green), Brake (Red), Clutch (Blue).
 * **24-Button Matrix:** Monospace pill chips highlighting live button clicks and shifter paddle pulls.
 
-### 5. Calibration & Diagnostics
+### 5. Interactive Force Feedback & Motor Test Suite
+* **Hardware Centering Spring:** Dynamically engages the direct-drive autocenter spring pulling the wheel toward 0.0° with adjustable strength slider.
+* **Mechanical Friction & Damping:** Interactive resistance test simulating direct drive natural damping and internal mechanical friction.
+* **Motor Torque Pulse Test:** Gentle alternating left/right torque pulse sequence (~23% holding force) with safety confirmation dialog to verify motor output.
+* **Rim Handle Vibration:** Tests Formula V2.5 left and right handle rumble motors with alternating and synchronized pulses.
+* **Emergency Force Cutoff:** Dedicated safety button instantly canceling all active motor torque, centering springs, and vibrations.
+
+### 6. Calibration & Hardware Diagnostics
 * **Center Calibration:** One-click optical/magnetic motor index zero-point calibration.
 * **Pedal Deadzones:** Customizable lower deadbands for Throttle, Brake, and Clutch.
 * **ClubSport Shifter Wizard:** Step-by-step guided wizard for 1st–7th gear and Reverse indexing.
