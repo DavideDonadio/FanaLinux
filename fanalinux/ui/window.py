@@ -17,6 +17,7 @@ from fanalinux.core.detector import GameDetector
 from fanalinux.core.presets import load_preset
 from fanalinux.ui.views.overview import OverviewView
 from fanalinux.ui.views.tuning import TuningView
+from fanalinux.ui.views.vibration import VibrationView
 from fanalinux.ui.views.leds import LedsView
 from fanalinux.ui.views.profiles import ProfilesView
 from fanalinux.ui.views.calibration import CalibrationView
@@ -72,6 +73,11 @@ class MainWindow(Adw.ApplicationWindow):
             on_toast_requested=self.show_toast,
             on_presets_changed=self._on_presets_changed
         )
+        self.vibration_view = VibrationView(
+            self.device,
+            haptic_engine=self.telemetry_mgr.haptic_engine,
+            on_toast_requested=self.show_toast
+        )
         self.leds_view = LedsView(
             self.device,
             telemetry_mgr=self.telemetry_mgr,
@@ -91,6 +97,9 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self.view_stack.add_titled_with_icon(
             self.tuning_view, "tuning", "Tuning Menu", "preferences-system-symbolic"
+        )
+        self.view_stack.add_titled_with_icon(
+            self.vibration_view, "vibration", "Vibration", "audio-volume-high-symbolic"
         )
         self.view_stack.add_titled_with_icon(
             self.leds_view, "leds", "LEDs & Display", "weather-clear-symbolic"

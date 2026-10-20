@@ -8,6 +8,8 @@ import json
 import logging
 from typing import Optional, Callable
 from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
+from fanalinux.core.haptics import HapticEngine
+from fanalinux.core.vibration import load_vibration_settings
 
 logger = logging.getLogger("fanalinux.telemetry.manager")
 
@@ -36,16 +38,19 @@ class TelemetryManager:
             on_telemetry=self._handle_telemetry,
             on_car_detected=self.set_car_name
         )
+        self.haptic_engine = HapticEngine(self.device)
         self._last_gear = None
         self._limiter_strobe = False
 
     def start(self):
         self.enabled = True
         self.ac_client.start()
+        self.haptic_engine.start()
 
     def stop(self):
         self.enabled = False
         self.ac_client.stop()
+        self.haptic_engine.stop()
         if self.device and self.device.connected:
             self.device.set_revleds([(0, 0, 0)] * 9)
             self.device.clear_display()
@@ -123,3 +128,6 @@ class TelemetryManager:
             self.device.set_flagleds([(255, 255, 0)] * 6)  # Yellow ABS warning
         elif tc_active:
             self.device.set_flagleds([(0, 100, 255)] * 6)   # Blue TC warning
+
+        # 4. Trigger Haptic Vibration Pulses (ABS, TC, Rev Limiter, Engine)
+        self.haptic_engine.update_telemetry(rpm, effective_max, abs_active, tc_active, speed_kmh)
