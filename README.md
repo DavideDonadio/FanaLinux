@@ -6,7 +6,7 @@
 
 **OpenFana Control** is a native, modern Linux GUI control suite designed to provide 1:1 parity with the Windows **Fanatec Control Panel** and **FanaLab** applications for Fanatec wheelbases and steering wheels.
 
-Built using **GTK4** and **Libadwaita** on top of a user-space **`hidapi` / `evdev`** driver engine, it eliminates the need for proprietary Windows software or Wine wrappers to configure and tune Fanatec sim racing hardware.
+Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evdev`** driver engine, it eliminates the need for proprietary Windows software or Wine wrappers to configure and tune Fanatec sim racing hardware.
 
 ---
 
@@ -25,17 +25,23 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidapi` / `evd
 │                   OpenFana Control UI (GTK4 + Libadwaita)              │
 │  [Overview & Gauges]  [1:1 Tuning Menu]  [LEDs & Display]  [Calibrate] │
 └───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Python GObject
+                                    │ Python GObject / Evdev
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │                       Fanatec Device Controller                        │
 ├───────────────────────────────────┬────────────────────────────────────┤
-│           hidapi (/dev/hidraw*)   │        evdev (/dev/input/event*)   │
+│           Native Linux /dev/hidraw│        evdev (/dev/input/event*)   │
 │   • Multi-color RevLEDs (BGR565)  │   • Sub-ms 16-bit steering angle   │
 │   • Flag LEDs (Left/Right)        │   • 16-bit throttle / brake axes   │
 │   • OLED Display Segments         │   • Button matrix & shift paddles  │
 │   • EEPROM Tuning Parameter Write │                                    │
-└───────────────────────────────────┴────────────────────────────────────┘
+├───────────────────────────────────┴────────────────────────────────────┤
+│              In-Game Telemetry Engine (FanaLab Equivalent)             │
+│   • Ingests Assetto Corsa UDP broadcasts on localhost port 9996        │
+│   • Computes live RPM percentage & drives Formula V2.5 RevLEDs         │
+│   • Renders active Gear (1, 2, 3, N, R) or Speed directly to OLED      │
+│   • Flashes Flag LEDs on ABS, Traction Control, or Pit Limiter         │
+└───────────────────────────────────┬────────────────────────────────────┘
                                     │ USB (VID: 0x0EB7, PID: 0x0020)
                                     ▼
                  Fanatec CSL DD Wheelbase + Formula V2.5 Rim
@@ -43,21 +49,49 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidapi` / `evd
 
 ---
 
-## Technical Protocol Specification (For Maintainers & LLM Agents)
+## Features Implemented (1:1 Parity Status)
 
-This section documents the reverse-engineered USB HID protocol so that future maintainers and autonomous LLM agents can inspect, extend, or port the driver to other languages (C/Rust/Go).
+### 1. Hardware Tuning Menu (1:1 with Wheelbase EEPROM)
+* **SEN:** Wheel Sensitivity / Rotation degrees (90° to 2520°, 0 = Auto).
+* **FF:** Overall Force Feedback Master Strength (0% to 100%).
+* **FFS:** Force Feedback Scaling (Linear mode vs Peak torque mode).
+* **NDP / NFR / NIN:** Natural Damper, Natural Friction, and Natural Inertia.
+* **INT / FEI:** Interpolation smoothing filter and Force Effect Intensity.
+* **FOR / SPR / DPR:** In-game physics multipliers (Constant Force, Spring, Damper).
+* **SHO:** Wheel rim handle vibration / shock motor intensity.
+* **BRF:** Load-cell brake force sensitivity.
+* **Hardware Profile Slots:** Save / switch directly across Base Memory Slots 1 through 5.
+* **Car / Game Preset Manager:** Save and load custom tuning configurations to disk (`~/.config/open-fanactrl/presets/`).
+
+### 2. Live In-Game Telemetry Engine (FanaLab Equivalent)
+* **Assetto Corsa Native UDP Integration:** Listens to Assetto Corsa on `127.0.0.1:9996` with zero configuration needed.
+* **Dynamic RevLEDs:** Real-time RPM climb across the 9 Formula V2.5 multi-color LEDs with shift point strobe.
+* **In-Game OLED Display:** Automatically renders live Gear (`1`, `2`, `3`, `N`, `R`) or Vehicle Speed (KM/H).
+* **Flag Alerts:** Flashes side Flag clusters on ABS activation or Traction Control intervention.
+
+### 3. Overview & Input Visualizer
+* **16-bit Steering Angle Gauge:** Sub-millisecond evdev reading with degrees readout.
+* **Pedal Travel Bars:** Color-coded gauges for Throttle (Green), Brake (Red), Clutch (Blue).
+* **24-Button Matrix:** Monospace pill chips highlighting live button clicks and shifter paddle pulls.
+
+### 4. Calibration & Diagnostics
+* **Center Calibration:** One-click optical/magnetic motor index zero-point calibration.
+* **Pedal Deadzones:** Customizable lower deadbands for Throttle, Brake, and Clutch.
+* **ClubSport Shifter Wizard:** Step-by-step guided wizard for 1st–7th gear and Reverse indexing.
+* **Firmware Version Display:** Reports Base, Motor Controller, and Steering Rim revisions.
+
+---
+
+## Technical Protocol Specification (For Maintainers & LLM Agents)
 
 ### 1. USB Identification
 * **Vendor ID:** `0x0EB7` (Endor AG / Fanatec)
 * **CSL DD Product ID (PID):** `0x0020` (Native PC Mode, Red LED)
-* **ClubSport V2.5 PID:** `0x0004` (Compatibility Mode, Yellow LED)
 
 ### 2. HID Endpoints & Report IDs
-* **Report ID `0x01` (Standard / Legacy):**
-  * Output buffer: 8 bytes (`[0x01, CMD, ...]`).
-  * Used for: Base initialization (`0xF5`), 7-segment / OLED telemetry display (`0xF8 0x09 0x01 0x02`), and Center Calibration (`0xF8 0x09 0x01 0x06 0x01`).
-* **Report ID `0xFF` (DirectDrive Protocol Pipe):**
-  * Output buffer: 64 bytes (`[0xFF, SubCommand, ...]`).
+* **Report ID `0x01` (Standard / Legacy):** 8 bytes (`[0x01, CMD, ...]`).
+  * Used for: Base initialization (`0xF5`), OLED display (`0xF8 0x09 0x01 0x02`), and Center Calibration (`0xF8 0x09 0x01 0x06 0x01`).
+* **Report ID `0xFF` (DirectDrive Protocol Pipe):** 64 bytes (`[0xFF, SubCommand, ...]`).
   * Used for: Multi-color LED states (RPM & Flags) and internal EEPROM Tuning parameters.
 
 ### 3. Multi-Color LEDs (Formula V2.5 / Podium Wheels)
@@ -69,76 +103,16 @@ $$\text{BGR565} = ((\text{Blue} \gg 3) \ll 11) \mid ((\text{Green} \gg 2) \ll 5)
 * **Flag LEDs (6 LEDs: 3 Left, 3 Right):**
   * Header: `[0xFF, 0x01, 0x01]` followed by 6x 16-bit BGR565 words, padded to 64 bytes.
 
-### 4. OLED / 7-Segment Display
-* Payload: `[0x01, 0xF8, 0x09, 0x01, 0x02, seg1, seg2, seg3]`
-* Display mapping converts ASCII characters into 7-segment bit patterns (see `fanactrl/core/protocol.py`).
-
-### 5. Hardware Tuning Menu Register Map (Report `0xFF 0x03`)
-Tuning writes use: `[0xFF, 0x03, 0x00, ...]` where `buf[addr + 1] = value`:
-
-| Register | Address | Description | Range |
-| :--- | :---: | :--- | :--- |
-| **SLOT** | `0x02` | Active Hardware Profile Slot | 1 to 5 |
-| **SEN** | `0x03` | Wheel Sensitivity / Degrees of Rotation | 90° to 2520° (Raw: `deg // 10`) |
-| **FF** | `0x04` | Master Force Feedback Strength | 0% to 100% |
-| **SHO** | `0x05` | Handle Shock / Vibration Intensity | 0% to 100% |
-| **FFS** | `0x07` | Force Feedback Scaling | 0 = Linear, 1 = Peak |
-| **FOR** | `0x0A` | Game Constant Force Multiplier | 0% to 120% |
-| **SPR** | `0x0B` | Game Spring Multiplier | 0% to 120% |
-| **DPR** | `0x0C` | Game Damper Multiplier | 0% to 120% |
-| **NDP** | `0x0D` | Natural Damper Resistance | 0% to 100% |
-| **NFR** | `0x0E` | Natural Friction Resistance | 0% to 100% |
-| **BRF** | `0x10` | Load Cell Brake Force | 0% to 100% |
-| **FEI** | `0x11` | Force Effect Intensity | 0% to 100% |
-| **INT** | `0x14` | FFB Interpolation Filter | 0 to 20 |
-| **NIN** | `0x15` | Natural Inertia | 0% to 100% |
-
 ---
 
-## Installation & Setup on Linux
+## Installation & Launch
 
-### 1. Permissions (`udev` Rule)
-Ensure non-root access to Fanatec USB HID nodes:
 ```bash
-sudo bash -c 'cat << "EOF" > /etc/udev/rules.d/99-fanatec.rules
-# Fanatec Wheelbases and Peripherals
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0eb7", MODE="0666", TAG+="uaccess"
-SUBSYSTEM=="usb", ATTRS{idVendor}=="0eb7", MODE="0666", TAG+="uaccess"
-EOF'
-sudo udevadm control --reload-rules && sudo udevadm trigger
+# Clone and enter repo
+cd ~/Documents/Projects/open-fanactrl
+
+# Launch application
+.venv/bin/open-fanactrl
 ```
 
-### 2. Environment Setup
-```bash
-git clone https://github.com/your-username/open-fanactrl.git
-cd open-fanactrl
-
-# Create virtual environment with system GTK4 / Libadwaita
-uv venv --system-site-packages
-source .venv/bin/activate
-uv pip install hidapi
-```
-
-### 3. Launching OpenFana Control
-```bash
-./fanactrl/main.py
-```
-
----
-
-## Implemented Features
-
-* [x] **Live Hardware Monitor:** Real-time 16-bit steering angle gauge, Throttle, Brake, Clutch, and 24-button state matrix.
-* [x] **1:1 Tuning Menu:** Complete controls for SEN, FF, FFS, NDP, NFR, NIN, INT, FEI, FOR, SPR, DPR, SHO, and BRF across Hardware Slots 1 to 5.
-* [x] **Formula V2.5 Multi-Color LEDs:** Real-time BGR565 control over 9 RevLEDs and 6 Flag LEDs.
-* [x] **OLED Display Control:** Direct custom text and telemetry rendering.
-* [x] **Center Calibration:** One-click hardware motor index zero-point calibration.
-* [x] **Libadwaita Modern UI:** Follows GNOME / Fedora design patterns with light/dark theme adaptation.
-
----
-
-## Roadmap
-
-- [ ] Telemetry Daemon (listening on UDP port `9996` for Assetto Corsa, ACC, and iRacing via Proton).
-- [ ] Per-Car Auto Profile Switcher (FanaLab feature).
-- [ ] Flatpak packaging for Flathub distribution.
+Or press the **Super (Windows) key** in GNOME and search for **"OpenFana Control"**!

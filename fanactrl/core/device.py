@@ -8,8 +8,9 @@ Maintains concurrent compatibility with evdev gaming inputs.
 import os
 import glob
 import time
+import select
 import logging
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict, Any
 
 from fanactrl.core.protocol import (
     FANATEC_VENDOR_ID,
@@ -41,15 +42,16 @@ class FanatecDevice:
         self.connected = False
         self.product_name = "Fanatec CSL DD"
         self.rim_name = "ClubSport Steering Wheel Formula V2.5"
+        self.firmware_base = "1.1.8.4"
+        self.firmware_motor = "1.0.3.2"
+        self.firmware_rim = "45"
 
     def find_hidraw_path(self) -> Optional[str]:
         """Locate the Fanatec hidraw device node."""
-        # Check by-id symlinks first
         by_id_matches = glob.glob("/dev/input/by-id/*Fanatec*-hidraw*")
         if by_id_matches:
             return os.path.realpath(by_id_matches[0])
 
-        # Scan /sys/class/hidraw entries
         for entry in glob.glob("/sys/class/hidraw/hidraw*"):
             uevent_path = os.path.join(entry, "device", "uevent")
             if os.path.exists(uevent_path):
@@ -184,7 +186,43 @@ class FanatecDevice:
                 self.write_report(out_buf)
                 time.sleep(0.005)
 
+    def read_tuning_profile(self, slot: int = 1) -> Optional[TuningProfile]:
+        """Request and parse the active tuning report from the wheel base."""
+        if self._fd is None or not self.connected:
+            return None
+        try:
+            # Send slot query command: [0xFF, 0x03, 0x01, slot]
+            buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, slot & 0xFF] + [0x00] * 60
+            self.write_report(buf)
+            time.sleep(0.02)
+
+            # Check if an input report is ready
+            r, _, _ = select.select([self._fd], [], [], 0.08)
+            if r:
+                data = os.read(self._fd, 64)
+                if len(data) >= 32 and data[0] == 0xFF and data[1] == 0x03:
+                    prof = TuningProfile(slot=slot)
+                    # Parse registers from buffer
+                    # sen: addr 0x03
+                    raw_sen = data[TUNING_REGISTERS["SEN"] + 1]
+                    prof.sen = raw_sen * 10
+                    prof.ff = data[TUNING_REGISTERS["FF"] + 1]
+                    prof.ndp = data[TUNING_REGISTERS["NDP"] + 1]
+                    prof.nfr = data[TUNING_REGISTERS["NFR"] + 1]
+                    return prof
+        except Exception as e:
+            logger.debug(f"Could not read tuning report: {e}")
+        return None
+
     def calibrate_center(self):
         """Trigger center calibration sequence in hardware."""
         payload = [REPORT_ID_LEGACY_CMD, 0xF8, 0x09, 0x01, 0x06, 0x01, 0x00, 0x00]
+        self.write_report(payload)
+
+    def calibrate_shifter_step(self, gear_index: int):
+        """
+        Trigger shifter gear calibration step.
+        gear_index: 0=Reverse, 1=1st, 2=2nd, ... 7=7th.
+        """
+        payload = [REPORT_ID_LEGACY_CMD, 0xF8, 0x09, 0x01, 0x05, gear_index & 0xFF, 0x00, 0x00]
         self.write_report(payload)

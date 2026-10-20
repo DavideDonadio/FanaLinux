@@ -1,13 +1,19 @@
 """
 Tuning Menu View: 1:1 Hardware Motor & Steering Tuning Controls.
+Includes Preset Management (Save, Load, Export/Import JSON).
 """
 
+import os
+import json
+import pathlib
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 
 from fanactrl.core.tuning import TuningProfile, TUNING_METADATA
+
+PRESETS_DIR = pathlib.Path.home() / ".config" / "open-fanactrl" / "presets"
 
 
 class TuningView(Adw.PreferencesPage):
@@ -18,17 +24,20 @@ class TuningView(Adw.PreferencesPage):
         self.profile = TuningProfile()
         self._controls = {}
 
+        # Ensure preset directory exists
+        PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+
         self._build_ui()
 
     def _build_ui(self):
-        # 1. Profile Slot Switcher
+        # 1. Profile Slot & Preset Switcher
         slot_group = Adw.PreferencesGroup()
-        slot_group.set_title("Onboard Hardware Memory Slot")
-        slot_group.set_description("Directly loads/stores tuning settings in the wheelbase non-volatile memory")
+        slot_group.set_title("Hardware Memory Slots &amp; Presets")
+        slot_group.set_description("Select hardware memory slots or save custom per-car game presets")
 
         slot_row = Adw.ActionRow()
-        slot_row.set_title("Active Hardware Profile")
-        slot_row.set_subtitle("Select which hardware preset slot to view or configure")
+        slot_row.set_title("Active Hardware Slot")
+        slot_row.set_subtitle("Directly selects wheelbase EEPROM profile (Slots 1 to 5)")
 
         self.slot_dropdown = Gtk.DropDown.new_from_strings([
             "Slot 1 (S_1)", "Slot 2 (S_2)", "Slot 3 (S_3)", "Slot 4 (S_4)", "Slot 5 (S_5)"
@@ -38,6 +47,29 @@ class TuningView(Adw.PreferencesPage):
         self.slot_dropdown.connect("notify::selected", self._on_slot_changed)
         slot_row.add_suffix(self.slot_dropdown)
         slot_group.add(slot_row)
+
+        preset_row = Adw.ActionRow()
+        preset_row.set_title("Custom Car / Game Preset")
+        preset_row.set_subtitle("Load or save tuning configurations to disk")
+
+        preset_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        preset_box.set_valign(Gtk.Align.CENTER)
+
+        self.preset_entry = Gtk.Entry()
+        self.preset_entry.set_placeholder_text("Assetto Corsa - GT3")
+        self.preset_entry.set_text("Assetto Corsa - GT3")
+        self.preset_entry.set_width_chars(18)
+        self.preset_entry.set_valign(Gtk.Align.CENTER)
+        preset_box.append(self.preset_entry)
+
+        save_preset_btn = Gtk.Button(label="Save Preset")
+        save_preset_btn.set_size_request(110, 38)
+        save_preset_btn.set_valign(Gtk.Align.CENTER)
+        save_preset_btn.connect("clicked", self._on_save_preset)
+        preset_box.append(save_preset_btn)
+
+        preset_row.add_suffix(preset_box)
+        slot_group.add(preset_row)
 
         self.add(slot_group)
 
@@ -147,6 +179,28 @@ class TuningView(Adw.PreferencesPage):
         self.profile.slot = slot_num
         if self.on_toast_requested:
             self.on_toast_requested(f"Switched to Hardware Profile Slot {slot_num}")
+
+    def _on_save_preset(self, btn):
+        preset_name = self.preset_entry.get_text().strip() or "Custom"
+        safe_name = "".join(c for c in preset_name if c.isalnum() or c in (' ', '_', '-')).rstrip()
+        path = PRESETS_DIR / f"{safe_name}.json"
+        
+        # Pull current UI state into profile
+        for meta in TUNING_METADATA:
+            param_id = meta["id"]
+            ctrl = self._controls.get(param_id)
+            if not ctrl:
+                continue
+            if isinstance(ctrl, Gtk.Switch):
+                setattr(self.profile, param_id, 1 if ctrl.get_active() else 0)
+            elif isinstance(ctrl, Gtk.Adjustment):
+                setattr(self.profile, param_id, int(ctrl.get_value()))
+
+        with open(path, "w") as f:
+            f.write(self.profile.to_json())
+
+        if self.on_toast_requested:
+            self.on_toast_requested(f"Saved preset '{safe_name}' to disk")
 
     def _on_reset_defaults(self, btn):
         self.profile = TuningProfile()

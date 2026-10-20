@@ -1,5 +1,6 @@
 """
 LEDs & Display Telemetry View (FanaLab Equivalent).
+Includes Native Assetto Corsa UDP Telemetry Ingestion.
 """
 
 import gi
@@ -9,6 +10,8 @@ from gi.repository import Gtk, Adw, GLib
 import threading
 import time
 
+from fanactrl.core.telemetry.manager import TelemetryManager
+
 
 class LedsView(Adw.PreferencesPage):
     def __init__(self, device, on_toast_requested=None):
@@ -17,13 +20,52 @@ class LedsView(Adw.PreferencesPage):
         self.on_toast_requested = on_toast_requested
         self._led_dots = []
 
+        # Initialize In-Game Telemetry Manager
+        self.telemetry_mgr = TelemetryManager(self.device)
+
         self._build_ui()
 
     def _build_ui(self):
-        # 1. 1-inch OLED Display Group
+        # 1. Live In-Game Telemetry Engine (Assetto Corsa & Sim Games)
+        telem_group = Adw.PreferencesGroup()
+        telem_group.set_title("Live In-Game Telemetry (Assetto Corsa / FanaLab)")
+        telem_group.set_description(
+            "Captures live RPM, gear, speed, flags, and ABS directly from Assetto Corsa "
+            "over UDP port 9996 and drives the Formula V2.5 RevLEDs and OLED display."
+        )
+
+        telem_toggle_row = Adw.ActionRow()
+        telem_toggle_row.set_title("Assetto Corsa Telemetry Engine")
+        telem_toggle_row.set_subtitle("Listening on localhost UDP port 9996")
+        telem_toggle_row.set_icon_name("media-record-symbolic")
+
+        self.telem_status_label = Gtk.Label(label="Disabled")
+        self.telem_status_label.set_valign(Gtk.Align.CENTER)
+        self.telem_status_label.add_css_class("val-badge")
+        telem_toggle_row.add_suffix(self.telem_status_label)
+
+        self.telem_switch = Gtk.Switch()
+        self.telem_switch.set_valign(Gtk.Align.CENTER)
+        self.telem_switch.connect("state-set", self._on_telemetry_toggled)
+        telem_toggle_row.add_suffix(self.telem_switch)
+        telem_group.add(telem_toggle_row)
+
+        mode_row = Adw.ActionRow()
+        mode_row.set_title("OLED In-Game Display Mode")
+        mode_row.set_subtitle("Choose what information appears on your rim display while driving")
+
+        self.mode_dropdown = Gtk.DropDown.new_from_strings(["Current Gear (1, 2, 3, N, R)", "Speed (KM/H)"])
+        self.mode_dropdown.set_valign(Gtk.Align.CENTER)
+        self.mode_dropdown.connect("notify::selected", self._on_mode_changed)
+        mode_row.add_suffix(self.mode_dropdown)
+        telem_group.add(mode_row)
+
+        self.add(telem_group)
+
+        # 2. 1-inch OLED Display Manual Controls
         oled_group = Adw.PreferencesGroup()
-        oled_group.set_title("OLED Rim Display")
-        oled_group.set_description("Write custom strings or simulated telemetry to the Formula V2.5 center display")
+        oled_group.set_title("OLED Rim Display (Manual Override)")
+        oled_group.set_description("Write custom strings directly to the Formula V2.5 center display")
 
         disp_row = Adw.ActionRow()
         disp_row.set_title("Display String")
@@ -57,7 +99,7 @@ class LedsView(Adw.PreferencesPage):
         oled_group.add(disp_row)
         self.add(oled_group)
 
-        # 2. RevLEDs (9 Multi-Color LEDs) Group
+        # 3. RevLEDs (9 Multi-Color LEDs) Group
         rev_group = Adw.PreferencesGroup()
         rev_group.set_title("RPM RevLEDs (9 LEDs)")
         rev_group.set_description("Sequential multi-color shift indicators (Green -> Yellow -> Red / Blue)")
@@ -69,7 +111,6 @@ class LedsView(Adw.PreferencesPage):
         rev_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         rev_box.set_valign(Gtk.Align.CENTER)
 
-        # Visual preview dots
         dots_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         dots_box.set_valign(Gtk.Align.CENTER)
         self._led_dots = []
@@ -91,7 +132,7 @@ class LedsView(Adw.PreferencesPage):
         rev_group.add(rev_row)
         self.add(rev_group)
 
-        # 3. Flag LEDs (6 Multi-Color LEDs: 3 Left, 3 Right)
+        # 4. Flag LEDs (6 Multi-Color LEDs: 3 Left, 3 Right)
         flag_group = Adw.PreferencesGroup()
         flag_group.set_title("Side Flag LEDs (6 LEDs)")
         flag_group.set_description("Cluster alerts for marshaling flags, pit limiter, and ABS warnings")
@@ -127,6 +168,24 @@ class LedsView(Adw.PreferencesPage):
         flag_group.add(flag_row)
         self.add(flag_group)
 
+    def _on_telemetry_toggled(self, switch, state):
+        if state:
+            self.telemetry_mgr.start()
+            self.telem_status_label.set_text("Listening (UDP 9996)")
+            self.telem_status_label.add_css_class("success")
+            if self.on_toast_requested:
+                self.on_toast_requested("Assetto Corsa Telemetry Engine active! Waiting for session...")
+        else:
+            self.telemetry_mgr.stop()
+            self.telem_status_label.set_text("Disabled")
+            self.telem_status_label.remove_css_class("success")
+            if self.on_toast_requested:
+                self.on_toast_requested("Telemetry engine stopped")
+
+    def _on_mode_changed(self, dropdown, param):
+        idx = dropdown.get_selected()
+        self.telemetry_mgr.display_mode = "gear" if idx == 0 else "speed"
+
     def _on_send_display(self, btn):
         text = self.disp_entry.get_text()
         if self.device and self.device.connected:
@@ -144,17 +203,14 @@ class LedsView(Adw.PreferencesPage):
         for i, dot in enumerate(self._led_dots):
             if i < active_count:
                 dot.set_css_classes(["led-preview-dot"])
-                # Color based on index
                 if i < 3:
-                    c = "#2ec27e" # Green
+                    c = "#2ec27e"
                 elif i < 6:
-                    c = "#f6d32d" # Yellow
+                    c = "#f6d32d"
                 elif i < 8:
-                    c = "#e01b24" # Red
+                    c = "#e01b24"
                 else:
-                    c = "#3584e4" # Blue
-                if color_css:
-                    c = color_css
+                    c = "#3584e4"
                 dot.set_opacity(1.0)
             else:
                 dot.set_css_classes(["led-preview-dot"])
@@ -178,10 +234,9 @@ class LedsView(Adw.PreferencesPage):
                 GLib.idle_add(self._set_gui_dots, i)
                 time.sleep(0.1)
 
-            # Flash all white twice
             for _ in range(2):
                 self.device.set_revleds([(255, 255, 255)] * 9)
-                GLib.idle_add(self._set_gui_dots, 9, "#ffffff")
+                GLib.idle_add(self._set_gui_dots, 9)
                 time.sleep(0.12)
                 self.device.set_revleds([(0, 0, 0)] * 9)
                 GLib.idle_add(self._set_gui_dots, 0)
