@@ -76,7 +76,11 @@ class TelemetryManager:
         else:
             self.max_rpm = 6500
 
-    def _handle_telemetry(self, rpm: int, gear: int, speed_kmh: float, abs_active: bool, tc_active: bool):
+    def _handle_telemetry(self, rpm: int, gear: int, speed_kmh: float, abs_active: bool, tc_active: bool,
+                          wheel_slip=(0.0, 0.0, 0.0, 0.0),
+                          wheel_speed=(0.0, 0.0, 0.0, 0.0),
+                          suspension=(0.0, 0.0, 0.0, 0.0),
+                          steer_angle=0.0):
         if not self.enabled or not self.device or not self.device.connected:
             return
 
@@ -129,5 +133,11 @@ class TelemetryManager:
         elif tc_active:
             self.device.set_flagleds([(0, 100, 255)] * 6)   # Blue TC warning
 
-        # 4. Trigger Haptic Vibration Pulses (ABS, TC, Rev Limiter, Engine)
-        self.haptic_engine.update_telemetry(rpm, effective_max, abs_active, tc_active, speed_kmh)
+        # 4. Trigger Haptic Vibration Pulses (ABS, TC, Rev Limiter, Engine, Wheel Lock/Spin, Slip)
+        self.haptic_engine.update_telemetry(
+            rpm, effective_max, abs_active, tc_active, speed_kmh,
+            wheel_slip=wheel_slip,
+            wheel_speed=wheel_speed,
+            suspension=suspension,
+            steer_angle=steer_angle
+        )

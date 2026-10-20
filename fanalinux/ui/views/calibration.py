@@ -10,6 +10,8 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 
+from fanalinux.ui.widgets.wheel_dial import WheelDialWidget
+
 
 class CalibrationView(Adw.PreferencesPage):
     def __init__(self, device, on_toast_requested=None):
@@ -132,25 +134,17 @@ class CalibrationView(Adw.PreferencesPage):
 
         self.add(ffb_group)
 
-        # 2. Wheel Center Calibration
+        # 2. Wheel Center Calibration & Visual Dial
         center_group = Adw.PreferencesGroup()
         center_group.set_title("Wheel Center Calibration")
         center_group.set_description(
             "Recalibrates the motor optical/magnetic index zero point. "
-            "Ensure your steering wheel is physically centered before triggering."
+            "Ensure your steering wheel is physically centered (0.0°) before triggering."
         )
 
-        cal_row = Adw.ActionRow()
-        cal_row.set_title("Calibrate Center (0.0° Index)")
-        cal_row.set_subtitle("Writes persistent zero-position into base non-volatile flash")
-
-        cal_btn = Gtk.Button(label="Calibrate Center")
-        cal_btn.set_size_request(170, 42)
-        cal_btn.set_valign(Gtk.Align.CENTER)
-        cal_btn.add_css_class("destructive-action")
-        cal_btn.connect("clicked", self._on_calibrate_clicked)
-        cal_row.add_suffix(cal_btn)
-        center_group.add(cal_row)
+        # Embedded 360° Circular Steering Visualizer Dial (Screenshot 2)
+        self.wheel_dial = WheelDialWidget(on_calibrate_clicked=self._on_calibrate_clicked)
+        center_group.add(self.wheel_dial)
 
         self.add(center_group)
 
@@ -324,6 +318,10 @@ class CalibrationView(Adw.PreferencesPage):
         if self.on_toast_requested:
             self.on_toast_requested("Testing tactile vibration (18 Hz rumble)...")
 
+    def update_steering(self, norm_val: float, raw_val: int):
+        deg = norm_val * 450.0
+        GLib.idle_add(self.wheel_dial.set_angle, deg)
+
     def _on_emergency_stop_clicked(self, btn):
         if self.device:
             self.device.stop_all_forces()
@@ -332,7 +330,7 @@ class CalibrationView(Adw.PreferencesPage):
         if self.on_toast_requested:
             self.on_toast_requested("Emergency Cutoff: All forces, springs, and vibrations zeroed!")
 
-    def _on_calibrate_clicked(self, btn):
+    def _on_calibrate_clicked(self, btn=None):
         if not self.device or not self.device.connected:
             if self.on_toast_requested:
                 self.on_toast_requested("Device not connected!")

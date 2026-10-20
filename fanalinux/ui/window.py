@@ -116,8 +116,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_content(self.toast_overlay)
 
         # Start Evdev Listener
+        def _on_steering_event(norm_val: float, raw_val: int):
+            self.overview_view.update_steering(norm_val, raw_val)
+            self.calibration_view.update_steering(norm_val, raw_val)
+
         self.evdev_listener = EvdevListener(
-            on_steering=self.overview_view.update_steering,
+            on_steering=_on_steering_event,
             on_throttle=self.overview_view.update_throttle,
             on_brake=self.overview_view.update_brake,
             on_clutch=self.overview_view.update_clutch,

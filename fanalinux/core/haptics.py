@@ -32,6 +32,11 @@ class HapticEngine:
         self._last_abs_pulse = 0.0
         self._last_tc_pulse = 0.0
         self._last_rev_pulse = 0.0
+        self._last_lock_pulse = 0.0
+        self._last_spin_pulse = 0.0
+        self._last_slip_pulse = 0.0
+        self._last_susp_pulse = 0.0
+        self._last_suspension = [0.0, 0.0, 0.0, 0.0]
 
         # Worker thread
         self._worker_thread: Optional[threading.Thread] = None
@@ -74,7 +79,11 @@ class HapticEngine:
             self._pulse_end_time = max(self._pulse_end_time, target_end)
             self._pulse_active = True
 
-    def update_telemetry(self, rpm: int, max_rpm: int, abs_active: bool, tc_active: bool, speed_kmh: float = 0.0):
+    def update_telemetry(self, rpm: int, max_rpm: int, abs_active: bool, tc_active: bool, speed_kmh: float = 0.0,
+                         wheel_slip=(0.0, 0.0, 0.0, 0.0),
+                         wheel_speed=(0.0, 0.0, 0.0, 0.0),
+                         suspension=(0.0, 0.0, 0.0, 0.0),
+                         steer_angle=0.0):
         """Process incoming telemetry frame and dispatch vibration effects."""
         if not self._running or not self.device or not self.device.connected:
             return
@@ -86,7 +95,6 @@ class HapticEngine:
         # 1. ABS Event
         if abs_active and self.settings.abs_enabled:
             duration_s = max(0.04, self.settings.abs_duration / 1000.0)
-            # Re-trigger with a tiny gap if ABS stays clamped
             if (now - self._last_abs_pulse) >= (duration_s * 0.9):
                 self._last_abs_pulse = now
                 intensity = max(10, min(100, self.settings.abs_strength * 10))
@@ -108,7 +116,51 @@ class HapticEngine:
                 intensity = max(10, min(100, self.settings.rev_strength * 10))
                 self.trigger_pulse(intensity, 0.05)
 
-        # 4. Engine Vibration baseline
+        # 4. Wheel Lock (individual tire lockup during braking)
+        if self.settings.wheel_lock_enabled and speed_kmh > 15.0:
+            is_locked = any(s < -0.25 for s in wheel_slip)
+            if is_locked and (now - self._last_lock_pulse) >= 0.08:
+                self._last_lock_pulse = now
+                intensity = max(10, min(100, self.settings.wheel_lock_strength * 10))
+                self.trigger_pulse(intensity, 0.07)
+
+        # 5. Wheel Spin (driven wheel loss of traction under power)
+        if self.settings.wheel_spin_enabled and speed_kmh > 5.0:
+            is_spinning = any(s > 0.30 for s in wheel_slip)
+            if is_spinning and (now - self._last_spin_pulse) >= 0.08:
+                self._last_spin_pulse = now
+                intensity = max(10, min(100, self.settings.wheel_spin_strength * 10))
+                self.trigger_pulse(intensity, 0.07)
+
+        # 6. Understeer & Oversteer Slip Angle Vibration
+        fl_slip, fr_slip, rl_slip, rr_slip = wheel_slip if len(wheel_slip) >= 4 else (0, 0, 0, 0)
+        front_slip = max(abs(fl_slip), abs(fr_slip))
+        rear_slip = max(abs(rl_slip), abs(rr_slip))
+
+        if self.settings.understeer_enabled and speed_kmh > 20.0 and abs(steer_angle) > 0.1:
+            # Front tires scrubbing significantly more than rear
+            if (front_slip - rear_slip) > 0.15 and (now - self._last_slip_pulse) >= 0.09:
+                self._last_slip_pulse = now
+                intensity = max(10, min(100, self.settings.understeer_strength * 10))
+                self.trigger_pulse(intensity, 0.08)
+        elif self.settings.oversteer_enabled and speed_kmh > 20.0:
+            # Rear tires stepping out
+            if (rear_slip - front_slip) > 0.20 and (now - self._last_slip_pulse) >= 0.09:
+                self._last_slip_pulse = now
+                intensity = max(10, min(100, self.settings.oversteer_strength * 10))
+                self.trigger_pulse(intensity, 0.08)
+
+        # 7. Suspension Travel / Curb Strike Vibration
+        if self.settings.suspension_enabled and len(suspension) >= 4:
+            susp_thresh = max(0.01, self.settings.suspension_threshold / 100.0)
+            deltas = [abs(curr - prev) for curr, prev in zip(suspension, self._last_suspension)]
+            self._last_suspension = list(suspension)
+            if any(d > susp_thresh for d in deltas) and (now - self._last_susp_pulse) >= 0.08:
+                self._last_susp_pulse = now
+                intensity = max(10, min(100, self.settings.suspension_strength * 10))
+                self.trigger_pulse(intensity, 0.06)
+
+        # 8. Engine Vibration baseline
         if self.settings.engine_enabled and rpm > 300:
             initial_thresh = (self.settings.engine_initial / 100.0)
             if rpm_ratio >= initial_thresh:

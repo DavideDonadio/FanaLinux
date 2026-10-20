@@ -123,8 +123,28 @@ class AssettoCorsaTelemetry:
                         # Gear: 0 = R, 1 = N, 2 = 1st, 3 = 2nd...
                         gear = raw_gear - 1
 
+                        wheel_slip = (0.0, 0.0, 0.0, 0.0)
+                        wheel_speed = (0.0, 0.0, 0.0, 0.0)
+                        suspension = (0.0, 0.0, 0.0, 0.0)
+                        steer_angle = 0.0
+
+                        if len(data) >= 200:
+                            try:
+                                steer_angle = float(struct.unpack_from("<f", data, 24)[0])
+                                wheel_slip = struct.unpack_from("<4f", data, 56)
+                                wheel_speed = struct.unpack_from("<4f", data, 104)
+                                suspension = struct.unpack_from("<4f", data, 184)
+                            except Exception:
+                                pass
+
                         if self.on_telemetry:
-                            self.on_telemetry(rpm, gear, speed_kmh, abs_active, tc_active)
+                            self.on_telemetry(
+                                rpm, gear, speed_kmh, abs_active, tc_active,
+                                wheel_slip=wheel_slip,
+                                wheel_speed=wheel_speed,
+                                suspension=suspension,
+                                steer_angle=steer_angle
+                            )
 
             except Exception as e:
                 if self._running:
