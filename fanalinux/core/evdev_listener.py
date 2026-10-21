@@ -85,16 +85,22 @@ class EvdevListener:
         import fcntl
         EVIOCGNAME = 0x82004506
         for node in glob.glob("/dev/input/event*"):
+            fd = None
             try:
                 fd = os.open(node, os.O_RDONLY | os.O_NONBLOCK)
                 buf = bytearray(256)
                 fcntl.ioctl(fd, EVIOCGNAME, buf)
-                os.close(fd)
                 name = buf.split(b'\x00')[0].decode('utf-8', errors='ignore')
                 if "FANATEC" in name.upper():
                     return node
             except Exception:
                 pass
+            finally:
+                if fd is not None:
+                    try:
+                        os.close(fd)
+                    except Exception:
+                        pass
         return None
 
     def start(self) -> bool:
@@ -107,6 +113,20 @@ class EvdevListener:
         try:
             self._fd = os.open(node, os.O_RDONLY | os.O_NONBLOCK)
             self.device_node = node
+
+            # Probe axis min/max values dynamically using EVIOCGABS
+            self._axis_ranges = {}
+            import fcntl
+            EVIOCGABS = lambda axis: 0x80184540 + axis
+            for axis_code in [ABS_X, ABS_Z, ABS_RZ, ABS_THROTTLE]:
+                buf = bytearray(24)
+                try:
+                    fcntl.ioctl(self._fd, EVIOCGABS(axis_code), buf)
+                    _, min_v, max_v, _, _, _ = struct.unpack("iiiiii", buf)
+                    self._axis_ranges[axis_code] = (min_v, max_v)
+                except Exception:
+                    pass
+
             self._running = True
             self._thread = threading.Thread(target=self._worker, daemon=True)
             self._thread.start()
@@ -159,6 +179,15 @@ class EvdevListener:
                     self._fd = None
                 break
 
+    def _normalize_pedal(self, code: int, value: int) -> float:
+        ranges = getattr(self, "_axis_ranges", {})
+        default_max = 255 if code == ABS_THROTTLE else 65535
+        min_v, max_v = ranges.get(code, (0, default_max))
+        span = max(1, max_v - min_v)
+        # Invert: raw unpressed is max, raw fully pressed is min
+        norm = 1.0 - ((value - min_v) / float(span))
+        return max(0.0, min(1.0, norm))
+
     def _process_event(self, etype: int, code: int, value: int):
         if etype == EV_ABS:
             if code == ABS_X and self.on_steering:
@@ -168,16 +197,11 @@ class EvdevListener:
                 normalized = max(-1.0, min(1.0, normalized))
                 self.on_steering(normalized, value)
             elif code == ABS_Z and self.on_throttle:
-                # 0..65535, inverting if needed (0 = released, 65535 = pressed)
-                # Fanatec raw 16-bit is often 65535 unpressed -> 0 pressed
-                norm = 1.0 - (value / 65535.0)
-                self.on_throttle(max(0.0, min(1.0, norm)))
+                self.on_throttle(self._normalize_pedal(code, value))
             elif code == ABS_RZ and self.on_brake:
-                norm = 1.0 - (value / 65535.0)
-                self.on_brake(max(0.0, min(1.0, norm)))
+                self.on_brake(self._normalize_pedal(code, value))
             elif code == ABS_THROTTLE and self.on_clutch:
-                norm = 1.0 - (value / 255.0)
-                self.on_clutch(max(0.0, min(1.0, norm)))
+                self.on_clutch(self._normalize_pedal(code, value))
             elif code == ABS_HAT0X and self.on_button:
                 # D-Pad / FunkySwitch X: -1 = Left, 1 = Right, 0 = Released
                 prev_x = getattr(self, "_hat_x", 0)
@@ -212,7 +236,7 @@ class EvdevListener:
             elif 704 <= code <= 767:
                 btn_num = code - 704 + 17     # Buttons 17..80 (BTN_TRIGGER_HAPPY1..64)
             elif 304 <= code <= 319:
-                btn_num = code - 304 + 1      # Standard gamepad buttons
+                btn_num = code - 304 + 81     # Gamepad buttons mapped to 81..96 (non-overlapping)
             else:
                 btn_num = code
             is_pressed = (value == 1)

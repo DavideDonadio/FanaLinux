@@ -370,8 +370,8 @@ class GameDetector:
                         matched_pid = match["pid"]
                         matched_exe = match["exe"]
 
-                        # Check if game just started or changed
-                        if self.active_game is None or self.active_game["id"] != matched_game["id"]:
+                        # Check if game just started, changed, or restarted with a new PID
+                        if self.active_game is None or self.active_game["id"] != matched_game["id"] or self.active_pid != matched_pid:
                             self.active_game = matched_game
                             self.active_pid = matched_pid
                             self.active_exe = matched_exe
@@ -403,4 +403,4 @@ class GameDetector:
             except Exception as e:
                 logger.error(f"Error in GameDetector loop: {e}")
 
-            time.sleep(self.poll_interval)
+            time.sleep(max(0.5, float(self.poll_interval)))

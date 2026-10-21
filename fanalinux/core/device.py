@@ -10,6 +10,8 @@ import glob
 import time
 import select
 import logging
+import threading
+import errno
 from typing import Optional, List, Tuple, Dict, Any
 
 from fanalinux.core.protocol import (
@@ -46,6 +48,7 @@ class FanatecDevice:
         self.firmware_motor = "1.0.3.2"
         self.firmware_rim = "45"
         self._abort_vibration = False
+        self._lock = threading.Lock()
 
     def find_hidraw_path(self) -> Optional[str]:
         """Locate the Fanatec hidraw device node."""
@@ -130,17 +133,31 @@ class FanatecDevice:
         return True
 
     def write_report(self, data: List[int]) -> int:
-        """Write raw HID report buffer directly to hidraw."""
+        """Write raw HID report buffer directly to hidraw with thread safety and non-blocking retry."""
         if self._fd is None or not self.connected:
             return 0
-        try:
-            return os.write(self._fd, bytes(data))
-        except (OSError, ValueError) as e:
-            logger.warning(f"Device error during write (disconnected): {e}")
-            self.disconnect()
-            return 0
-        except Exception as e:
-            logger.error(f"Error writing report to hidraw: {e}")
+        with self._lock:
+            if self._fd is None or not self.connected:
+                return 0
+            payload = bytes(data)
+            for attempt in range(2):
+                try:
+                    return os.write(self._fd, payload)
+                except BlockingIOError:
+                    time.sleep(0.002)
+                    continue
+                except (OSError, ValueError) as e:
+                    err_code = getattr(e, 'errno', None)
+                    if err_code in (errno.EAGAIN, errno.EWOULDBLOCK):
+                        time.sleep(0.002)
+                        continue
+                    # Fatal hardware disconnection error (ENODEV, EIO, EBADF)
+                    logger.warning(f"Fatal device error during write (disconnecting): {e}")
+                    self.disconnect()
+                    return 0
+                except Exception as e:
+                    logger.error(f"Error writing report to hidraw: {e}")
+                    return 0
             return 0
 
     def initialize_hardware(self):
@@ -194,22 +211,28 @@ class FanatecDevice:
         time.sleep(0.01)
 
         # 2. Build full tuning report buffer with all registers populated
+        # Encode SEN safely: 0 = Auto, 90..2520 deg mapped to 9..252
+        if profile.sen <= 0:
+            raw_sen = 0
+        else:
+            raw_sen = max(9, min(252, profile.sen // 10))
+
         reg_values = {
             "SLOT": profile.slot,
-            "SEN": profile.sen // 10 if profile.sen <= 1080 else (0xED + ((profile.sen - 1080) // 10)),
-            "FF": profile.ff,
-            "FFS": profile.ffs,
-            "NDP": profile.ndp,
-            "NFR": profile.nfr,
-            "NIN": profile.nin,
-            "INT": profile.int_filter,
-            "FEI": profile.fei,
-            "FOR": profile.for_mult // 10,
-            "SPR": profile.spr_mult // 10,
-            "DPR": profile.dpr_mult // 10,
-            "SHO": profile.sho // 10,
-            "BLI": profile.bli,
-            "BRF": profile.brf,
+            "SEN": raw_sen,
+            "FF": max(0, min(100, profile.ff)),
+            "FFS": 1 if profile.ffs else 0,
+            "NDP": max(0, min(100, profile.ndp)),
+            "NFR": max(0, min(100, profile.nfr)),
+            "NIN": max(0, min(100, profile.nin)),
+            "INT": max(0, min(20, profile.int_filter)),
+            "FEI": max(0, min(100, profile.fei)),
+            "FOR": max(0, min(12, profile.for_mult // 10)),
+            "SPR": max(0, min(12, profile.spr_mult // 10)),
+            "DPR": max(0, min(12, profile.dpr_mult // 10)),
+            "SHO": max(0, min(10, profile.sho // 10)),
+            "BLI": max(0, min(100, profile.bli)),
+            "BRF": max(0, min(100, profile.brf)),
         }
 
         out_buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x00] + [0x00] * 61
@@ -224,29 +247,39 @@ class FanatecDevice:
         """Request and parse the active tuning report from the wheel base."""
         if self._fd is None or not self.connected:
             return None
-        try:
-            # Send slot query command: [0xFF, 0x03, 0x01, slot]
-            buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, slot & 0xFF] + [0x00] * 60
-            self.write_report(buf)
-            time.sleep(0.02)
+        with self._lock:
+            try:
+                # Send slot query command: [0xFF, 0x03, 0x01, slot]
+                buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, slot & 0xFF] + [0x00] * 60
+                os.write(self._fd, bytes(buf))
+                time.sleep(0.02)
 
-            # Check if an input report is ready
-            r, _, _ = select.select([self._fd], [], [], 0.08)
-            if r:
-                data = os.read(self._fd, 64)
-                if len(data) >= 32 and data[0] == 0xFF and data[1] == 0x03:
-                    prof = TuningProfile(slot=slot)
-                    # Parse registers from buffer
-                    # sen: addr 0x03
-                    raw_sen = data[TUNING_REGISTERS["SEN"] + 1]
-                    prof.sen = raw_sen * 10
-                    prof.ff = data[TUNING_REGISTERS["FF"] + 1]
-                    prof.ndp = data[TUNING_REGISTERS["NDP"] + 1]
-                    prof.nfr = data[TUNING_REGISTERS["NFR"] + 1]
-                    return prof
-        except Exception as e:
-            logger.debug(f"Could not read tuning report: {e}")
-        return None
+                # Check if an input report is ready
+                r, _, _ = select.select([self._fd], [], [], 0.08)
+                if r:
+                    data = os.read(self._fd, 64)
+                    if len(data) >= 32 and data[0] == 0xFF and data[1] == 0x03:
+                        prof = TuningProfile(slot=slot)
+                        # Parse all registers from buffer
+                        raw_sen = data[TUNING_REGISTERS["SEN"] + 1]
+                        prof.sen = 0 if raw_sen == 0 else raw_sen * 10
+                        prof.ff = data[TUNING_REGISTERS["FF"] + 1]
+                        prof.ndp = data[TUNING_REGISTERS["NDP"] + 1]
+                        prof.nfr = data[TUNING_REGISTERS["NFR"] + 1]
+                        prof.nin = data[TUNING_REGISTERS["NIN"] + 1]
+                        prof.int_filter = data[TUNING_REGISTERS["INT"] + 1]
+                        prof.fei = data[TUNING_REGISTERS["FEI"] + 1]
+                        prof.for_mult = data[TUNING_REGISTERS["FOR"] + 1] * 10
+                        prof.spr_mult = data[TUNING_REGISTERS["SPR"] + 1] * 10
+                        prof.dpr_mult = data[TUNING_REGISTERS["DPR"] + 1] * 10
+                        prof.sho = data[TUNING_REGISTERS["SHO"] + 1] * 10
+                        prof.bli = data[TUNING_REGISTERS["BLI"] + 1]
+                        prof.brf = data[TUNING_REGISTERS["BRF"] + 1]
+                        prof.ffs = data[TUNING_REGISTERS["FFS"] + 1]
+                        return prof
+            except Exception as e:
+                logger.debug(f"Could not read tuning report: {e}")
+            return None
 
     def calibrate_center(self):
         """Trigger center calibration sequence in hardware."""

@@ -61,6 +61,7 @@ class TelemetryManager:
     def set_car_name(self, car_name: str):
         """Lookup car in database or adapt."""
         cleaned = car_name.lower().strip()
+        self.peak_rpm_seen = 0
         if cleaned in CAR_DATABASE:
             try:
                 self.max_rpm = int(CAR_DATABASE[cleaned])
@@ -102,7 +103,10 @@ class TelemetryManager:
                 self.device.set_display_text(gear_str)
         elif self.display_mode == "speed":
             speed_int = max(0, min(999, int(speed_kmh)))
-            self.device.set_display_text(f"{speed_int:03d}")
+            speed_txt = f"{speed_int:03d}"
+            if speed_txt != getattr(self, "_last_speed_txt", None):
+                self._last_speed_txt = speed_txt
+                self.device.set_display_text(speed_txt)
 
         # 2. Update 9 RevLEDs
         # Scale: rev lights start at 60% of redline and reach full at 96%
@@ -130,11 +134,16 @@ class TelemetryManager:
 
         self.device.set_revleds(active_colors)
 
-        # 3. Handle Flag LEDs on ABS / TC alerts
-        if abs_active:
-            self.device.set_flagleds([(255, 255, 0)] * 6)  # Yellow ABS warning
-        elif tc_active:
-            self.device.set_flagleds([(0, 100, 255)] * 6)   # Blue TC warning
+        # 3. Handle Flag LEDs on ABS / TC alerts with state tracking and black turn-off
+        flag_state = "ABS" if abs_active else ("TC" if tc_active else "OFF")
+        if flag_state != getattr(self, "_last_flag_state", None):
+            self._last_flag_state = flag_state
+            if abs_active:
+                self.device.set_flagleds([(255, 255, 0)] * 6)  # Yellow ABS warning
+            elif tc_active:
+                self.device.set_flagleds([(0, 100, 255)] * 6)   # Blue TC warning
+            else:
+                self.device.set_flagleds([(0, 0, 0)] * 6)        # Turn off LEDs
 
         # 4. Trigger Haptic Vibration Pulses (ABS, TC, Rev Limiter, Engine, Wheel Lock/Spin, Slip)
         self.haptic_engine.update_telemetry(
@@ -146,4 +155,4 @@ class TelemetryManager:
         )
 
         # 5. Execute Dynamic FFB Damper Overlay (Speed-Sensitive & Reverse Driving Damper)
-        self.dynamic_ffb_engine.update_telemetry(speed_kmh, gear, steer_angle)
+        self.dynamic_ffb_engine.update_telemetry(speed_kmh, gear, steer_angle, wheel_speed=wheel_speed)

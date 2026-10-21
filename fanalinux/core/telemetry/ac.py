@@ -76,6 +76,28 @@ class AssettoCorsaTelemetry:
         ])
         self._sock.sendto(payload, (self.UDP_IP, self.UDP_PORT))
 
+    def _dispatch_telemetry(self, rpm: int, gear: int, speed_kmh: float, abs_active: bool, tc_active: bool,
+                            wheel_slip=(0.0, 0.0, 0.0, 0.0),
+                            wheel_speed=(0.0, 0.0, 0.0, 0.0),
+                            suspension=(0.0, 0.0, 0.0, 0.0),
+                            steer_angle=0.0):
+        """Invoke on_telemetry callback safely supporting both 5-arg and extended 9-arg signatures."""
+        if not self.on_telemetry:
+            return
+        try:
+            self.on_telemetry(
+                rpm, gear, speed_kmh, abs_active, tc_active,
+                wheel_slip=wheel_slip,
+                wheel_speed=wheel_speed,
+                suspension=suspension,
+                steer_angle=steer_angle
+            )
+        except TypeError:
+            try:
+                self.on_telemetry(rpm, gear, speed_kmh, abs_active, tc_active)
+            except Exception as e:
+                logger.error(f"Error calling telemetry callback: {e}")
+
     def _worker(self):
         while self._running:
             try:
@@ -114,7 +136,8 @@ class AssettoCorsaTelemetry:
 
                     timeout_count = 0
                     data = self._sock.recv(2048)
-                    if len(data) >= 80:
+                    # Assetto Corsa RTCarUpdate packets are strictly 328 to 388 bytes
+                    if 320 <= len(data) <= 400:
                         speed_kmh = float(struct.unpack("<f", data[8:12])[0])
                         abs_active = bool(data[21])
                         tc_active = bool(data[22])
@@ -128,23 +151,21 @@ class AssettoCorsaTelemetry:
                         suspension = (0.0, 0.0, 0.0, 0.0)
                         steer_angle = 0.0
 
-                        if len(data) >= 200:
-                            try:
-                                steer_angle = float(struct.unpack_from("<f", data, 24)[0])
-                                wheel_slip = struct.unpack_from("<4f", data, 56)
-                                wheel_speed = struct.unpack_from("<4f", data, 104)
-                                suspension = struct.unpack_from("<4f", data, 184)
-                            except Exception:
-                                pass
+                        try:
+                            steer_angle = float(struct.unpack_from("<f", data, 24)[0])
+                            wheel_slip = struct.unpack_from("<4f", data, 56)
+                            wheel_speed = struct.unpack_from("<4f", data, 104)
+                            suspension = struct.unpack_from("<4f", data, 184)
+                        except Exception:
+                            pass
 
-                        if self.on_telemetry:
-                            self.on_telemetry(
-                                rpm, gear, speed_kmh, abs_active, tc_active,
-                                wheel_slip=wheel_slip,
-                                wheel_speed=wheel_speed,
-                                suspension=suspension,
-                                steer_angle=steer_angle
-                            )
+                        self._dispatch_telemetry(
+                            rpm, gear, speed_kmh, abs_active, tc_active,
+                            wheel_slip=wheel_slip,
+                            wheel_speed=wheel_speed,
+                            suspension=suspension,
+                            steer_angle=steer_angle
+                        )
 
             except Exception as e:
                 if self._running:

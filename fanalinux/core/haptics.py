@@ -151,14 +151,15 @@ class HapticEngine:
                 self.trigger_pulse(intensity, 0.08)
 
         # 7. Suspension Travel / Curb Strike Vibration
-        if self.settings.suspension_enabled and len(suspension) >= 4:
-            susp_thresh = max(0.01, self.settings.suspension_threshold / 100.0)
-            deltas = [abs(curr - prev) for curr, prev in zip(suspension, self._last_suspension)]
+        if len(suspension) >= 4:
+            if self.settings.suspension_enabled:
+                susp_thresh = max(0.01, self.settings.suspension_threshold / 100.0)
+                deltas = [abs(curr - prev) for curr, prev in zip(suspension, self._last_suspension)]
+                if any(d > susp_thresh for d in deltas) and (now - self._last_susp_pulse) >= 0.08:
+                    self._last_susp_pulse = now
+                    intensity = max(10, min(100, self.settings.suspension_strength * 10))
+                    self.trigger_pulse(intensity, 0.06)
             self._last_suspension = list(suspension)
-            if any(d > susp_thresh for d in deltas) and (now - self._last_susp_pulse) >= 0.08:
-                self._last_susp_pulse = now
-                intensity = max(10, min(100, self.settings.suspension_strength * 10))
-                self.trigger_pulse(intensity, 0.06)
 
         # 8. Engine Vibration baseline
         if self.settings.engine_enabled and rpm > 300:
@@ -179,6 +180,7 @@ class HapticEngine:
         freq = 18
         half_period = (1.0 / freq) / 2.0  # ~27ms
         toggle_state = False
+        was_active = False
 
         while not self._stop_event.is_set():
             now = time.time()
@@ -197,6 +199,7 @@ class HapticEngine:
                 active_intensity = self._engine_vibration_level
 
             if active_intensity > 0 and self.device and self.device.connected:
+                was_active = True
                 # Direct drive torque amplitude
                 amp = int((active_intensity / 100.0) * 5500)
                 torque = amp if toggle_state else -amp
@@ -212,6 +215,8 @@ class HapticEngine:
                     pass
                 time.sleep(half_period)
             else:
-                # Idle: zero forces and sleep slightly longer
-                self._zero_forces()
-                time.sleep(0.02)
+                # Idle: zero forces ONCE upon transition from active, then sleep without USB chatter
+                if was_active:
+                    self._zero_forces()
+                    was_active = False
+                time.sleep(0.04)

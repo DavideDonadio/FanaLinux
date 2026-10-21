@@ -7,7 +7,10 @@ Replicates FanaLab's 'FFB Dynamique' / 'Surcouche d'Amortissement':
 
 import os
 import json
-from dataclasses import dataclass, asdict
+import logging
+from dataclasses import dataclass, asdict, fields
+
+logger = logging.getLogger("fanalinux.dynamic_ffb_settings")
 
 SETTINGS_PATH = os.path.expanduser("~/.config/fanalinux/dynamic_ffb.json")
 
@@ -33,14 +36,20 @@ def load_dynamic_ffb_settings() -> DynamicFFBSettings:
         try:
             with open(SETTINGS_PATH, "r") as f:
                 data = json.load(f)
-                return DynamicFFBSettings(**data)
-        except Exception:
-            pass
+                if isinstance(data, dict):
+                    valid_keys = {f.name for f in fields(DynamicFFBSettings)}
+                    filtered = {k: v for k, v in data.items() if k in valid_keys}
+                    return DynamicFFBSettings(**filtered)
+        except Exception as e:
+            logger.warning(f"Error loading dynamic FFB settings: {e}")
     return DynamicFFBSettings()
 
 
 def save_dynamic_ffb_settings(settings: DynamicFFBSettings):
     """Save dynamic FFB settings to ~/.config/fanalinux/dynamic_ffb.json."""
-    os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
-    with open(SETTINGS_PATH, "w") as f:
-        json.dump(asdict(settings), f, indent=4)
+    try:
+        os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
+        with open(SETTINGS_PATH, "w") as f:
+            json.dump(asdict(settings), f, indent=4)
+    except Exception as e:
+        logger.error(f"Error saving dynamic FFB settings to disk: {e}")

@@ -292,8 +292,9 @@ class TuningView(Adw.PreferencesPage):
 
     def _on_load_preset_clicked(self, btn):
         idx = self.preset_dropdown.get_selected()
-        if idx >= 0:
-            name = self.preset_dropdown.get_model().get_string(idx)
+        model = self.preset_dropdown.get_model()
+        if model and 0 <= idx < model.get_n_items():
+            name = model.get_string(idx)
             p = load_preset(name)
             if p:
                 self.set_active_profile(p)
@@ -335,7 +336,8 @@ class TuningView(Adw.PreferencesPage):
     def refresh_presets(self):
         presets = list_presets()
         curr_idx = self.preset_dropdown.get_selected()
-        curr_text = self.preset_dropdown.get_model().get_string(curr_idx) if curr_idx >= 0 else "Default"
+        model = self.preset_dropdown.get_model()
+        curr_text = model.get_string(curr_idx) if (model and 0 <= curr_idx < model.get_n_items()) else "Default"
         self.preset_dropdown.set_model(Gtk.StringList.new(presets))
         # Reselect
         for i, name in enumerate(presets):
