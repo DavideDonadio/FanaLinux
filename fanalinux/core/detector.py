@@ -33,12 +33,22 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
     {
         "id": "acc",
         "name": "Assetto Corsa Competizione",
-        "executables": ["acc.exe", "ac2-win64-shipping.exe"],
+        "executables": ["acc.exe"],
         "default_preset": "Assetto Corsa - GT3",
         "has_telemetry": False,
         "telemetry_type": None,
         "description": "Official Fanatec GT World Challenge Simulator",
         "icon": "acc.svg"
+    },
+    {
+        "id": "assetto_corsa_evo",
+        "name": "Assetto Corsa EVO",
+        "executables": ["ac2-win64-shipping.exe"],
+        "default_preset": "Assetto Corsa - GT3",
+        "has_telemetry": False,
+        "telemetry_type": None,
+        "description": "Kunos Simulazioni Assetto Corsa EVO (Early Access / Proton)",
+        "icon": "assetto_corsa.svg"
     },
     {
         "id": "ea_sports_f1",

@@ -20,7 +20,7 @@ class CalibrationSettings:
     @classmethod
     def from_dict(cls, data: dict) -> "CalibrationSettings":
         try:
-            raw = int(data.get("center_raw", 32768))
+            raw = int(float(data.get("center_raw", 32768)))
         except (ValueError, TypeError):
             raw = 32768
         return cls(center_raw=raw)

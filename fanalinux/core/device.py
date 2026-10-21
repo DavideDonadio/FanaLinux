@@ -69,7 +69,6 @@ class FanatecDevice:
             non_pedal = [m for m in by_id_matches if not any(x in m.lower() for x in ("pedal", "shifter", "handbrake"))]
             if non_pedal:
                 return os.path.realpath(non_pedal[0])
-            return os.path.realpath(by_id_matches[0])
 
         known_pids = (
             f"{PID_CSL_DD:04X}",
@@ -102,9 +101,10 @@ class FanatecDevice:
                     pass
 
         if candidates:
-            # Return the highest scored wheelbase node
+            # Return the highest scored wheelbase node (must score >= 2 to exclude standalone pedals/shifters)
             candidates.sort(key=lambda c: c[0], reverse=True)
-            return candidates[0][1]
+            if candidates[0][0] >= 2:
+                return candidates[0][1]
 
         return None
 
@@ -270,7 +270,7 @@ class FanatecDevice:
             self.active_sen = sen_val
 
         try:
-            slot = max(1, min(5, int(getattr(profile, "slot", 1))))
+            slot = max(1, min(5, int(float(getattr(profile, "slot", 1)))))
         except (ValueError, TypeError):
             slot = 1
 
@@ -317,7 +317,7 @@ class FanatecDevice:
         if self._fd is None or not self.connected:
             return None
         try:
-            clamped_slot = max(1, min(5, int(slot)))
+            clamped_slot = max(1, min(5, int(float(slot))))
         except (ValueError, TypeError):
             clamped_slot = 1
 

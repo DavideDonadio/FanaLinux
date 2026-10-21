@@ -38,11 +38,11 @@ class DynamicFFBSettings:
                 f_type = valid_fields[k].type
                 try:
                     if f_type is bool or f_type == "bool":
-                        coerced[k] = bool(v) and str(v).lower() not in ("0", "false")
+                        coerced[k] = bool(v) and str(v).strip().lower() not in ("0", "false", "no", "off", "")
                     elif f_type is float or f_type == "float":
                         coerced[k] = float(v)
                     else:
-                        coerced[k] = int(v)
+                        coerced[k] = int(float(v))
                 except (ValueError, TypeError):
                     coerced[k] = valid_fields[k].default
         return cls(**coerced)

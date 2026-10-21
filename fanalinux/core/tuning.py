@@ -48,7 +48,7 @@ class TuningProfile:
                     if f_type is str or f_type == "str":
                         coerced[k] = str(v)
                     else:
-                        coerced[k] = int(v)
+                        coerced[k] = int(float(v))
                 except (ValueError, TypeError):
                     coerced[k] = valid_fields[k].default
         # For legacy presets saved prior to BLI implementation, default to 85%

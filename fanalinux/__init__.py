@@ -1,2 +1,2 @@
 """FanaLinux - Native Linux Control Panel and Telemetry Suite for Fanatec Hardware."""
-__version__ = "0.4.8"
+__version__ = "0.4.9"
