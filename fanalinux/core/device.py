@@ -95,7 +95,11 @@ class FanatecDevice:
             return False
 
     def disconnect(self):
-        """Close connection to device."""
+        """
+        Close connection to device node.
+        Note: Callers should ensure telemetry is stopped and best-effort display/LED
+        blanking is performed prior to calling disconnect().
+        """
         self.connected = False
         fd = self._fd
         self._fd = None
@@ -212,7 +216,16 @@ class FanatecDevice:
 
     def apply_tuning_profile(self, profile: TuningProfile):
         """Write all tuning attributes from the profile into the hardware registers."""
-        self.active_sen = profile.sen if profile.sen > 0 else 900
+        # Encode SEN safely: 0 = Auto, 90..2520 deg mapped to 9..252
+        if profile.sen <= 0 or profile.sen < 45:
+            raw_sen = 0
+            self.active_sen = 900
+        elif profile.sen < 90:
+            raw_sen = 9
+            self.active_sen = 90
+        else:
+            raw_sen = max(9, min(252, profile.sen // 10))
+            self.active_sen = profile.sen
 
         # 1. Select Slot
         buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, profile.slot & 0xFF] + [0x00] * 60
@@ -220,11 +233,6 @@ class FanatecDevice:
         time.sleep(0.01)
 
         # 2. Build full tuning report buffer with all registers populated
-        # Encode SEN safely: 0 = Auto, 90..2520 deg mapped to 9..252
-        if profile.sen <= 0:
-            raw_sen = 0
-        else:
-            raw_sen = max(9, min(252, profile.sen // 10))
 
         reg_values = {
             "SLOT": profile.slot,

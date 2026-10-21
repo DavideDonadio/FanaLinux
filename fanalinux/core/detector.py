@@ -169,6 +169,7 @@ class GameDetector:
         self.on_scan_tick = on_scan_tick
 
         self.running = False
+        self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
         self.active_game: Optional[Dict[str, Any]] = None
@@ -277,6 +278,7 @@ class GameDetector:
     def start(self):
         if self.running:
             return
+        self._stop_event.clear()
         self.running = True
         self._thread = threading.Thread(target=self._scan_loop, daemon=True, name="GameDetectorThread")
         self._thread.start()
@@ -284,6 +286,7 @@ class GameDetector:
 
     def stop(self):
         self.running = False
+        self._stop_event.set()
         if self._thread:
             self._thread.join(timeout=1.0)
             self._thread = None
@@ -414,4 +417,4 @@ class GameDetector:
             except Exception as e:
                 logger.error(f"Error in GameDetector loop: {e}")
             finally:
-                time.sleep(self.poll_interval)
+                self._stop_event.wait(timeout=self.poll_interval)

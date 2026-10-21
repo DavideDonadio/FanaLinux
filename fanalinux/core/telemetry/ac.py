@@ -161,7 +161,7 @@ class AssettoCorsaTelemetry:
                     timeout_count = 0
                     data = self._sock.recv(2048)
                     # Assetto Corsa RTCarUpdate packets are strictly 328 to 388 bytes and start with identifier 'a' (97)
-                    if 320 <= len(data) <= 400 and (data[0] == ord('a') or data[0] == 0):
+                    if 320 <= len(data) <= 400 and data[0] == ord('a'):
                         speed_kmh = float(struct.unpack("<f", data[8:12])[0])
                         abs_active = bool(data[21])
                         tc_active = bool(data[22])

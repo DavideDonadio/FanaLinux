@@ -263,10 +263,16 @@ class TuningView(Adw.PreferencesPage):
 
             def _on_val_changed(adjustment, lbl=val_label, pid=param_id, unit=meta['unit']):
                 raw_v = int(adjustment.get_value())
-                if pid == "sen" and raw_v <= 0:
-                    lbl.set_text("Auto")
-                else:
-                    lbl.set_text(f"{raw_v}{unit}")
+                if pid == "sen":
+                    # Snap 1..89 to 0 (Auto) if < 45, else 90
+                    if 0 < raw_v < 90:
+                        raw_v = 0 if raw_v < 45 else 90
+                        adjustment.set_value(raw_v)
+                        return
+                    if raw_v <= 0:
+                        lbl.set_text("Auto")
+                        return
+                lbl.set_text(f"{raw_v}{unit}")
 
             adj.connect("value-changed", _on_val_changed)
 
@@ -317,7 +323,10 @@ class TuningView(Adw.PreferencesPage):
             if isinstance(ctrl, Gtk.Switch):
                 setattr(self.profile, param_id, 1 if ctrl.get_active() else 0)
             elif isinstance(ctrl, Gtk.Adjustment):
-                setattr(self.profile, param_id, int(ctrl.get_value()))
+                val = int(ctrl.get_value())
+                if param_id == "sen" and 0 < val < 90:
+                    val = 0 if val < 45 else 90
+                setattr(self.profile, param_id, val)
 
         if save_preset(preset_name, self.profile):
             self.refresh_presets()
@@ -368,7 +377,10 @@ class TuningView(Adw.PreferencesPage):
             if isinstance(ctrl, Gtk.Switch):
                 setattr(self.profile, param_id, 1 if ctrl.get_active() else 0)
             elif isinstance(ctrl, Gtk.Adjustment):
-                setattr(self.profile, param_id, int(ctrl.get_value()))
+                val = int(ctrl.get_value())
+                if param_id == "sen" and 0 < val < 90:
+                    val = 0 if val < 45 else 90
+                setattr(self.profile, param_id, val)
 
         if self.device and self.device.connected:
             self.device.apply_tuning_profile(self.profile)

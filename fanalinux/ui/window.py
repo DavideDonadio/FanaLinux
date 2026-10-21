@@ -248,9 +248,13 @@ class MainWindow(Adw.ApplicationWindow):
                     self.evdev_listener.start()
                     self.calibration_view.set_evdev_listener(self.evdev_listener)
                 self.show_toast("Fanatec CSL DD connected and online!")
-                active_profile = getattr(self.tuning_view, "active_profile", None)
-                if active_profile and self.device:
-                    self.device.apply_tuning_profile(active_profile)
+                # Only re-apply profile if an auto-profile sim session is actively in progress
+                active_game = getattr(self.detector, "active_game", None) if self.detector else None
+                if active_game:
+                    active_profile = getattr(self.tuning_view, "profile", None)
+                    if active_profile and self.device:
+                        print(f"Restoring profile '{active_profile.name}' (Slot {active_profile.slot}) for '{active_game['name']}' after reconnect")
+                        self.device.apply_tuning_profile(active_profile)
             else:
                 self.evdev_listener.stop()
                 self.show_toast("Fanatec hardware disconnected!")
@@ -269,6 +273,12 @@ class MainWindow(Adw.ApplicationWindow):
             self.telemetry_mgr.stop()
         if self.evdev_listener:
             self.evdev_listener.stop()
-        if self.device:
+        if self.device and self.device.connected:
+            try:
+                self.device.clear_display()
+                self.device.set_revleds([(0, 0, 0)] * 9)
+                self.device.set_flagleds([(0, 0, 0)] * 6)
+            except Exception:
+                pass
             self.device.disconnect()
         return False
