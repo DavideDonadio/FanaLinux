@@ -12,30 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install System Dependencies (GTK4, Libadwaita & Headers)
+      - name: Install System Dependencies (GTK4, Libadwaita & PyGObject)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgirepository1.0-dev \
-            libcairo2-dev \
-            pkg-config \
+            python3-gi \
+            python3-gi-cairo \
             gir1.2-gtk-4.0 \
             gir1.2-adw-1 \
             libadwaita-1-0 \
             libhidapi-dev \
             xvfb
 
-      - name: Install Python Package & Dependencies
+      - name: Set up Environment with System Site-Packages
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install pycairo PyGObject
-          pip install -e .
+          python3 -m venv --system-site-packages venv
+          ./venv/bin/pip install --upgrade pip setuptools wheel
+          ./venv/bin/pip install -e .
 
       - name: Run Smoke and Unit Tests under Virtual Display
         run: |
-          xvfb-run -a python3 -m unittest discover -s tests
+          xvfb-run -a ./venv/bin/python3 -m unittest discover -s tests
