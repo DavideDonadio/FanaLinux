@@ -48,7 +48,7 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "has_telemetry": False,
         "telemetry_type": None,
         "description": "Kunos Simulazioni Assetto Corsa EVO (Early Access / Proton)",
-        "icon": "assetto_corsa.svg"
+        "icon": "assetto_corsa_evo.jpg"
     },
     {
         "id": "ea_sports_f1",
