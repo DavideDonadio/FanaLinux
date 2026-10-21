@@ -204,7 +204,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.tuning_view.set_active_profile(profile)
 
         if auto_telem:
-            self.telemetry_mgr.start()
+            telem_type = game_info.get("telemetry_type") or "ac_udp"
+            self.telemetry_mgr.start(telemetry_type=telem_type)
             self.leds_view.set_telemetry_active(True)
 
         self.profiles_view.update_status(game_info)

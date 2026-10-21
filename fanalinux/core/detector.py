@@ -59,7 +59,7 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
             "f1_25", "f1_24", "f1_23", "f1_22"
         ],
         "default_preset": "F1 24",
-        "has_telemetry": False,
+        "has_telemetry": True,
         "telemetry_type": "f1_udp",
         "description": "EA Sports / Codemasters Formula 1 series (F1 25, F1 24, F1 23...)",
         "icon": "ea_sports_f1.svg"
@@ -89,8 +89,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "name": "DiRT Rally 2.0",
         "executables": ["dirtrally2.exe"],
         "default_preset": "Rally",
-        "has_telemetry": False,
-        "telemetry_type": None,
+        "has_telemetry": True,
+        "telemetry_type": "dirt_udp",
         "description": "Codemasters DiRT Rally 2.0",
         "icon": "dirt_rally_2.svg"
     },
@@ -99,8 +99,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "name": "EA Sports WRC",
         "executables": ["wrc.exe"],
         "default_preset": "Rally",
-        "has_telemetry": False,
-        "telemetry_type": None,
+        "has_telemetry": True,
+        "telemetry_type": "dirt_udp",
         "description": "EA Sports World Rally Championship",
         "icon": "ea_wrc.svg"
     },
@@ -109,8 +109,8 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "name": "BeamNG.drive",
         "executables": ["beamng.drive.x64.exe", "beamng.drive.ui.x64.exe"],
         "default_preset": "Default",
-        "has_telemetry": False,
-        "telemetry_type": None,
+        "has_telemetry": True,
+        "telemetry_type": "beamng_outgauge",
         "description": "Soft-body physics vehicle simulator",
         "icon": "beamng.svg"
     },

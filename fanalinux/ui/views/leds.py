@@ -207,9 +207,9 @@ class LedsView(Adw.PreferencesPage):
                 self.on_toast_requested("Device not connected!")
             return
 
-        if self.telemetry_mgr and getattr(self.telemetry_mgr.ac_client, "is_connected", False):
+        if self.telemetry_mgr and self.telemetry_mgr.is_connected:
             if self.on_toast_requested:
-                self.on_toast_requested("Cannot run demo lap while live Assetto Corsa telemetry is active!")
+                self.on_toast_requested("Cannot run demo lap while live telemetry is active!")
             return
 
         def _sim_worker():

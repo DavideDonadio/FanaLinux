@@ -6,8 +6,11 @@ Includes Adaptive Peak RPM Auto-Calibration and Car Database.
 import os
 import json
 import logging
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict, Any
 from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
+from fanalinux.core.telemetry.beamng import BeamNGTelemetry
+from fanalinux.core.telemetry.dirt import DirtRallyTelemetry
+from fanalinux.core.telemetry.f1 import F1Telemetry
 from fanalinux.core.haptics import HapticEngine
 from fanalinux.core.vibration import load_vibration_settings
 from fanalinux.core.dynamic_ffb_engine import DynamicFFBEngine
@@ -24,6 +27,13 @@ if os.path.exists(CAR_DATA_PATH):
     except Exception:
         pass
 
+TELEMETRY_FACTORIES = {
+    "ac_udp": AssettoCorsaTelemetry,
+    "beamng_outgauge": BeamNGTelemetry,
+    "dirt_udp": DirtRallyTelemetry,
+    "f1_udp": F1Telemetry,
+}
+
 
 class TelemetryManager:
     def __init__(self, device):
@@ -34,10 +44,11 @@ class TelemetryManager:
         self.peak_rpm_seen = 0
         self.auto_detect_rpm = True
 
-        self.ac_client = AssettoCorsaTelemetry(
-            on_telemetry=self._handle_telemetry,
-            on_car_detected=self.set_car_name
-        )
+        self._clients: Dict[str, Any] = {}
+        self.active_telemetry_type = "ac_udp"
+        self.active_client = self._get_client("ac_udp")
+        self.ac_client = self.active_client  # Backwards compatibility
+
         self.haptic_engine = HapticEngine(self.device)
         self.dynamic_ffb_engine = DynamicFFBEngine(self.device)
         self._last_gear = None
@@ -45,12 +56,36 @@ class TelemetryManager:
         self._last_flag_state = None
         self._limiter_strobe = False
 
-    def start(self):
+    def _get_client(self, telem_type: str):
+        if telem_type not in self._clients:
+            factory = TELEMETRY_FACTORIES.get(telem_type, AssettoCorsaTelemetry)
+            self._clients[telem_type] = factory(
+                on_telemetry=self._handle_telemetry,
+                on_car_detected=self.set_car_name
+            )
+        return self._clients[telem_type]
+
+    @property
+    def is_connected(self) -> bool:
+        return bool(self.active_client and getattr(self.active_client, "is_connected", False))
+
+    def start(self, telemetry_type: Optional[str] = None):
         self.enabled = True
         self._last_gear = None
         self._last_speed_txt = None
         self._last_flag_state = None
-        self.ac_client.start()
+
+        target_type = telemetry_type or self.active_telemetry_type or "ac_udp"
+        if self.active_client and getattr(self.active_client, "is_connected", False) and self.active_telemetry_type != target_type:
+            try:
+                self.active_client.stop()
+            except Exception:
+                pass
+
+        self.active_telemetry_type = target_type
+        self.active_client = self._get_client(target_type)
+        self.ac_client = self.active_client  # Backwards compatibility
+        self.active_client.start()
         self.haptic_engine.start()
 
     def stop(self):
@@ -58,7 +93,11 @@ class TelemetryManager:
         self._last_gear = None
         self._last_speed_txt = None
         self._last_flag_state = None
-        self.ac_client.stop()
+        if self.active_client:
+            try:
+                self.active_client.stop()
+            except Exception:
+                pass
         self.haptic_engine.stop()
         self.dynamic_ffb_engine.reset()
         if self.device and self.device.connected:

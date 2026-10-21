@@ -1,0 +1,140 @@
+"""
+DiRT Rally 2.0 & EA Sports WRC Telemetry Client for Linux.
+Connects via Codemasters D-BOX / UDP extradata protocol (default port 20777).
+"""
+
+import socket
+import select
+import struct
+import time
+import logging
+from typing import Callable, Optional
+from fanalinux.core.telemetry.base import BaseTelemetryClient
+
+logger = logging.getLogger("fanalinux.telemetry.dirt")
+
+
+class DirtRallyTelemetry(BaseTelemetryClient):
+    UDP_IP = "127.0.0.1"
+    UDP_PORT = 20777
+
+    # Codemasters extradata=3 packet contains 64 single-precision floats (256 bytes)
+    # Some revisions append 2 extra floats (264 bytes)
+    STRUCT_FORMAT = "<64f"
+    MIN_PACKET_SIZE = 256
+
+    def __init__(self,
+                 on_telemetry: Optional[Callable] = None,
+                 on_car_detected: Optional[Callable[[str], None]] = None,
+                 default_max_rpm: int = 7500,
+                 port: int = 20777):
+        super().__init__(on_telemetry=on_telemetry,
+                         on_car_detected=on_car_detected,
+                         default_max_rpm=default_max_rpm)
+        self.UDP_PORT = port
+        self._sock: Optional[socket.socket] = None
+
+    def stop(self):
+        super().stop()
+        if self._sock:
+            try:
+                self._sock.close()
+            except Exception:
+                pass
+            self._sock = None
+
+    def _worker(self):
+        while self._running:
+            try:
+                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self._sock.bind((self.UDP_IP, self.UDP_PORT))
+                self._sock.setblocking(False)
+                logger.info(f"Listening for DiRT / WRC UDP telemetry on {self.UDP_IP}:{self.UDP_PORT}")
+
+                timeout_count = 0
+                while self._running:
+                    r, _, _ = select.select([self._sock], [], [], 0.5)
+                    if not r:
+                        if self.is_connected:
+                            timeout_count += 1
+                            if timeout_count > 6:
+                                logger.info("DiRT Rally telemetry stream timed out")
+                                self.is_connected = False
+                        continue
+
+                    timeout_count = 0
+                    data, _ = self._sock.recvfrom(512)
+                    if len(data) >= self.MIN_PACKET_SIZE:
+                        if not self.is_connected:
+                            self.is_connected = True
+                            logger.info("Connected to DiRT Rally telemetry stream")
+
+                        self.process_packet(data)
+
+            except Exception as e:
+                if self._running:
+                    logger.debug(f"DiRT telemetry socket error: {e}")
+                self.is_connected = False
+                time.sleep(2.0)
+            finally:
+                if self._sock:
+                    try:
+                        self._sock.close()
+                    except Exception:
+                        pass
+                    self._sock = None
+
+    def process_packet(self, data: bytes):
+        """Parse raw 64-float Codemasters packet and dispatch to listener."""
+        try:
+            floats = struct.unpack_from(self.STRUCT_FORMAT, data)
+
+            # Speed: Index 7 is velocity in m/s
+            speed_ms = floats[7]
+            speed_kmh = max(0.0, float(speed_ms * 3.6))
+
+            # RPM: Index 37 is RPM / 10
+            rpm = max(0, int(floats[37] * 10.0))
+
+            # Gear: Index 33 (0 = Neutral, 1-9 = Forward, >= 10 or < 0 = Reverse)
+            raw_gear = int(floats[33])
+            if raw_gear >= 10 or raw_gear < 0:
+                gear = -1
+            elif raw_gear == 0:
+                gear = 0
+            else:
+                gear = raw_gear
+
+            # Suspension travel (meters): FL (19), FR (20), RL (17), RR (18)
+            suspension = (
+                float(floats[19]),
+                float(floats[20]),
+                float(floats[17]),
+                float(floats[18])
+            )
+
+            # Wheel speeds (m/s): RL (25), RR (26), FL (27), FR (28)
+            wheel_speed = (
+                float(floats[27]),
+                float(floats[28]),
+                float(floats[25]),
+                float(floats[26])
+            )
+
+            # Steer angle: Index 3 (or roll/yaw vector)
+            steer_angle = float(floats[3]) if abs(floats[3]) <= 1.0 else 0.0
+
+            self._dispatch_telemetry(
+                rpm=rpm,
+                gear=gear,
+                speed_kmh=speed_kmh,
+                abs_active=False,
+                tc_active=False,
+                wheel_slip=(0.0, 0.0, 0.0, 0.0),
+                wheel_speed=wheel_speed,
+                suspension=suspension,
+                steer_angle=steer_angle
+            )
+        except Exception as e:
+            logger.error(f"Error parsing DiRT Rally packet: {e}")

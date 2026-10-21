@@ -45,11 +45,11 @@ Fanatec and related product names are used solely to identify compatible hardwar
 │                   Auto-Profile Sim Game Detector                                       │
 │   • Background /proc process scanner detecting Steam/Proton/Wine/native sims           │
 │   • Auto-switches wheelbase tuning presets (AC, ACC, F1, iRacing, AMS2, Rally, etc.)   │
-│   • Auto-launches in-game UDP telemetry engine (Assetto Corsa UDP 9996)                │
+│   • Auto-launches in-game UDP telemetry engine (AC, BeamNG, DiRT Rally, F1, WRC)       │
 │   • Restores baseline fallback profile upon simulator exit                             │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │                       In-Game Telemetry & Dynamic FFB Engine                           │
-│   • Ingests Assetto Corsa UDP broadcasts on localhost port 9996                        │
+│   • Ingests AC, BeamNG OutGauge, DiRT Rally D-BOX, and Codemasters F1 UDP streams      │
 │   • Computes live RPM percentage & drives Formula V2.5 RevLEDs                         │
 │   • Renders active Gear (1, 2, 3, N, R) or Speed directly to OLED                      │
 │   • Flashes Flag LEDs on ABS, Traction Control, or Pit Limiter                         │
@@ -86,7 +86,12 @@ Fanatec and related product names are used solely to identify compatible hardwar
 * **Factory Preset Catalog:** Pre-seeded with optimized profiles (`Default`, `Assetto Corsa - GT3`, `Assetto Corsa - Formula`, `F1 24`, `Drift`, `Rally`) in `~/.config/fanalinux/presets/`.
 
 ### 3. Live In-Game Telemetry Engine
-* **Assetto Corsa Native UDP Integration:** Listens to Assetto Corsa on `127.0.0.1:9996` with zero configuration needed.
+FanaLinux features an engine-agnostic telemetry ingestion pipeline powering RevLEDs, OLED gear/speed readouts, flag alerts, vibration haptics, and dynamic FFB damping:
+* **Multi-Simulator UDP Support:**
+  * **Assetto Corsa (`ac_udp`):** Connects to native UDP broadcast on `127.0.0.1:9996` out of the box with zero setup.
+  * **BeamNG.drive (`beamng_outgauge`):** Listens on `127.0.0.1:4444`. In BeamNG, open *Options → Other → OutGauge Support*, set IP to `127.0.0.1` and Port to `4444`.
+  * **DiRT Rally 2.0 & EA Sports WRC (`dirt_udp`):** Listens on `127.0.0.1:20777`. In `hardware_settings_config.xml`, enable UDP telemetry: `<udp enabled="true" extradata="3" ip="127.0.0.1" port="20777" delay="1" />`.
+  * **EA Sports F1 Series (`f1_udp`):** Listens on `127.0.0.1:20777`. In F1 *Settings → Telemetry Settings*, set UDP Telemetry to `On`, IP to `127.0.0.1`, Port to `20777`, and Send Rate to `60 Hz`.
 * **Dynamic RevLEDs:** Real-time RPM climb across the 9 Formula V2.5 multi-color LEDs with shift point strobe.
 * **In-Game OLED Display:** Automatically renders live Gear (`1`, `2`, `3`, `N`, `R`) or Vehicle Speed (KM/H).
 * **Flag Alerts:** Flashes side Flag clusters on ABS activation or Traction Control intervention.
