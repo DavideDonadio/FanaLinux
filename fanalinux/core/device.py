@@ -63,8 +63,9 @@ class FanatecDevice:
             if os.path.exists(uevent_path):
                 try:
                     with open(uevent_path, "r") as f:
-                        content = f.read()
-                        if f"{self.vendor_id:04X}" in content.upper() and f"{self.product_id:04X}" in content.upper():
+                        content = f.read().upper()
+                        # Match Fanatec Vendor ID 0EB7 across all Fanatec wheelbases (CSL DD, DD Pro, Podium, Elite, ClubSport)
+                        if f"{self.vendor_id:04X}" in content:
                             dev_name = os.path.basename(entry)
                             return f"/dev/{dev_name}"
                 except Exception:
@@ -227,15 +228,17 @@ class FanatecDevice:
             raw_sen = max(9, min(252, profile.sen // 10))
             self.active_sen = profile.sen
 
+        slot = max(1, min(5, int(getattr(profile, "slot", 1))))
+
         # 1. Select Slot
-        buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, profile.slot & 0xFF] + [0x00] * 60
+        buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, slot & 0xFF] + [0x00] * 60
         self.write_report(buf)
         time.sleep(0.01)
 
         # 2. Build full tuning report buffer with all registers populated
 
         reg_values = {
-            "SLOT": profile.slot,
+            "SLOT": slot,
             "SEN": raw_sen,
             "FF": max(0, min(100, profile.ff)),
             "FFS": 1 if profile.ffs else 0,

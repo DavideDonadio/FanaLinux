@@ -26,9 +26,8 @@ if os.path.exists(CAR_DATA_PATH):
 
 
 class TelemetryManager:
-    def __init__(self, device, on_status_change: Optional[Callable[[bool, str], None]] = None):
+    def __init__(self, device):
         self.device = device
-        self.on_status_change = on_status_change
         self.enabled = False
         self.display_mode = "gear"  # "gear", "speed", or "custom"
         self.max_rpm = 6500         # Sane baseline (adaptive tracking will refine)

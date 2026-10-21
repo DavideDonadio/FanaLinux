@@ -47,6 +47,7 @@ class HapticEngine:
         if self._running:
             return
         self._running = True
+        self._last_suspension = [0.0, 0.0, 0.0, 0.0]
         self._stop_event.clear()
         self._worker_thread = threading.Thread(target=self._haptic_loop, daemon=True)
         self._worker_thread.start()
@@ -55,6 +56,7 @@ class HapticEngine:
     def stop(self):
         """Stop worker and zero all motor forces."""
         self._running = False
+        self._last_suspension = [0.0, 0.0, 0.0, 0.0]
         self._stop_event.set()
         if self._worker_thread:
             self._worker_thread.join(timeout=0.5)

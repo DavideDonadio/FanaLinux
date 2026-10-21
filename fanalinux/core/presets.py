@@ -175,7 +175,9 @@ def load_preset(name: str) -> Optional[TuningProfile]:
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
-            return TuningProfile.from_dict(data)
+            prof = TuningProfile.from_dict(data)
+            prof.slot = max(1, min(5, int(getattr(prof, "slot", 1))))
+            return prof
     except Exception as e:
         logger.error(f"Error loading preset '{name}': {e}")
         return None
@@ -188,6 +190,7 @@ def save_preset(name: str, profile: TuningProfile) -> bool:
     if not safe_name:
         safe_name = "Custom"
     profile.name = safe_name
+    profile.slot = max(1, min(5, int(getattr(profile, "slot", 1))))
     filepath = PRESETS_DIR / f"{safe_name}.json"
     try:
         with open(filepath, "w", encoding="utf-8") as f:

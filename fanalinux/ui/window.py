@@ -4,6 +4,7 @@ Integrates Hardware Device, Evdev Listener, Telemetry Manager, and Auto-Profile 
 """
 
 import os
+import logging
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
@@ -23,6 +24,8 @@ from fanalinux.ui.views.leds import LedsView
 from fanalinux.ui.views.profiles import ProfilesView
 from fanalinux.ui.views.calibration import CalibrationView
 from fanalinux.ui.helpers import widen_page_clamp
+
+logger = logging.getLogger("fanalinux.window")
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -253,7 +256,7 @@ class MainWindow(Adw.ApplicationWindow):
                 if active_game:
                     active_profile = getattr(self.tuning_view, "profile", None)
                     if active_profile and self.device:
-                        print(f"Restoring profile '{active_profile.name}' (Slot {active_profile.slot}) for '{active_game['name']}' after reconnect")
+                        logger.info(f"Restoring profile '{active_profile.name}' (Slot {active_profile.slot}) for '{active_game['name']}' after reconnect")
                         self.device.apply_tuning_profile(active_profile)
             else:
                 self.evdev_listener.stop()

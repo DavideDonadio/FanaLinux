@@ -467,7 +467,9 @@ class CalibrationView(Adw.PreferencesPage):
 
     def update_steering(self, norm_val: float, raw_val: int):
         self._last_raw_steering = raw_val
-        deg = norm_val * 450.0
+        active_sen = getattr(self.device, "active_sen", 900)
+        max_deg = (active_sen / 2.0) if active_sen > 0 else 450.0
+        deg = norm_val * max_deg
         GLib.idle_add(self.wheel_dial.set_angle, deg)
 
     def _on_emergency_stop_clicked(self, btn):

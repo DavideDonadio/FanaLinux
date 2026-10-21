@@ -295,7 +295,9 @@ class OverviewView(Adw.PreferencesPage):
                 chip.remove_css_class("active")
 
     def update_steering(self, norm_val: float, raw_val: int):
-        deg = norm_val * 450.0
+        active_sen = getattr(self.device, "active_sen", 900)
+        max_deg = (active_sen / 2.0) if active_sen > 0 else 450.0
+        deg = norm_val * max_deg
         frac = (norm_val + 1.0) / 2.0
         GLib.idle_add(self._apply_steering, deg, frac)
 
