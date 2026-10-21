@@ -31,7 +31,7 @@ class TuningProfile:
     dpr_mult: int = 100     # Damper Effect multiplier (0 - 120%)
     # Wheel and Pedals Feedback
     sho: int = 100          # Wheel vibration / shock (0 = Off, 10 - 100%)
-    bli: int = 0            # Brake Level Indicator (0 = Off, 1 - 100%)
+    bli: int = 85           # Brake Level Indicator (0 = Off, 1 - 100%)
     brf: int = 50           # Brake Force for load-cell pedals (0 - 100%)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -51,6 +51,9 @@ class TuningProfile:
                         coerced[k] = int(v)
                 except (ValueError, TypeError):
                     coerced[k] = valid_fields[k].default
+        # For legacy presets saved prior to BLI implementation, default to 85%
+        if "bli" not in data:
+            coerced["bli"] = 85
         return cls(**coerced)
 
     def to_json(self) -> str:
@@ -214,7 +217,7 @@ TUNING_METADATA = [
         "max": 100,
         "step": 5,
         "unit": "%",
-        "default": 0,
+        "default": 85,
         "category": "Hardware Feedback"
     },
     {

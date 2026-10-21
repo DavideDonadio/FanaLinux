@@ -59,9 +59,21 @@ class VibrationSettings:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "VibrationSettings":
-        valid_keys = {f.name for f in cls.__dataclass_fields__.values()}
-        filtered = {k: v for k, v in data.items() if k in valid_keys}
-        return cls(**filtered)
+        valid_fields = cls.__dataclass_fields__
+        coerced = {}
+        for k, v in data.items():
+            if k in valid_fields:
+                f_type = valid_fields[k].type
+                try:
+                    if f_type is bool or f_type == "bool":
+                        coerced[k] = bool(v) and str(v).lower() not in ("0", "false")
+                    elif f_type is float or f_type == "float":
+                        coerced[k] = float(v)
+                    else:
+                        coerced[k] = int(v)
+                except (ValueError, TypeError):
+                    coerced[k] = valid_fields[k].default
+        return cls(**coerced)
 
 
 def load_vibration_settings() -> VibrationSettings:

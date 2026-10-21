@@ -17,6 +17,14 @@ CALIBRATION_PATH = os.path.expanduser("~/.config/fanalinux/calibration.json")
 class CalibrationSettings:
     center_raw: int = 32768  # 16-bit raw center position (factory default: 32768)
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "CalibrationSettings":
+        try:
+            raw = int(data.get("center_raw", 32768))
+        except (ValueError, TypeError):
+            raw = 32768
+        return cls(center_raw=raw)
+
 
 def load_calibration_settings() -> CalibrationSettings:
     """Load calibration settings from ~/.config/fanalinux/calibration.json."""
@@ -24,7 +32,8 @@ def load_calibration_settings() -> CalibrationSettings:
         try:
             with open(CALIBRATION_PATH, "r") as f:
                 data = json.load(f)
-                return CalibrationSettings(**data)
+                if isinstance(data, dict):
+                    return CalibrationSettings.from_dict(data)
         except Exception as e:
             logger.warning(f"Failed to load calibration settings: {e}")
     return CalibrationSettings()

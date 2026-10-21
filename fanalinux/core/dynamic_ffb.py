@@ -29,6 +29,24 @@ class DynamicFFBSettings:
     reverse_damper_strength: int = 20  # 0 to 100%
     reverse_fade_in: int = 5           # 1 to 10 ramp intensity
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "DynamicFFBSettings":
+        valid_fields = {f.name: f for f in fields(cls)}
+        coerced = {}
+        for k, v in data.items():
+            if k in valid_fields:
+                f_type = valid_fields[k].type
+                try:
+                    if f_type is bool or f_type == "bool":
+                        coerced[k] = bool(v) and str(v).lower() not in ("0", "false")
+                    elif f_type is float or f_type == "float":
+                        coerced[k] = float(v)
+                    else:
+                        coerced[k] = int(v)
+                except (ValueError, TypeError):
+                    coerced[k] = valid_fields[k].default
+        return cls(**coerced)
+
 
 def load_dynamic_ffb_settings() -> DynamicFFBSettings:
     """Load dynamic FFB settings from ~/.config/fanalinux/dynamic_ffb.json."""
@@ -37,9 +55,7 @@ def load_dynamic_ffb_settings() -> DynamicFFBSettings:
             with open(SETTINGS_PATH, "r") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
-                    valid_keys = {f.name for f in fields(DynamicFFBSettings)}
-                    filtered = {k: v for k, v in data.items() if k in valid_keys}
-                    return DynamicFFBSettings(**filtered)
+                    return DynamicFFBSettings.from_dict(data)
         except Exception as e:
             logger.warning(f"Error loading dynamic FFB settings: {e}")
     return DynamicFFBSettings()

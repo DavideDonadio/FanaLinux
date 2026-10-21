@@ -76,6 +76,7 @@ class FanatecDevice:
             f"{PID_DD_PRO:04X}",
             f"{PID_PODIUM_DD1:04X}",
             f"{PID_PODIUM_DD2:04X}",
+            f"{PID_CLUBSPORT_V2:04X}",
             f"{PID_CLUBSPORT_V25:04X}",
             f"{PID_CSL_ELITE:04X}",
             f"{PID_CSL_ELITE_PS4:04X}",
@@ -268,7 +269,10 @@ class FanatecDevice:
             raw_sen = max(9, min(252, sen_val // 10))
             self.active_sen = sen_val
 
-        slot = max(1, min(5, int(getattr(profile, "slot", 1))))
+        try:
+            slot = max(1, min(5, int(getattr(profile, "slot", 1))))
+        except (ValueError, TypeError):
+            slot = 1
 
         # 1. Select Slot
         buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, slot & 0xFF] + [0x00] * 60
@@ -313,8 +317,13 @@ class FanatecDevice:
         if self._fd is None or not self.connected:
             return None
         try:
-            # Send slot query command: [0xFF, 0x03, 0x01, slot]
-            buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, slot & 0xFF] + [0x00] * 60
+            clamped_slot = max(1, min(5, int(slot)))
+        except (ValueError, TypeError):
+            clamped_slot = 1
+
+        try:
+            # Send slot query command: [0xFF, 0x03, 0x01, clamped_slot]
+            buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, clamped_slot & 0xFF] + [0x00] * 60
             self.write_report(buf)
             time.sleep(0.02)
 
@@ -330,7 +339,7 @@ class FanatecDevice:
                     data = os.read(self._fd, 64)
 
                 if len(data) >= 32 and data[0] == 0xFF and data[1] == 0x03:
-                    prof = TuningProfile(slot=slot)
+                    prof = TuningProfile(slot=clamped_slot)
                     # Parse all registers from buffer
                     raw_sen = data[TUNING_REGISTERS["SEN"] + 1]
                     prof.sen = 0 if raw_sen == 0 else raw_sen * 10
