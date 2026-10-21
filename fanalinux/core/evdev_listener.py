@@ -29,6 +29,8 @@ ABS_Y = 0x01       # Additional Axis
 ABS_Z = 0x02       # Throttle / Accelerator
 ABS_RZ = 0x05      # Brake
 ABS_THROTTLE = 0x06 # Clutch / Aux
+ABS_HAT0X = 0x10   # D-Pad / FunkySwitch Hat X
+ABS_HAT0Y = 0x11   # D-Pad / FunkySwitch Hat Y
 
 
 class EvdevListener:
@@ -176,7 +178,42 @@ class EvdevListener:
             elif code == ABS_THROTTLE and self.on_clutch:
                 norm = 1.0 - (value / 255.0)
                 self.on_clutch(max(0.0, min(1.0, norm)))
+            elif code == ABS_HAT0X and self.on_button:
+                # D-Pad / FunkySwitch X: -1 = Left, 1 = Right, 0 = Released
+                prev_x = getattr(self, "_hat_x", 0)
+                if prev_x != value:
+                    if prev_x == -1:
+                        self.on_button("HAT_LEFT", False)
+                    elif prev_x == 1:
+                        self.on_button("HAT_RIGHT", False)
+                    if value == -1:
+                        self.on_button("HAT_LEFT", True)
+                    elif value == 1:
+                        self.on_button("HAT_RIGHT", True)
+                    self._hat_x = value
+            elif code == ABS_HAT0Y and self.on_button:
+                # D-Pad / FunkySwitch Y: -1 = Up, 1 = Down, 0 = Released
+                prev_y = getattr(self, "_hat_y", 0)
+                if prev_y != value:
+                    if prev_y == -1:
+                        self.on_button("HAT_UP", False)
+                    elif prev_y == 1:
+                        self.on_button("HAT_DOWN", False)
+                    if value == -1:
+                        self.on_button("HAT_UP", True)
+                    elif value == 1:
+                        self.on_button("HAT_DOWN", True)
+                    self._hat_y = value
 
         elif etype == EV_KEY and self.on_button:
+            # Map Linux evdev joystick key codes to 1-based button numbers
+            if 288 <= code <= 303:
+                btn_num = code - 288 + 1      # Buttons 1..16 (BTN_TRIGGER..BTN_TOP2)
+            elif 704 <= code <= 767:
+                btn_num = code - 704 + 17     # Buttons 17..80 (BTN_TRIGGER_HAPPY1..64)
+            elif 304 <= code <= 319:
+                btn_num = code - 304 + 1      # Standard gamepad buttons
+            else:
+                btn_num = code
             is_pressed = (value == 1)
-            self.on_button(code, is_pressed)
+            self.on_button(btn_num, is_pressed)

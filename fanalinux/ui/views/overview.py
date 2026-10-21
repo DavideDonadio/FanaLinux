@@ -176,27 +176,20 @@ class OverviewView(Adw.PreferencesPage):
         # 3. Button Matrix Visualizer
         btn_group = Adw.PreferencesGroup()
         btn_group.set_title("Button Matrix Live State")
-        btn_group.set_description("Buttons and shifter paddles highlight live when pressed")
+        btn_group.set_description("Buttons, paddles, and FunkySwitch inputs highlight live when pressed")
 
-        btn_flow = Gtk.FlowBox()
-        btn_flow.set_max_children_per_line(8)
-        btn_flow.set_selection_mode(Gtk.SelectionMode.NONE)
-        btn_flow.set_homogeneous(True)
-        btn_flow.set_row_spacing(10)
-        btn_flow.set_column_spacing(10)
-        btn_flow.set_margin_top(16)
-        btn_flow.set_margin_bottom(16)
-        btn_flow.set_margin_start(16)
-        btn_flow.set_margin_end(16)
+        self.btn_flow = Gtk.FlowBox()
+        self.btn_flow.set_max_children_per_line(9)
+        self.btn_flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.btn_flow.set_homogeneous(True)
+        self.btn_flow.set_row_spacing(10)
+        self.btn_flow.set_column_spacing(10)
+        self.btn_flow.set_margin_top(16)
+        self.btn_flow.set_margin_bottom(16)
+        self.btn_flow.set_margin_start(16)
+        self.btn_flow.set_margin_end(16)
 
-        for btn_num in range(1, 25):
-            lbl = Gtk.Label(label=f"B{btn_num:02d}")
-            lbl.add_css_class("btn-chip")
-            lbl.set_size_request(56, 42)
-            lbl.set_valign(Gtk.Align.CENTER)
-            lbl.set_halign(Gtk.Align.CENTER)
-            self._button_chips[btn_num] = lbl
-            btn_flow.append(lbl)
+        self._rebuild_button_matrix(self.current_rim_info)
 
         matrix_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         matrix_box.add_css_class("card")
@@ -205,10 +198,45 @@ class OverviewView(Adw.PreferencesPage):
         matrix_box.set_margin_bottom(8)
         matrix_box.set_margin_start(2)
         matrix_box.set_margin_end(2)
-        matrix_box.append(btn_flow)
+        matrix_box.append(self.btn_flow)
 
         btn_group.add(matrix_box)
         self.add(btn_group)
+
+    def _create_and_add_chip(self, chip_id, label_text: str) -> Gtk.Label:
+        lbl = Gtk.Label(label=label_text)
+        lbl.add_css_class("btn-chip")
+        lbl.set_size_request(56, 42)
+        lbl.set_valign(Gtk.Align.CENTER)
+        lbl.set_halign(Gtk.Align.CENTER)
+        self._button_chips[chip_id] = lbl
+        self.btn_flow.append(lbl)
+        return lbl
+
+    def _rebuild_button_matrix(self, rim_info: dict):
+        """Dynamically generate the button matrix tailored to the active steering wheel rim."""
+        self._button_chips.clear()
+        while child := self.btn_flow.get_first_child():
+            self.btn_flow.remove(child)
+
+        active_buttons = rim_info.get("active_buttons")
+        if active_buttons:
+            for btn_num in active_buttons:
+                self._create_and_add_chip(btn_num, f"B{btn_num:02d}")
+        else:
+            btn_count = rim_info.get("button_count", 18)
+            for btn_num in range(1, btn_count + 1):
+                self._create_and_add_chip(btn_num, f"B{btn_num:02d}")
+
+        if rim_info.get("has_dpad", True):
+            hat_inputs = [
+                ("HAT_UP", "D-UP"),
+                ("HAT_DOWN", "D-DN"),
+                ("HAT_LEFT", "D-LT"),
+                ("HAT_RIGHT", "D-RT"),
+            ]
+            for hat_id, hat_label in hat_inputs:
+                self._create_and_add_chip(hat_id, hat_label)
 
     def _on_rim_selected(self, dropdown, param):
         idx = dropdown.get_selected()
@@ -220,6 +248,9 @@ class OverviewView(Adw.PreferencesPage):
             if self.device:
                 self.device.rim_name = rim_info["name"]
             self.rim_row.set_subtitle(rim_info["subtitle"])
+
+            # Dynamically rebuild button matrix to match newly selected rim
+            self._rebuild_button_matrix(rim_info)
 
             # Update prefix image
             rim_img_path = os.path.join(RESOURCES_DIR, "rims", rim_info.get("image", "formula_v2.png"))
@@ -293,14 +324,19 @@ class OverviewView(Adw.PreferencesPage):
         self.clutch_bar.set_fraction(val)
         self.clutch_label.set_text(f"{int(val * 100)}%")
 
-    def update_button(self, code: int, is_pressed: bool):
-        btn_idx = (code - 288 + 1) if code >= 288 else (code % 24 + 1)
-        GLib.idle_add(self._apply_button, btn_idx, is_pressed)
+    def update_button(self, btn_id, is_pressed: bool):
+        GLib.idle_add(self._apply_button, btn_id, is_pressed)
 
-    def _apply_button(self, btn_idx: int, is_pressed: bool):
-        if btn_idx in self._button_chips:
-            chip = self._button_chips[btn_idx]
-            if is_pressed:
-                chip.add_css_class("active")
+    def _apply_button(self, btn_id, is_pressed: bool):
+        if btn_id not in self._button_chips:
+            # Auto-expand chip dynamically if an accessory button is pressed beyond configured count
+            if isinstance(btn_id, int) and 1 <= btn_id <= 64:
+                self._create_and_add_chip(btn_id, f"B{btn_id:02d}")
             else:
-                chip.remove_css_class("active")
+                return
+
+        chip = self._button_chips[btn_id]
+        if is_pressed:
+            chip.add_css_class("active")
+        else:
+            chip.remove_css_class("active")
