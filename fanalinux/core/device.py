@@ -17,6 +17,12 @@ from typing import Optional, List, Tuple, Dict, Any
 from fanalinux.core.protocol import (
     FANATEC_VENDOR_ID,
     PID_CSL_DD,
+    PID_DD_PRO,
+    PID_PODIUM_DD1,
+    PID_PODIUM_DD2,
+    PID_CLUBSPORT_V25,
+    PID_CSL_ELITE,
+    PID_CSL_ELITE_PS4,
     CMD_INIT,
     CMD_DISPLAY_PREFIX,
     CMD_LEGACY_LED_PREFIX,
@@ -53,23 +59,52 @@ class FanatecDevice:
         self._lock = threading.RLock()
 
     def find_hidraw_path(self) -> Optional[str]:
-        """Locate the Fanatec hidraw device node."""
+        """
+        Locate the Fanatec hidraw device node with intelligent preference for
+        wheelbases over peripheral accessories (e.g. standalone USB pedals/shifters).
+        """
         by_id_matches = glob.glob("/dev/input/by-id/*Fanatec*-hidraw*")
         if by_id_matches:
+            # Prioritize wheelbases over pedals / shifters
+            non_pedal = [m for m in by_id_matches if not any(x in m.lower() for x in ("pedal", "shifter", "handbrake"))]
+            if non_pedal:
+                return os.path.realpath(non_pedal[0])
             return os.path.realpath(by_id_matches[0])
 
+        known_pids = (
+            f"{PID_CSL_DD:04X}",
+            f"{PID_DD_PRO:04X}",
+            f"{PID_PODIUM_DD1:04X}",
+            f"{PID_PODIUM_DD2:04X}",
+            f"{PID_CLUBSPORT_V25:04X}",
+            f"{PID_CSL_ELITE:04X}",
+            f"{PID_CSL_ELITE_PS4:04X}",
+        )
+
+        candidates = []
         for entry in glob.glob("/sys/class/hidraw/hidraw*"):
             uevent_path = os.path.join(entry, "device", "uevent")
             if os.path.exists(uevent_path):
                 try:
                     with open(uevent_path, "r") as f:
                         content = f.read().upper()
-                        # Match Fanatec Vendor ID 0EB7 across all Fanatec wheelbases (CSL DD, DD Pro, Podium, Elite, ClubSport)
                         if f"{self.vendor_id:04X}" in content:
                             dev_name = os.path.basename(entry)
-                            return f"/dev/{dev_name}"
+                            dev_path = f"/dev/{dev_name}"
+                            score = 1
+                            if not any(x in content for x in ("PEDAL", "SHIFTER", "HANDBRAKE")):
+                                score = 2
+                            if any(pid in content for pid in known_pids):
+                                score = 3
+                            candidates.append((score, dev_path))
                 except Exception:
                     pass
+
+        if candidates:
+            # Return the highest scored wheelbase node
+            candidates.sort(key=lambda c: c[0], reverse=True)
+            return candidates[0][1]
+
         return None
 
     def connect(self) -> bool:
@@ -217,16 +252,21 @@ class FanatecDevice:
 
     def apply_tuning_profile(self, profile: TuningProfile):
         """Write all tuning attributes from the profile into the hardware registers."""
+        try:
+            sen_val = int(getattr(profile, "sen", 900))
+        except (ValueError, TypeError):
+            sen_val = 900
+
         # Encode SEN safely: 0 = Auto, 90..2520 deg mapped to 9..252
-        if profile.sen <= 0 or profile.sen < 45:
+        if sen_val <= 0 or sen_val < 45:
             raw_sen = 0
             self.active_sen = 900
-        elif profile.sen < 90:
+        elif sen_val < 90:
             raw_sen = 9
             self.active_sen = 90
         else:
-            raw_sen = max(9, min(252, profile.sen // 10))
-            self.active_sen = profile.sen
+            raw_sen = max(9, min(252, sen_val // 10))
+            self.active_sen = sen_val
 
         slot = max(1, min(5, int(getattr(profile, "slot", 1))))
 
@@ -235,24 +275,29 @@ class FanatecDevice:
         self.write_report(buf)
         time.sleep(0.01)
 
-        # 2. Build full tuning report buffer with all registers populated
+        # 2. Build full tuning report buffer with all registers populated safely coerced
+        def safe_int(attr, default=0):
+            try:
+                return int(getattr(profile, attr, default))
+            except (ValueError, TypeError):
+                return default
 
         reg_values = {
             "SLOT": slot,
             "SEN": raw_sen,
-            "FF": max(0, min(100, profile.ff)),
-            "FFS": 1 if profile.ffs else 0,
-            "NDP": max(0, min(100, profile.ndp)),
-            "NFR": max(0, min(100, profile.nfr)),
-            "NIN": max(0, min(100, profile.nin)),
-            "INT": max(0, min(20, profile.int_filter)),
-            "FEI": max(0, min(100, profile.fei)),
-            "FOR": max(0, min(12, profile.for_mult // 10)),
-            "SPR": max(0, min(12, profile.spr_mult // 10)),
-            "DPR": max(0, min(12, profile.dpr_mult // 10)),
-            "SHO": max(0, min(10, profile.sho // 10)),
-            "BLI": max(0, min(100, profile.bli)),
-            "BRF": max(0, min(100, profile.brf)),
+            "FF": max(0, min(100, safe_int("ff", 100))),
+            "FFS": 1 if bool(getattr(profile, "ffs", 1)) and str(getattr(profile, "ffs", 1)) not in ("0", "False") else 0,
+            "NDP": max(0, min(100, safe_int("ndp", 20))),
+            "NFR": max(0, min(100, safe_int("nfr", 5))),
+            "NIN": max(0, min(100, safe_int("nin", 0))),
+            "INT": max(0, min(20, safe_int("int_filter", 3))),
+            "FEI": max(0, min(100, safe_int("fei", 100))),
+            "FOR": max(0, min(12, safe_int("for_mult", 100) // 10)),
+            "SPR": max(0, min(12, safe_int("spr_mult", 100) // 10)),
+            "DPR": max(0, min(12, safe_int("dpr_mult", 100) // 10)),
+            "SHO": max(0, min(10, safe_int("sho", 100) // 10)),
+            "BLI": max(0, min(100, safe_int("bli", 85))),
+            "BRF": max(0, min(100, safe_int("brf", 50))),
         }
 
         out_buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x00] + [0x00] * 61

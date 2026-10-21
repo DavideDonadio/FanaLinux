@@ -302,6 +302,9 @@ class TuningView(Adw.PreferencesPage):
                 self.set_active_profile(p)
                 if self.on_toast_requested:
                     self.on_toast_requested(f"Loaded preset '{name}'")
+            else:
+                if self.on_toast_requested:
+                    self.on_toast_requested(f"Could not load preset '{name}': invalid or corrupt JSON")
 
     def set_active_profile(self, profile: TuningProfile):
         """Update tuning UI to reflect profile values."""

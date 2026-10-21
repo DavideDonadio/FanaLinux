@@ -39,9 +39,19 @@ class TuningProfile:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TuningProfile":
-        valid_keys = {f.name for f in cls.__dataclass_fields__.values()}
-        filtered = {k: v for k, v in data.items() if k in valid_keys}
-        return cls(**filtered)
+        valid_fields = cls.__dataclass_fields__
+        coerced = {}
+        for k, v in data.items():
+            if k in valid_fields:
+                f_type = valid_fields[k].type
+                try:
+                    if f_type is str or f_type == "str":
+                        coerced[k] = str(v)
+                    else:
+                        coerced[k] = int(v)
+                except (ValueError, TypeError):
+                    coerced[k] = valid_fields[k].default
+        return cls(**coerced)
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2)

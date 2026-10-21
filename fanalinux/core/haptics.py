@@ -37,6 +37,7 @@ class HapticEngine:
         self._last_slip_pulse = 0.0
         self._last_susp_pulse = 0.0
         self._last_suspension = [0.0, 0.0, 0.0, 0.0]
+        self._suspension_primed = False
 
         # Worker thread
         self._worker_thread: Optional[threading.Thread] = None
@@ -47,7 +48,7 @@ class HapticEngine:
         if self._running:
             return
         self._running = True
-        self._last_suspension = [0.0, 0.0, 0.0, 0.0]
+        self._suspension_primed = False
         self._stop_event.clear()
         self._worker_thread = threading.Thread(target=self._haptic_loop, daemon=True)
         self._worker_thread.start()
@@ -56,7 +57,7 @@ class HapticEngine:
     def stop(self):
         """Stop worker and zero all motor forces."""
         self._running = False
-        self._last_suspension = [0.0, 0.0, 0.0, 0.0]
+        self._suspension_primed = False
         self._stop_event.set()
         if self._worker_thread:
             self._worker_thread.join(timeout=0.5)
@@ -154,14 +155,18 @@ class HapticEngine:
 
         # 7. Suspension Travel / Curb Strike Vibration
         if len(suspension) >= 4:
-            if self.settings.suspension_enabled:
-                susp_thresh = max(0.01, self.settings.suspension_threshold / 100.0)
-                deltas = [abs(curr - prev) for curr, prev in zip(suspension, self._last_suspension)]
-                if any(d > susp_thresh for d in deltas) and (now - self._last_susp_pulse) >= 0.08:
-                    self._last_susp_pulse = now
-                    intensity = max(10, min(100, self.settings.suspension_strength * 10))
-                    self.trigger_pulse(intensity, 0.06)
-            self._last_suspension = list(suspension)
+            if not self._suspension_primed:
+                self._last_suspension = list(suspension)
+                self._suspension_primed = True
+            else:
+                if self.settings.suspension_enabled:
+                    susp_thresh = max(0.01, self.settings.suspension_threshold / 100.0)
+                    deltas = [abs(curr - prev) for curr, prev in zip(suspension, self._last_suspension)]
+                    if any(d > susp_thresh for d in deltas) and (now - self._last_susp_pulse) >= 0.08:
+                        self._last_susp_pulse = now
+                        intensity = max(10, min(100, self.settings.suspension_strength * 10))
+                        self.trigger_pulse(intensity, 0.06)
+                self._last_suspension = list(suspension)
 
         # 8. Engine Vibration baseline
         if self.settings.engine_enabled and rpm > 300:
