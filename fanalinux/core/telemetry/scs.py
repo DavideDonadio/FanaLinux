@@ -118,19 +118,9 @@ class SCSTelemetry(BaseTelemetryClient):
         if len(mm) < 968:
             return
 
-        # Paused check at offset 4
+        # Paused check at offset 4 and timestamp at offset 8
         paused = struct.unpack_from("<?", mm, 4)[0]
         sim_time = struct.unpack_from("<Q", mm, 8)[0]
-
-        # Freshness watchdog: if sim_time doesn't advance for >3.0s while unpaused, mark disconnected
-        now = time.time()
-        if self._last_sim_time is None or sim_time != self._last_sim_time:
-            self._last_sim_time = sim_time
-            self._last_time_change = now
-            self.is_connected = True
-        elif not paused and (now - self._last_time_change) > 3.0:
-            self.is_connected = False
-            return
 
         if paused:
             self._dispatch_telemetry(
@@ -151,6 +141,20 @@ class SCSTelemetry(BaseTelemetryClient):
 
         speed_kmh = max(0.0, float(speed_ms * 3.6))
         rpm_int = max(0, int(rpm))
+
+        # Resilient freshness watchdog:
+        # Ticking clock, active engine revs, vehicle speed, or inputs all confirm live session
+        now = time.time()
+        is_active = (sim_time != 0 and sim_time != self._last_sim_time) or (rpm_int > 0 or speed_kmh > 0.0 or throttle > 0.0)
+        if is_active:
+            if sim_time != 0:
+                self._last_sim_time = sim_time
+            self._last_time_change = now
+            self.is_connected = True
+        elif not paused and self._last_sim_time is not None and (now - self._last_time_change) > 4.0:
+            # Frozen buffer: plugin crashed or stopped updating
+            self.is_connected = False
+            return
 
         # Truck gear representation: gear < 0 is reverse (-1, -2...), 0 is neutral, > 0 forward
         display_gear = gear if gear >= 0 else -1
