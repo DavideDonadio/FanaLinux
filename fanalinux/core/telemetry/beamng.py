@@ -21,7 +21,6 @@ class BeamNGTelemetry(BaseTelemetryClient):
     # OutGauge packet: 92 bytes base (without trailing optional id)
     # I: time (4)
     # 4s: car (4)
-    # 4s: code (4)
     # H: flags (2)
     # b: gear (1)
     # b: plid (1)
@@ -30,8 +29,8 @@ class BeamNGTelemetry(BaseTelemetryClient):
     # 3f: throttle(f), brake(f), clutch(f)
     # 16s: display1(16)
     # 16s: display2(16)
-    OUTGAUGE_FORMAT = "<I 4s 4s H b b 7f 2I 3f 16s 16s"
-    MIN_PACKET_SIZE = struct.calcsize(OUTGAUGE_FORMAT)  # 92 bytes
+    OUTGAUGE_FORMAT = "<I 4s H b b 7f 2I 3f 16s 16s"
+    MIN_PACKET_SIZE = 92
 
     # showLights bitmasks
     DL_TC = 1 << 4    # 16
@@ -109,15 +108,15 @@ class BeamNGTelemetry(BaseTelemetryClient):
                 if self.on_car_detected:
                     self.on_car_detected(self.car_name)
 
-            raw_gear = fields[4]
+            raw_gear = fields[3]
             # OutGauge: 0=R, 1=N, 2=1st, 3=2nd ...
             gear = raw_gear - 1
 
-            speed_ms = fields[6]
+            speed_ms = fields[5]
             speed_kmh = max(0.0, float(speed_ms * 3.6))
-            rpm = max(0, int(fields[7]))
+            rpm = max(0, int(fields[6]))
 
-            show_lights = fields[14]
+            show_lights = fields[13]
             abs_active = bool(show_lights & self.DL_ABS)
             tc_active = bool(show_lights & self.DL_TC)
 

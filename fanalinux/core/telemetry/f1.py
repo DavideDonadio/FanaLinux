@@ -142,17 +142,18 @@ class F1Telemetry(BaseTelemetryClient):
 
             # Packet 7: Car Status
             elif packet_id == self.PACKET_ID_CAR_STATUS:
-                # Status entry size is ~47-55 bytes
-                entry_size = 47 if packet_format <= 2020 else 55
+                # Dynamic stride: 60 bytes (2020), 47 bytes (2021..2022), 55 bytes (2023+)
+                remaining = len(data) - header_size
+                entry_size = max(45, remaining // 22)
                 offset = header_size + (player_car_index * entry_size)
-                if len(data) >= offset + 16:
+                if len(data) >= offset + 19:
                     tc_val = data[offset]
                     abs_val = data[offset + 1]
                     self._last_tc = bool(tc_val > 0)
                     self._last_abs = bool(abs_val > 0)
-                    # maxRPM offset is usually offset + 12 or 14
+                    # maxRPM offset is byte 17 across all packed layouts
                     try:
-                        max_rpm = struct.unpack_from("<H", data, offset + 14)[0]
+                        max_rpm = struct.unpack_from("<H", data, offset + 17)[0]
                         if 8000 <= max_rpm <= 18000:
                             self.max_rpm = max_rpm
                     except Exception:

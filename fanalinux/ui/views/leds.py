@@ -207,7 +207,7 @@ class LedsView(Adw.PreferencesPage):
                 self.on_toast_requested("Device not connected!")
             return
 
-        if self.telemetry_mgr and self.telemetry_mgr.is_connected:
+        if self.telemetry_mgr and (self.telemetry_mgr.is_connected or getattr(self.telemetry_mgr, "is_running", False)):
             if self.on_toast_requested:
                 self.on_toast_requested("Cannot run demo lap while live telemetry is active!")
             return

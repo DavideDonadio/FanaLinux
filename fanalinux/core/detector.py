@@ -215,10 +215,12 @@ class GameDetector:
             except Exception:
                 pass
 
+        self.config_version = 2
         if CONFIG_PATH.exists():
             try:
                 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                    self.config_version = int(data.get("config_version", 1))
                     self.enabled = bool(data.get("enabled", True))
                     self.poll_interval = data.get("poll_interval", 1.5)
                     self.fallback_preset = str(data.get("fallback_preset", "Default"))
@@ -232,6 +234,16 @@ class GameDetector:
             except Exception as e:
                 logger.error(f"Error loading game profiles config: {e}")
 
+        # Migration to v2: Enable auto_telemetry for builtins with newly supported telemetry
+        needs_migration_save = False
+        if self.config_version < 2:
+            new_telemetry_games = {"ea_sports_f1", "dirt_rally_2", "ea_wrc", "beamng"}
+            for gid in new_telemetry_games:
+                if gid in self.game_mappings:
+                    self.game_mappings[gid]["auto_telemetry"] = True
+            self.config_version = 2
+            needs_migration_save = True
+
         # Fill default mappings for builtins if not present
         for game in BUILTIN_GAMES:
             gid = game["id"]
@@ -241,10 +253,15 @@ class GameDetector:
                     "preset": game.get("default_preset", "Default"),
                     "auto_telemetry": game.get("has_telemetry", False)
                 }
+                needs_migration_save = True
+
+        if needs_migration_save:
+            self.save_config()
 
     def save_config(self):
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         data = {
+            "config_version": self.config_version,
             "enabled": self.enabled,
             "poll_interval": self.poll_interval,
             "fallback_preset": self.fallback_preset,

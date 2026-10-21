@@ -28,6 +28,10 @@ class BaseTelemetryClient:
         self._inspect_callback()
 
     @property
+    def is_running(self) -> bool:
+        return bool(self._running or (self._thread and self._thread.is_alive()))
+
+    @property
     def on_telemetry(self):
         return self._on_telemetry
 

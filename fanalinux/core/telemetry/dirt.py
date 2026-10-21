@@ -122,16 +122,40 @@ class DirtRallyTelemetry(BaseTelemetryClient):
                 float(floats[26])
             )
 
-            # Steer angle: Index 3 (or roll/yaw vector)
-            steer_angle = float(floats[3]) if abs(floats[3]) <= 1.0 else 0.0
+            # Steer angle: Index 30 is steering input [-1.0, 1.0]
+            steer_angle = float(floats[30])
+
+            # Inputs: Throttle (29), Brake (31)
+            throttle = float(floats[29])
+            brake = float(floats[31])
+
+            # Derive wheel slip and detect brake lock / power spin
+            abs_active = False
+            tc_active = False
+            if speed_ms > 1.0:
+                fl_slip = abs(wheel_speed[0] - speed_ms) / speed_ms
+                fr_slip = abs(wheel_speed[1] - speed_ms) / speed_ms
+                rl_slip = abs(wheel_speed[2] - speed_ms) / speed_ms
+                rr_slip = abs(wheel_speed[3] - speed_ms) / speed_ms
+                wheel_slip = (fl_slip, fr_slip, rl_slip, rr_slip)
+
+                # Wheel lockup under braking
+                if brake > 0.3 and any(ws < speed_ms * 0.35 for ws in wheel_speed):
+                    abs_active = True
+
+                # Driven wheel spin under acceleration
+                if throttle > 0.4 and any(ws > speed_ms * 1.35 for ws in wheel_speed):
+                    tc_active = True
+            else:
+                wheel_slip = (0.0, 0.0, 0.0, 0.0)
 
             self._dispatch_telemetry(
                 rpm=rpm,
                 gear=gear,
                 speed_kmh=speed_kmh,
-                abs_active=False,
-                tc_active=False,
-                wheel_slip=(0.0, 0.0, 0.0, 0.0),
+                abs_active=abs_active,
+                tc_active=tc_active,
+                wheel_slip=wheel_slip,
                 wheel_speed=wheel_speed,
                 suspension=suspension,
                 steer_angle=steer_angle

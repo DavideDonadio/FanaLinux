@@ -69,6 +69,10 @@ class TelemetryManager:
     def is_connected(self) -> bool:
         return bool(self.active_client and getattr(self.active_client, "is_connected", False))
 
+    @property
+    def is_running(self) -> bool:
+        return bool(self.enabled or (self.active_client and getattr(self.active_client, "is_running", False)))
+
     def start(self, telemetry_type: Optional[str] = None):
         self.enabled = True
         self._last_gear = None
@@ -76,7 +80,8 @@ class TelemetryManager:
         self._last_flag_state = None
 
         target_type = telemetry_type or self.active_telemetry_type or "ac_udp"
-        if self.active_client and getattr(self.active_client, "is_connected", False) and self.active_telemetry_type != target_type:
+        # Stop previous client whenever type differs to free ports (e.g. 20777)
+        if self.active_client and self.active_telemetry_type != target_type:
             try:
                 self.active_client.stop()
             except Exception:
@@ -93,9 +98,10 @@ class TelemetryManager:
         self._last_gear = None
         self._last_speed_txt = None
         self._last_flag_state = None
-        if self.active_client:
+        # Stop all instantiated clients to prevent socket leaks / port conflicts
+        for client in self._clients.values():
             try:
-                self.active_client.stop()
+                client.stop()
             except Exception:
                 pass
         self.haptic_engine.stop()

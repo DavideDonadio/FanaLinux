@@ -8,16 +8,15 @@ to stream RPM, gear, speed, ABS, and TC events in real time.
 import socket
 import struct
 import select
-import threading
 import time
-import inspect
 import logging
 from typing import Callable, Optional
+from fanalinux.core.telemetry.base import BaseTelemetryClient
 
 logger = logging.getLogger("fanalinux.telemetry.ac")
 
 
-class AssettoCorsaTelemetry:
+class AssettoCorsaTelemetry(BaseTelemetryClient):
     UDP_IP = "127.0.0.1"
     UDP_PORT = 9996
 
@@ -27,57 +26,16 @@ class AssettoCorsaTelemetry:
     DISMISS = 3
 
     def __init__(self,
-                 on_telemetry: Optional[Callable[[int, int, float, bool, bool], None]] = None,
+                 on_telemetry: Optional[Callable] = None,
                  on_car_detected: Optional[Callable[[str], None]] = None,
                  default_max_rpm: int = 6500):
-        """
-        on_telemetry callback: (rpm, gear, speed_kmh, abs_active, tc_active)
-        """
-        self._on_telemetry = on_telemetry
-        self.on_car_detected = on_car_detected
-        self.default_max_rpm = default_max_rpm
-        self.max_rpm = default_max_rpm
-        self.car_name = "Unknown"
-        self._running = False
-        self._thread: Optional[threading.Thread] = None
+        super().__init__(on_telemetry=on_telemetry,
+                         on_car_detected=on_car_detected,
+                         default_max_rpm=default_max_rpm)
         self._sock: Optional[socket.socket] = None
-        self.is_connected = False
-        self._callback_takes_extended = True
-        self._inspect_callback()
-
-    @property
-    def on_telemetry(self):
-        return self._on_telemetry
-
-    @on_telemetry.setter
-    def on_telemetry(self, cb):
-        self._on_telemetry = cb
-        self._inspect_callback()
-
-    def _inspect_callback(self):
-        if not self._on_telemetry:
-            self._callback_takes_extended = False
-            return
-        try:
-            sig = inspect.signature(self._on_telemetry)
-            params = sig.parameters
-            has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
-            self._callback_takes_extended = len(params) >= 6 or "wheel_speed" in params or has_var_keyword
-        except Exception:
-            self._callback_takes_extended = True
-
-    def start(self):
-        """Start the background telemetry polling thread."""
-        if self._running:
-            return
-        self._running = True
-        self._thread = threading.Thread(target=self._worker, daemon=True)
-        self._thread.start()
-        logger.info("Assetto Corsa telemetry thread started")
 
     def stop(self):
         """Stop telemetry thread and send dismiss packet."""
-        self._running = False
         if self._sock:
             try:
                 self._send_command(self.DISMISS)
@@ -85,10 +43,7 @@ class AssettoCorsaTelemetry:
             except Exception:
                 pass
             self._sock = None
-        if self._thread:
-            self._thread.join(timeout=1.0)
-            self._thread = None
-        self.is_connected = False
+        super().stop()
 
     def _send_command(self, operation: int):
         if not self._sock:
@@ -98,29 +53,10 @@ class AssettoCorsaTelemetry:
             0x00, 0x00, 0x00, 0x00,  # Version
             operation, 0x00, 0x00, 0x00  # Operation ID
         ])
-        self._sock.sendto(payload, (self.UDP_IP, self.UDP_PORT))
-
-    def _dispatch_telemetry(self, rpm: int, gear: int, speed_kmh: float, abs_active: bool, tc_active: bool,
-                            wheel_slip=(0.0, 0.0, 0.0, 0.0),
-                            wheel_speed=(0.0, 0.0, 0.0, 0.0),
-                            suspension=(0.0, 0.0, 0.0, 0.0),
-                            steer_angle=0.0):
-        """Invoke on_telemetry callback safely supporting both 5-arg and extended 9-arg signatures without duplicate invocation."""
-        if not self.on_telemetry:
-            return
         try:
-            if getattr(self, "_callback_takes_extended", True):
-                self.on_telemetry(
-                    rpm, gear, speed_kmh, abs_active, tc_active,
-                    wheel_slip=wheel_slip,
-                    wheel_speed=wheel_speed,
-                    suspension=suspension,
-                    steer_angle=steer_angle
-                )
-            else:
-                self.on_telemetry(rpm, gear, speed_kmh, abs_active, tc_active)
-        except Exception as e:
-            logger.error(f"Error calling telemetry callback: {e}")
+            self._sock.sendto(payload, (self.UDP_IP, self.UDP_PORT))
+        except Exception:
+            pass
 
     def _worker(self):
         while self._running:
