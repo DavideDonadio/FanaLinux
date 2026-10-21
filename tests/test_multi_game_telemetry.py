@@ -18,6 +18,9 @@ from fanalinux.core.telemetry.manager import TelemetryManager
 from fanalinux.core.telemetry.beamng import BeamNGTelemetry
 from fanalinux.core.telemetry.dirt import DirtRallyTelemetry
 from fanalinux.core.telemetry.f1 import F1Telemetry
+from fanalinux.core.telemetry.forza import ForzaTelemetry
+from fanalinux.core.telemetry.ams2 import AMS2Telemetry
+from fanalinux.core.telemetry.scs import SCSTelemetry
 from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
 from fanalinux.core.detector import GameDetector, BUILTIN_GAMES
 
@@ -231,13 +234,90 @@ class TestMultiGameTelemetry(unittest.TestCase):
         self.assertTrue(hasattr(client, "is_running"))
         self.assertTrue(hasattr(client, "_dispatch_telemetry"))
 
-    def test_detector_migration_to_v2(self):
+    def test_forza_telemetry_dispatch(self):
+        received = []
+        def _cb(*args, **kwargs):
+            received.append((args, kwargs))
+
+        client = ForzaTelemetry(on_telemetry=_cb)
+        forza_pkt = bytearray(324)
+        struct.pack_into("<iI3f", forza_pkt, 0, 1, 1000, 8200.0, 800.0, 7200.0)
+        struct.pack_into("<4f", forza_pkt, 68, 0.05, 0.05, 0.06, 0.06)
+        struct.pack_into("<4f", forza_pkt, 84, 0.1, 0.1, 0.2, 0.2)
+        struct.pack_into("<4f", forza_pkt, 100, 150.0, 150.0, 150.0, 150.0)
+        struct.pack_into("<f", forza_pkt, 256, 50.0) # 50 m/s -> 180 km/h
+        struct.pack_into("<BbBB", forza_pkt, 312, 4, -64, 200, 50) # gear 4 -> 3rd, steer -64
+
+        client.process_packet(bytes(forza_pkt))
+        self.assertEqual(len(received), 1)
+        args, kwargs = received[0]
+        rpm, gear, speed_kmh, abs_active, tc_active = args
+        self.assertEqual(rpm, 7200)
+        self.assertEqual(gear, 3)
+        self.assertEqual(speed_kmh, 180.0)
+        self.assertEqual(client.max_rpm, 8200)
+        self.assertAlmostEqual(kwargs["steer_angle"], -64 / 127.0, places=2)
+
+    def test_ams2_telemetry_dispatch(self):
+        received = []
+        def _cb(*args, **kwargs):
+            received.append((args, kwargs))
+
+        client = AMS2Telemetry(on_telemetry=_cb)
+        ams2_pkt = bytearray(556)
+        struct.pack_into("<IIBBBB", ams2_pkt, 0, 10, 10, 0, 1, 0, 2)
+        struct.pack_into("<B", ams2_pkt, 17, 16 | 64) # CAR_ABS | CAR_TCS
+        struct.pack_into("<f", ams2_pkt, 36, 41.6667) # ~150 km/h
+        struct.pack_into("<HH", ams2_pkt, 40, 7500, 9000)
+        struct.pack_into("<b", ams2_pkt, 44, 32)
+        struct.pack_into("<B", ams2_pkt, 45, 5 | (6 << 4)) # 5th gear
+        struct.pack_into("<4f", ams2_pkt, 160, 126.0, 126.0, 126.0, 126.0)
+        struct.pack_into("<4f", ams2_pkt, 312, 0.05, 0.05, 0.06, 0.06)
+
+        client.process_packet(bytes(ams2_pkt))
+        self.assertEqual(len(received), 1)
+        args, kwargs = received[0]
+        rpm, gear, speed_kmh, abs_active, tc_active = args
+        self.assertEqual(rpm, 7500)
+        self.assertEqual(gear, 5)
+        self.assertAlmostEqual(speed_kmh, 150.0, delta=0.5)
+        self.assertEqual(client.max_rpm, 9000)
+        self.assertTrue(abs_active)
+        self.assertTrue(tc_active)
+
+    def test_scs_telemetry_dispatch(self):
+        received = []
+        def _cb(*args, **kwargs):
+            received.append((args, kwargs))
+
+        client = SCSTelemetry(on_telemetry=_cb)
+        scs_buf = bytearray(1024)
+        struct.pack_into("<?", scs_buf, 4, False)
+        struct.pack_into("<i", scs_buf, 504, 8)
+        struct.pack_into("<f", scs_buf, 740, 2500.0)
+        struct.pack_into("<5f", scs_buf, 948, 22.2222, 1450.0, 0.15, 0.8, 0.0)
+
+        client.process_frame(scs_buf)
+        self.assertEqual(len(received), 1)
+        args, kwargs = received[0]
+        rpm, gear, speed_kmh, abs_active, tc_active = args
+        self.assertEqual(rpm, 1450)
+        self.assertEqual(gear, 8)
+        self.assertAlmostEqual(speed_kmh, 80.0, delta=0.5)
+        self.assertEqual(client.max_rpm, 2500)
+        self.assertAlmostEqual(kwargs["steer_angle"], 0.15, places=2)
+
+    def test_detector_migration_to_v3(self):
         detector = GameDetector()
-        # Verify that ea_sports_f1, dirt_rally_2, ea_wrc, and beamng have auto_telemetry enabled
-        for gid in ("ea_sports_f1", "dirt_rally_2", "ea_wrc", "beamng"):
+        # Verify that all supported games have auto_telemetry enabled
+        supported_telemetry_games = (
+            "ea_sports_f1", "dirt_rally_2", "ea_wrc", "beamng",
+            "forza_motorsport", "ams2", "ets2", "ats"
+        )
+        for gid in supported_telemetry_games:
             mapping = detector.game_mappings.get(gid, {})
             self.assertTrue(mapping.get("auto_telemetry", False), f"{gid} should have auto_telemetry True")
-        self.assertEqual(detector.config_version, 2)
+        self.assertGreaterEqual(detector.config_version, 3)
 
 
 if __name__ == "__main__":

@@ -79,10 +79,10 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
         "name": "Automobilista 2",
         "executables": ["ams2avx.exe", "ams2.exe"],
         "default_preset": "Default",
-        "has_telemetry": False,
-        "telemetry_type": None,
+        "has_telemetry": True,
+        "telemetry_type": "ams2_udp",
         "description": "Reiza Studios Automobilista 2",
-        "icon": "ams2.svg"
+        "icon": "ams2.jpg"
     },
     {
         "id": "dirt_rally_2",
@@ -136,33 +136,33 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
     },
     {
         "id": "forza_motorsport",
-        "name": "Forza Motorsport",
-        "executables": ["forzamotorsport.exe"],
+        "name": "Forza Motorsport / Horizon",
+        "executables": ["forzamotorsport.exe", "forzahorizon5.exe", "forzahorizon4.exe"],
         "default_preset": "Default",
-        "has_telemetry": False,
-        "telemetry_type": None,
-        "description": "Turn 10 Studios Forza Motorsport",
-        "icon": "forza_motorsport.svg"
+        "has_telemetry": True,
+        "telemetry_type": "forza_udp",
+        "description": "Turn 10 / Playground Games (Forza Motorsport, Horizon 4/5)",
+        "icon": "forza_motorsport.jpg"
     },
     {
         "id": "ets2",
         "name": "Euro Truck Simulator 2",
         "executables": ["eurotrucks2.exe", "eurotrucks2"],
         "default_preset": "Default",
-        "has_telemetry": False,
-        "telemetry_type": None,
+        "has_telemetry": True,
+        "telemetry_type": "scs_shm",
         "description": "SCS Software Euro Truck Simulator 2",
-        "icon": "ets2.svg"
+        "icon": "ets2.jpg"
     },
     {
         "id": "ats",
         "name": "American Truck Simulator",
         "executables": ["amtrucks.exe", "amtrucks"],
         "default_preset": "Default",
-        "has_telemetry": False,
-        "telemetry_type": None,
+        "has_telemetry": True,
+        "telemetry_type": "scs_shm",
         "description": "SCS Software American Truck Simulator",
-        "icon": "ats.svg"
+        "icon": "ats.jpg"
     }
 ]
 
@@ -248,6 +248,20 @@ class GameDetector:
                     else:
                         logger.info(f"Preserved user explicit telemetry preference for '{gid}'")
             self.config_version = 2
+            needs_migration_save = True
+
+        # Migration to v3: Enable auto_telemetry for forza_motorsport, ams2, ets2, ats
+        if self.config_version < 3:
+            v3_telemetry_games = {"forza_motorsport", "ams2", "ets2", "ats"}
+            for gid in v3_telemetry_games:
+                if gid in self.game_mappings:
+                    mapping = self.game_mappings[gid]
+                    if not mapping.get("auto_telemetry_explicit", False):
+                        mapping["auto_telemetry"] = True
+                        logger.info(f"Migrated game telemetry default for '{gid}' -> enabled")
+                    else:
+                        logger.info(f"Preserved user explicit telemetry preference for '{gid}'")
+            self.config_version = 3
             needs_migration_save = True
 
         # Fill default mappings for builtins if not present

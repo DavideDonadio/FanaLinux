@@ -8,9 +8,12 @@ import json
 import logging
 from typing import Optional, Callable, Dict, Any
 from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
+from fanalinux.core.telemetry.ams2 import AMS2Telemetry
 from fanalinux.core.telemetry.beamng import BeamNGTelemetry
 from fanalinux.core.telemetry.dirt import DirtRallyTelemetry
 from fanalinux.core.telemetry.f1 import F1Telemetry
+from fanalinux.core.telemetry.forza import ForzaTelemetry
+from fanalinux.core.telemetry.scs import SCSTelemetry
 from fanalinux.core.haptics import HapticEngine
 from fanalinux.core.vibration import load_vibration_settings
 from fanalinux.core.dynamic_ffb_engine import DynamicFFBEngine
@@ -29,9 +32,12 @@ if os.path.exists(CAR_DATA_PATH):
 
 TELEMETRY_FACTORIES = {
     "ac_udp": AssettoCorsaTelemetry,
+    "ams2_udp": AMS2Telemetry,
     "beamng_outgauge": BeamNGTelemetry,
     "dirt_udp": DirtRallyTelemetry,
     "f1_udp": F1Telemetry,
+    "forza_udp": ForzaTelemetry,
+    "scs_shm": SCSTelemetry,
 }
 
 
