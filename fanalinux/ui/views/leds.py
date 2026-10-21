@@ -11,6 +11,7 @@ import threading
 import time
 
 from fanalinux.core.telemetry.manager import TelemetryManager
+from fanalinux.ui.helpers import widen_page_clamp
 
 
 class LedsView(Adw.PreferencesPage):
@@ -24,22 +25,8 @@ class LedsView(Adw.PreferencesPage):
         self.telemetry_mgr = telemetry_mgr if telemetry_mgr is not None else TelemetryManager(self.device)
 
         # Ensure wide clamp so RevLEDs and descriptions have ample horizontal room
-        GLib.idle_add(self._widen_page_clamp)
+        GLib.idle_add(widen_page_clamp, self)
         self._build_ui()
-
-    def _widen_page_clamp(self):
-        try:
-            sw = self.get_first_child()
-            if sw:
-                vp = sw.get_first_child()
-                if vp:
-                    clamp = vp.get_first_child()
-                    if isinstance(clamp, Adw.Clamp):
-                        clamp.set_maximum_size(1180)
-                        clamp.set_tightening_threshold(1080)
-        except Exception:
-            pass
-        return False
 
     def _build_ui(self):
         # 1. Live In-Game Telemetry Configuration
@@ -220,52 +207,66 @@ class LedsView(Adw.PreferencesPage):
                 self.on_toast_requested("Device not connected!")
             return
 
+        if self.telemetry_mgr and getattr(self.telemetry_mgr.ac_client, "is_connected", False):
+            if self.on_toast_requested:
+                self.on_toast_requested("Cannot run demo lap while live Assetto Corsa telemetry is active!")
+            return
+
         def _sim_worker():
+            was_enabled = self.telemetry_mgr.enabled
             self.telemetry_mgr.enabled = True
+            redline = float(getattr(self.telemetry_mgr, "max_rpm", 9000))
 
-            # 1. Idle in Neutral
-            self.telemetry_mgr._handle_telemetry(rpm=1800, gear=0, speed_kmh=0, abs_active=False, tc_active=False)
-            GLib.idle_add(self._set_gui_dots, 0)
-            time.sleep(1.2)
+            try:
+                # 1. Idle in Neutral
+                self.telemetry_mgr._handle_telemetry(rpm=1800, gear=0, speed_kmh=0, abs_active=False, tc_active=False)
+                GLib.idle_add(self._set_gui_dots, 0)
+                time.sleep(1.2)
 
-            # 2. Acceleration Gear 1
-            for r in range(2500, 8950, 160):
-                pct = r / 9000.0
-                dots = max(0, min(9, int(((pct - 0.65) / 0.33) * 9))) if pct >= 0.65 else 0
-                self.telemetry_mgr._handle_telemetry(rpm=r, gear=1, speed_kmh=r * 0.012, abs_active=False, tc_active=False)
-                GLib.idle_add(self._set_gui_dots, dots)
-                time.sleep(0.04)
+                # 2. Acceleration Gear 1
+                for r in range(2500, int(redline * 0.99), 160):
+                    pct = r / redline
+                    dots = max(0, min(9, int(((pct - 0.65) / 0.33) * 9))) if pct >= 0.65 else 0
+                    self.telemetry_mgr._handle_telemetry(rpm=r, gear=1, speed_kmh=r * 0.012, abs_active=False, tc_active=False)
+                    GLib.idle_add(self._set_gui_dots, dots)
+                    time.sleep(0.04)
 
-            time.sleep(0.25)
+                time.sleep(0.25)
 
-            # 3. Acceleration Gear 2
-            for r in range(6200, 8950, 170):
-                pct = r / 9000.0
-                dots = max(0, min(9, int(((pct - 0.65) / 0.33) * 9))) if pct >= 0.65 else 0
-                self.telemetry_mgr._handle_telemetry(rpm=r, gear=2, speed_kmh=r * 0.018, abs_active=False, tc_active=False)
-                GLib.idle_add(self._set_gui_dots, dots)
-                time.sleep(0.04)
+                # 3. Acceleration Gear 2
+                for r in range(int(redline * 0.7), int(redline * 0.99), 170):
+                    pct = r / redline
+                    dots = max(0, min(9, int(((pct - 0.65) / 0.33) * 9))) if pct >= 0.65 else 0
+                    self.telemetry_mgr._handle_telemetry(rpm=r, gear=2, speed_kmh=r * 0.018, abs_active=False, tc_active=False)
+                    GLib.idle_add(self._set_gui_dots, dots)
+                    time.sleep(0.04)
 
-            time.sleep(0.25)
+                time.sleep(0.25)
 
-            # 4. Acceleration Gear 3
-            for r in range(6400, 8950, 170):
-                pct = r / 9000.0
-                dots = max(0, min(9, int(((pct - 0.65) / 0.33) * 9))) if pct >= 0.65 else 0
-                self.telemetry_mgr._handle_telemetry(rpm=r, gear=3, speed_kmh=r * 0.024, abs_active=False, tc_active=False)
-                GLib.idle_add(self._set_gui_dots, dots)
-                time.sleep(0.04)
+                # 4. Acceleration Gear 3
+                for r in range(int(redline * 0.72), int(redline * 0.99), 170):
+                    pct = r / redline
+                    dots = max(0, min(9, int(((pct - 0.65) / 0.33) * 9))) if pct >= 0.65 else 0
+                    self.telemetry_mgr._handle_telemetry(rpm=r, gear=3, speed_kmh=r * 0.024, abs_active=False, tc_active=False)
+                    GLib.idle_add(self._set_gui_dots, dots)
+                    time.sleep(0.04)
 
-            # 5. Heavy Braking into Hairpin (ABS Yellow Flag Trigger)
-            self.telemetry_mgr._handle_telemetry(rpm=5200, gear=2, speed_kmh=90, abs_active=True, tc_active=False)
-            time.sleep(0.8)
-            self.telemetry_mgr._handle_telemetry(rpm=3200, gear=1, speed_kmh=45, abs_active=True, tc_active=False)
-            time.sleep(0.8)
+                # 5. Heavy Braking into Hairpin (ABS Yellow Flag Trigger)
+                self.telemetry_mgr._handle_telemetry(rpm=int(redline * 0.58), gear=2, speed_kmh=90, abs_active=True, tc_active=False)
+                time.sleep(0.8)
+                self.telemetry_mgr._handle_telemetry(rpm=int(redline * 0.35), gear=1, speed_kmh=45, abs_active=True, tc_active=False)
+                time.sleep(0.8)
 
-            # 6. Idle in Neutral & Clear Flags
-            self.telemetry_mgr._handle_telemetry(rpm=1800, gear=0, speed_kmh=0, abs_active=False, tc_active=False)
-            self.device.set_flagleds([(0, 0, 0)] * 6)
-            GLib.idle_add(self._set_gui_dots, 0)
+                # 6. Idle in Neutral & Clear Flags
+                self.telemetry_mgr._handle_telemetry(rpm=1800, gear=0, speed_kmh=0, abs_active=False, tc_active=False)
+                self.device.set_flagleds([(0, 0, 0)] * 6)
+                GLib.idle_add(self._set_gui_dots, 0)
+            finally:
+                self.telemetry_mgr.enabled = was_enabled
+                if not was_enabled and self.device and self.device.connected:
+                    self.device.set_revleds([(0, 0, 0)] * 9)
+                    self.device.set_flagleds([(0, 0, 0)] * 6)
+                    self.device.clear_display()
 
         threading.Thread(target=_sim_worker, daemon=True).start()
         if self.on_toast_requested:

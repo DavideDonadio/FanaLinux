@@ -16,6 +16,7 @@ from fanalinux.core.dynamic_ffb import (
     load_dynamic_ffb_settings,
     save_dynamic_ffb_settings,
 )
+from fanalinux.ui.helpers import widen_page_clamp
 
 
 class DynamicFFBView(Adw.PreferencesPage):
@@ -27,22 +28,8 @@ class DynamicFFBView(Adw.PreferencesPage):
         self.settings: DynamicFFBSettings = load_dynamic_ffb_settings()
 
         # Ensure full width layout
-        GLib.idle_add(self._widen_page_clamp)
+        GLib.idle_add(widen_page_clamp, self)
         self._build_ui()
-
-    def _widen_page_clamp(self):
-        try:
-            sw = self.get_first_child()
-            if sw:
-                vp = sw.get_first_child()
-                if vp:
-                    clamp = vp.get_first_child()
-                    if isinstance(clamp, Adw.Clamp):
-                        clamp.set_maximum_size(1180)
-                        clamp.set_tightening_threshold(1080)
-        except Exception:
-            pass
-        return False
 
     def _build_ui(self):
         # 1. Section: Speed-Sensitive Damper

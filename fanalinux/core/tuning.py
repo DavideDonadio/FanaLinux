@@ -58,7 +58,7 @@ TUNING_METADATA = [
         "reg": "SEN",
         "name": "Sensitivity (SEN)",
         "desc": "Maximum wheel rotation angle in degrees. 0 sets Auto (game-matched).",
-        "min": 90,
+        "min": 0,
         "max": 2520,
         "step": 10,
         "unit": "°",

@@ -12,6 +12,7 @@ from gi.repository import Gtk, Adw, GLib
 from typing import Optional, Callable
 
 from fanalinux.core.vibration import VibrationSettings, load_vibration_settings, save_vibration_settings
+from fanalinux.ui.helpers import widen_page_clamp
 
 logger = logging.getLogger("fanalinux.vibration")
 
@@ -26,22 +27,8 @@ class VibrationView(Adw.PreferencesPage):
 
         self._controls = {}
         # Ensure page clamp utilizes available window space
-        GLib.idle_add(self._widen_page_clamp)
+        GLib.idle_add(widen_page_clamp, self)
         self._build_ui()
-
-    def _widen_page_clamp(self):
-        try:
-            sw = self.get_first_child()
-            if sw:
-                vp = sw.get_first_child()
-                if vp:
-                    clamp = vp.get_first_child()
-                    if isinstance(clamp, Adw.Clamp):
-                        clamp.set_maximum_size(1180)
-                        clamp.set_tightening_threshold(1080)
-        except Exception:
-            pass
-        return False
 
     def _build_ui(self):
         # 1. Section: Braking & Engine Dynamics

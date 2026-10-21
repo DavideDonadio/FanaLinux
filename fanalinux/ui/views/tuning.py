@@ -14,6 +14,7 @@ from typing import Optional, Callable
 
 from fanalinux.core.tuning import TuningProfile, TUNING_METADATA
 from fanalinux.core.presets import list_presets, load_preset, save_preset, delete_preset, init_default_presets
+from fanalinux.ui.helpers import widen_page_clamp
 
 
 class TuningView(Adw.PreferencesPage):
@@ -34,23 +35,9 @@ class TuningView(Adw.PreferencesPage):
         init_default_presets()
 
         # Ensure page clamp utilizes available window space
-        GLib.idle_add(self._widen_page_clamp)
+        GLib.idle_add(widen_page_clamp, self)
 
         self._build_ui()
-
-    def _widen_page_clamp(self):
-        try:
-            sw = self.get_first_child()
-            if sw:
-                vp = sw.get_first_child()
-                if vp:
-                    clamp = vp.get_first_child()
-                    if isinstance(clamp, Adw.Clamp):
-                        clamp.set_maximum_size(1180)
-                        clamp.set_tightening_threshold(1080)
-        except Exception:
-            pass
-        return False
 
     def _build_ui(self):
         meta_by_id = {m["id"]: m for m in TUNING_METADATA}
@@ -251,7 +238,12 @@ class TuningView(Adw.PreferencesPage):
             val_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
             val_box.set_valign(Gtk.Align.CENTER)
 
-            val_label = Gtk.Label(label=f"{current_val}{meta['unit']}")
+            def _format_display_val(v):
+                if param_id == "sen" and int(v) <= 0:
+                    return "Auto"
+                return f"{int(v)}{meta['unit']}"
+
+            val_label = Gtk.Label(label=_format_display_val(current_val))
             val_label.set_width_chars(6)
             val_label.set_xalign(1.0)
             val_label.add_css_class("val-badge")
@@ -269,8 +261,12 @@ class TuningView(Adw.PreferencesPage):
             scale.set_valign(Gtk.Align.CENTER)
             scale.set_draw_value(False)
 
-            def _on_val_changed(adjustment, lbl=val_label, unit=meta['unit']):
-                lbl.set_text(f"{int(adjustment.get_value())}{unit}")
+            def _on_val_changed(adjustment, lbl=val_label, pid=param_id, unit=meta['unit']):
+                raw_v = int(adjustment.get_value())
+                if pid == "sen" and raw_v <= 0:
+                    lbl.set_text("Auto")
+                else:
+                    lbl.set_text(f"{raw_v}{unit}")
 
             adj.connect("value-changed", _on_val_changed)
 

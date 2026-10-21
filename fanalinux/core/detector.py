@@ -177,12 +177,23 @@ class GameDetector:
 
         # Load configuration
         self.enabled = True
-        self.poll_interval = 1.5
+        self._poll_interval = 1.5
         self.fallback_preset = "Default"
         self.game_mappings: Dict[str, Dict[str, Any]] = {}
         self.custom_games: List[Dict[str, Any]] = []
 
         self._load_config()
+
+    @property
+    def poll_interval(self) -> float:
+        return getattr(self, "_poll_interval", 1.5)
+
+    @poll_interval.setter
+    def poll_interval(self, value):
+        try:
+            self._poll_interval = max(0.5, min(10.0, float(value)))
+        except (ValueError, TypeError):
+            self._poll_interval = 1.5
 
     def _load_config(self):
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -198,7 +209,7 @@ class GameDetector:
                 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.enabled = bool(data.get("enabled", True))
-                    self.poll_interval = float(data.get("poll_interval", 1.5))
+                    self.poll_interval = data.get("poll_interval", 1.5)
                     self.fallback_preset = str(data.get("fallback_preset", "Default"))
                     self.game_mappings = data.get("game_mappings", {})
                     # Migrate legacy f1 keys if present
@@ -402,5 +413,5 @@ class GameDetector:
 
             except Exception as e:
                 logger.error(f"Error in GameDetector loop: {e}")
-
-            time.sleep(max(0.5, float(self.poll_interval)))
+            finally:
+                time.sleep(self.poll_interval)

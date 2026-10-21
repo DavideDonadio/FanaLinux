@@ -10,6 +10,7 @@ import struct
 import select
 import threading
 import time
+import inspect
 import logging
 from typing import Callable, Optional
 
@@ -32,7 +33,7 @@ class AssettoCorsaTelemetry:
         """
         on_telemetry callback: (rpm, gear, speed_kmh, abs_active, tc_active)
         """
-        self.on_telemetry = on_telemetry
+        self._on_telemetry = on_telemetry
         self.on_car_detected = on_car_detected
         self.default_max_rpm = default_max_rpm
         self.max_rpm = default_max_rpm
@@ -41,6 +42,29 @@ class AssettoCorsaTelemetry:
         self._thread: Optional[threading.Thread] = None
         self._sock: Optional[socket.socket] = None
         self.is_connected = False
+        self._callback_takes_extended = True
+        self._inspect_callback()
+
+    @property
+    def on_telemetry(self):
+        return self._on_telemetry
+
+    @on_telemetry.setter
+    def on_telemetry(self, cb):
+        self._on_telemetry = cb
+        self._inspect_callback()
+
+    def _inspect_callback(self):
+        if not self._on_telemetry:
+            self._callback_takes_extended = False
+            return
+        try:
+            sig = inspect.signature(self._on_telemetry)
+            params = sig.parameters
+            has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
+            self._callback_takes_extended = len(params) >= 6 or "wheel_speed" in params or has_var_keyword
+        except Exception:
+            self._callback_takes_extended = True
 
     def start(self):
         """Start the background telemetry polling thread."""
@@ -81,22 +105,22 @@ class AssettoCorsaTelemetry:
                             wheel_speed=(0.0, 0.0, 0.0, 0.0),
                             suspension=(0.0, 0.0, 0.0, 0.0),
                             steer_angle=0.0):
-        """Invoke on_telemetry callback safely supporting both 5-arg and extended 9-arg signatures."""
+        """Invoke on_telemetry callback safely supporting both 5-arg and extended 9-arg signatures without duplicate invocation."""
         if not self.on_telemetry:
             return
         try:
-            self.on_telemetry(
-                rpm, gear, speed_kmh, abs_active, tc_active,
-                wheel_slip=wheel_slip,
-                wheel_speed=wheel_speed,
-                suspension=suspension,
-                steer_angle=steer_angle
-            )
-        except TypeError:
-            try:
+            if getattr(self, "_callback_takes_extended", True):
+                self.on_telemetry(
+                    rpm, gear, speed_kmh, abs_active, tc_active,
+                    wheel_slip=wheel_slip,
+                    wheel_speed=wheel_speed,
+                    suspension=suspension,
+                    steer_angle=steer_angle
+                )
+            else:
                 self.on_telemetry(rpm, gear, speed_kmh, abs_active, tc_active)
-            except Exception as e:
-                logger.error(f"Error calling telemetry callback: {e}")
+        except Exception as e:
+            logger.error(f"Error calling telemetry callback: {e}")
 
     def _worker(self):
         while self._running:
@@ -136,8 +160,8 @@ class AssettoCorsaTelemetry:
 
                     timeout_count = 0
                     data = self._sock.recv(2048)
-                    # Assetto Corsa RTCarUpdate packets are strictly 328 to 388 bytes
-                    if 320 <= len(data) <= 400:
+                    # Assetto Corsa RTCarUpdate packets are strictly 328 to 388 bytes and start with identifier 'a' (97)
+                    if 320 <= len(data) <= 400 and (data[0] == ord('a') or data[0] == 0):
                         speed_kmh = float(struct.unpack("<f", data[8:12])[0])
                         abs_active = bool(data[21])
                         tc_active = bool(data[22])

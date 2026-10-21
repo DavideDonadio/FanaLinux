@@ -11,6 +11,7 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 
 from fanalinux.ui.widgets.wheel_dial import WheelDialWidget
+from fanalinux.ui.helpers import widen_page_clamp
 
 
 class CalibrationView(Adw.PreferencesPage):
@@ -24,7 +25,7 @@ class CalibrationView(Adw.PreferencesPage):
         self._self_test_running = False
 
         # Ensure wide clamp for 2-column layout
-        GLib.idle_add(self._widen_page_clamp)
+        GLib.idle_add(widen_page_clamp, self)
         self._build_ui()
 
     def set_evdev_listener(self, listener):
@@ -33,20 +34,6 @@ class CalibrationView(Adw.PreferencesPage):
     def update_rim(self, rim_info: dict):
         if hasattr(self, "wheel_dial") and self.wheel_dial:
             self.wheel_dial.set_rim(rim_info)
-
-    def _widen_page_clamp(self):
-        try:
-            sw = self.get_first_child()
-            if sw:
-                vp = sw.get_first_child()
-                if vp:
-                    clamp = vp.get_first_child()
-                    if isinstance(clamp, Adw.Clamp):
-                        clamp.set_maximum_size(1180)
-                        clamp.set_tightening_threshold(1080)
-        except Exception:
-            pass
-        return False
 
     def _build_ui(self):
         # 1. Force Feedback Motor & Vibration Test Suite
@@ -294,6 +281,14 @@ class CalibrationView(Adw.PreferencesPage):
         self.self_test_btn.set_label("Running (10s)...")
 
         def _worker():
+            def sleep_check(seconds: float) -> bool:
+                end_t = time.time() + seconds
+                while time.time() < end_t:
+                    if self._abort_self_test:
+                        return False
+                    time.sleep(min(0.04, max(0.005, end_t - time.time())))
+                return not self._abort_self_test
+
             try:
                 # -------------------------------------------------------------
                 # PHASE 1: Displays & Multi-Color LEDs (0.0s - 3.2s)
@@ -302,7 +297,8 @@ class CalibrationView(Adw.PreferencesPage):
                     GLib.idle_add(self.on_toast_requested, "Self-Test (1/3): Testing RevLEDs, Flag clusters & OLED...")
 
                 self.device.set_display_text("TST")
-                time.sleep(0.4)
+                if not sleep_check(0.4):
+                    return
 
                 color_palette = [
                     (0, 255, 0), (0, 255, 0), (0, 255, 0),       # Green
@@ -317,7 +313,8 @@ class CalibrationView(Adw.PreferencesPage):
                         return
                     current_leds[i] = color_palette[i]
                     self.device.set_revleds(current_leds)
-                    time.sleep(0.12)
+                    if not sleep_check(0.12):
+                        return
 
                 # Flag LEDs cycle (3 left, 3 right)
                 self.device.set_display_text("LED")
@@ -325,14 +322,16 @@ class CalibrationView(Adw.PreferencesPage):
                     if self._abort_self_test:
                         return
                     self.device.set_flagleds([c] * 6)
-                    time.sleep(0.35)
+                    if not sleep_check(0.35):
+                        return
 
                 # All LEDs full bright white flash
                 if self._abort_self_test:
                     return
                 self.device.set_revleds([(255, 255, 255)] * 9)
                 self.device.set_flagleds([(255, 255, 255)] * 6)
-                time.sleep(0.4)
+                if not sleep_check(0.4):
+                    return
 
                 # Clear LEDs
                 self.device.set_revleds([(0, 0, 0)] * 9)
@@ -355,9 +354,11 @@ class CalibrationView(Adw.PreferencesPage):
                         return
                     force = int(-7000 * (step / 10.0))
                     self.device.send_constant_force(force)
-                    time.sleep(0.07)
+                    if not sleep_check(0.07):
+                        return
 
-                time.sleep(0.35)
+                if not sleep_check(0.35):
+                    return
 
                 # Smooth ramp back to 0
                 for step in range(10, -1, -1):
@@ -365,7 +366,8 @@ class CalibrationView(Adw.PreferencesPage):
                         return
                     force = int(-7000 * (step / 10.0))
                     self.device.send_constant_force(force)
-                    time.sleep(0.035)
+                    if not sleep_check(0.035):
+                        return
 
                 # Smooth ramp Right (up to ~20% torque)
                 for step in range(1, 11):
@@ -373,9 +375,11 @@ class CalibrationView(Adw.PreferencesPage):
                         return
                     force = int(7000 * (step / 10.0))
                     self.device.send_constant_force(force)
-                    time.sleep(0.07)
+                    if not sleep_check(0.07):
+                        return
 
-                time.sleep(0.35)
+                if not sleep_check(0.35):
+                    return
 
                 # Smooth ramp back to 0
                 for step in range(10, -1, -1):
@@ -383,13 +387,15 @@ class CalibrationView(Adw.PreferencesPage):
                         return
                     force = int(7000 * (step / 10.0))
                     self.device.send_constant_force(force)
-                    time.sleep(0.035)
+                    if not sleep_check(0.035):
+                        return
 
                 # Centering spring check
                 if self._abort_self_test:
                     return
                 self.device.send_centering_spring(50)
-                time.sleep(0.8)
+                if not sleep_check(0.8):
+                    return
                 self.device.send_centering_spring(0)
 
                 # -------------------------------------------------------------
@@ -405,14 +411,16 @@ class CalibrationView(Adw.PreferencesPage):
 
                 # Left grip rumble (1.0s)
                 self.device.send_handle_vibration(180, 0)
-                time.sleep(1.0)
+                if not sleep_check(1.0):
+                    return
 
                 if self._abort_self_test:
                     return
 
                 # Right grip rumble (1.0s)
                 self.device.send_handle_vibration(0, 180)
-                time.sleep(1.0)
+                if not sleep_check(1.0):
+                    return
 
                 if self._abort_self_test:
                     return
@@ -423,9 +431,11 @@ class CalibrationView(Adw.PreferencesPage):
                 half = (1.0 / 18.0) / 2.0
                 while time.time() < end_vib and not self._abort_self_test:
                     self.device.send_constant_force(4500)
-                    time.sleep(half)
+                    if not sleep_check(half):
+                        return
                     self.device.send_constant_force(-4500)
-                    time.sleep(half)
+                    if not sleep_check(half):
+                        return
 
                 # -------------------------------------------------------------
                 # PHASE 4: Pass & Restoration (9.4s - 10.0s)
@@ -434,7 +444,8 @@ class CalibrationView(Adw.PreferencesPage):
                 self.device.send_handle_vibration(0, 0)
                 self.device.send_centering_spring(0)
                 self.device.set_display_text("OK")
-                time.sleep(0.6)
+                if not sleep_check(0.6):
+                    return
                 self.device.clear_display()
 
                 if self.on_toast_requested:
@@ -466,6 +477,7 @@ class CalibrationView(Adw.PreferencesPage):
             self.self_test_btn.set_sensitive(True)
             self.self_test_btn.set_label("Run Self-Test")
         if self.device:
+            self.device._abort_vibration = True
             self.device.stop_all_forces()
             try:
                 self.device.set_revleds([(0, 0, 0)] * 9)

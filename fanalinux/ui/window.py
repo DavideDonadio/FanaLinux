@@ -22,6 +22,7 @@ from fanalinux.ui.views.dynamic_ffb import DynamicFFBView
 from fanalinux.ui.views.leds import LedsView
 from fanalinux.ui.views.profiles import ProfilesView
 from fanalinux.ui.views.calibration import CalibrationView
+from fanalinux.ui.helpers import widen_page_clamp
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -164,17 +165,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.calibration_view,
         ]
         for page in views:
-            try:
-                sw = page.get_first_child()
-                if sw:
-                    vp = sw.get_first_child()
-                    if vp:
-                        clamp = vp.get_first_child()
-                        if isinstance(clamp, Adw.Clamp):
-                            clamp.set_maximum_size(1180)
-                            clamp.set_tightening_threshold(1080)
-            except Exception:
-                pass
+            widen_page_clamp(page)
         return False
 
     def _load_stylesheet(self):

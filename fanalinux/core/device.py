@@ -48,7 +48,9 @@ class FanatecDevice:
         self.firmware_motor = "1.0.3.2"
         self.firmware_rim = "45"
         self._abort_vibration = False
-        self._lock = threading.Lock()
+        self._vibration_token = 0
+        self.active_sen = 900
+        self._lock = threading.RLock()
 
     def find_hidraw_path(self) -> Optional[str]:
         """Locate the Fanatec hidraw device node."""
@@ -94,16 +96,14 @@ class FanatecDevice:
 
     def disconnect(self):
         """Close connection to device."""
-        if self._fd is not None:
+        self.connected = False
+        fd = self._fd
+        self._fd = None
+        if fd is not None:
             try:
-                self.clear_display()
-                self.set_revleds([(0, 0, 0)] * 9)
-                self.set_flagleds([(0, 0, 0)] * 6)
-                os.close(self._fd)
+                os.close(fd)
             except Exception:
                 pass
-            self._fd = None
-        self.connected = False
 
     def check_connection(self) -> bool:
         """
@@ -136,13 +136,16 @@ class FanatecDevice:
         """Write raw HID report buffer directly to hidraw with thread safety and non-blocking retry."""
         if self._fd is None or not self.connected:
             return 0
+        should_disconnect = False
+        bytes_written = 0
         with self._lock:
             if self._fd is None or not self.connected:
                 return 0
             payload = bytes(data)
             for attempt in range(2):
                 try:
-                    return os.write(self._fd, payload)
+                    bytes_written = os.write(self._fd, payload)
+                    break
                 except BlockingIOError:
                     time.sleep(0.002)
                     continue
@@ -153,12 +156,16 @@ class FanatecDevice:
                         continue
                     # Fatal hardware disconnection error (ENODEV, EIO, EBADF)
                     logger.warning(f"Fatal device error during write (disconnecting): {e}")
-                    self.disconnect()
-                    return 0
+                    should_disconnect = True
+                    break
                 except Exception as e:
                     logger.error(f"Error writing report to hidraw: {e}")
-                    return 0
-            return 0
+                    break
+
+        if should_disconnect:
+            self.disconnect()
+
+        return bytes_written
 
     def initialize_hardware(self):
         """Send standard initialization handshake."""
@@ -205,6 +212,8 @@ class FanatecDevice:
 
     def apply_tuning_profile(self, profile: TuningProfile):
         """Write all tuning attributes from the profile into the hardware registers."""
+        self.active_sen = profile.sen if profile.sen > 0 else 900
+
         # 1. Select Slot
         buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, profile.slot & 0xFF] + [0x00] * 60
         self.write_report(buf)
@@ -247,39 +256,45 @@ class FanatecDevice:
         """Request and parse the active tuning report from the wheel base."""
         if self._fd is None or not self.connected:
             return None
-        with self._lock:
-            try:
-                # Send slot query command: [0xFF, 0x03, 0x01, slot]
-                buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, slot & 0xFF] + [0x00] * 60
-                os.write(self._fd, bytes(buf))
-                time.sleep(0.02)
+        try:
+            # Send slot query command: [0xFF, 0x03, 0x01, slot]
+            buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, slot & 0xFF] + [0x00] * 60
+            self.write_report(buf)
+            time.sleep(0.02)
 
-                # Check if an input report is ready
-                r, _, _ = select.select([self._fd], [], [], 0.08)
-                if r:
+            if self._fd is None or not self.connected:
+                return None
+
+            # Check if an input report is ready (outside the USB lock)
+            r, _, _ = select.select([self._fd], [], [], 0.08)
+            if r and self._fd is not None:
+                with self._lock:
+                    if self._fd is None:
+                        return None
                     data = os.read(self._fd, 64)
-                    if len(data) >= 32 and data[0] == 0xFF and data[1] == 0x03:
-                        prof = TuningProfile(slot=slot)
-                        # Parse all registers from buffer
-                        raw_sen = data[TUNING_REGISTERS["SEN"] + 1]
-                        prof.sen = 0 if raw_sen == 0 else raw_sen * 10
-                        prof.ff = data[TUNING_REGISTERS["FF"] + 1]
-                        prof.ndp = data[TUNING_REGISTERS["NDP"] + 1]
-                        prof.nfr = data[TUNING_REGISTERS["NFR"] + 1]
-                        prof.nin = data[TUNING_REGISTERS["NIN"] + 1]
-                        prof.int_filter = data[TUNING_REGISTERS["INT"] + 1]
-                        prof.fei = data[TUNING_REGISTERS["FEI"] + 1]
-                        prof.for_mult = data[TUNING_REGISTERS["FOR"] + 1] * 10
-                        prof.spr_mult = data[TUNING_REGISTERS["SPR"] + 1] * 10
-                        prof.dpr_mult = data[TUNING_REGISTERS["DPR"] + 1] * 10
-                        prof.sho = data[TUNING_REGISTERS["SHO"] + 1] * 10
-                        prof.bli = data[TUNING_REGISTERS["BLI"] + 1]
-                        prof.brf = data[TUNING_REGISTERS["BRF"] + 1]
-                        prof.ffs = data[TUNING_REGISTERS["FFS"] + 1]
-                        return prof
-            except Exception as e:
-                logger.debug(f"Could not read tuning report: {e}")
-            return None
+
+                if len(data) >= 32 and data[0] == 0xFF and data[1] == 0x03:
+                    prof = TuningProfile(slot=slot)
+                    # Parse all registers from buffer
+                    raw_sen = data[TUNING_REGISTERS["SEN"] + 1]
+                    prof.sen = 0 if raw_sen == 0 else raw_sen * 10
+                    prof.ff = data[TUNING_REGISTERS["FF"] + 1]
+                    prof.ndp = data[TUNING_REGISTERS["NDP"] + 1]
+                    prof.nfr = data[TUNING_REGISTERS["NFR"] + 1]
+                    prof.nin = data[TUNING_REGISTERS["NIN"] + 1]
+                    prof.int_filter = data[TUNING_REGISTERS["INT"] + 1]
+                    prof.fei = data[TUNING_REGISTERS["FEI"] + 1]
+                    prof.for_mult = data[TUNING_REGISTERS["FOR"] + 1] * 10
+                    prof.spr_mult = data[TUNING_REGISTERS["SPR"] + 1] * 10
+                    prof.dpr_mult = data[TUNING_REGISTERS["DPR"] + 1] * 10
+                    prof.sho = data[TUNING_REGISTERS["SHO"] + 1] * 10
+                    prof.bli = data[TUNING_REGISTERS["BLI"] + 1]
+                    prof.brf = data[TUNING_REGISTERS["BRF"] + 1]
+                    prof.ffs = data[TUNING_REGISTERS["FFS"] + 1]
+                    return prof
+        except Exception as e:
+            logger.debug(f"Could not read tuning report: {e}")
+        return None
 
     def calibrate_center(self):
         """Trigger center calibration sequence in hardware."""
@@ -358,7 +373,11 @@ class FanatecDevice:
         if self._fd is None or not self.connected:
             return
 
-        self._abort_vibration = False
+        with self._lock:
+            self._vibration_token = getattr(self, "_vibration_token", 0) + 1
+            current_token = self._vibration_token
+            self._abort_vibration = False
+
         clamped_intensity = max(0, min(100, int(intensity)))
         amp = int((clamped_intensity / 100.0) * 6000)
 
@@ -375,16 +394,18 @@ class FanatecDevice:
         half = period / 2.0
         end_time = time.time() + duration
 
-        while time.time() < end_time and not self._abort_vibration:
+        while time.time() < end_time and not self._abort_vibration and self._vibration_token == current_token:
             self.send_constant_force(amp)
             time.sleep(half)
-            if self._abort_vibration:
+            if self._abort_vibration or self._vibration_token != current_token:
                 break
             self.send_constant_force(-amp)
             time.sleep(half)
 
-        self.send_constant_force(0)
-        self.send_handle_vibration(0, 0)
+        # Only reset forces if no newer vibration has superseded this one
+        if self._vibration_token == current_token:
+            self.send_constant_force(0)
+            self.send_handle_vibration(0, 0)
 
     def stop_all_forces(self):
         """Emergency stop: zero and disable all active motor effects and vibrations."""

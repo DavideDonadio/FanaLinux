@@ -53,7 +53,7 @@ DEFAULT_FACTORY_PRESETS: Dict[str, Dict[str, Any]] = {
         "dpr_mult": 100,
         "sho": 100,
         "brf": 55,
-        "bli": 85
+        "bli": 80
     },
     "Assetto Corsa - Formula": {
         "name": "Assetto Corsa - Formula",
@@ -71,7 +71,7 @@ DEFAULT_FACTORY_PRESETS: Dict[str, Dict[str, Any]] = {
         "dpr_mult": 100,
         "sho": 100,
         "brf": 60,
-        "bli": 85
+        "bli": 75
     },
     "F1 24": {
         "name": "F1 24",
@@ -89,7 +89,7 @@ DEFAULT_FACTORY_PRESETS: Dict[str, Dict[str, Any]] = {
         "dpr_mult": 100,
         "sho": 100,
         "brf": 50,
-        "bli": 85
+        "bli": 75
     },
     "Drift": {
         "name": "Drift",
@@ -107,7 +107,7 @@ DEFAULT_FACTORY_PRESETS: Dict[str, Dict[str, Any]] = {
         "dpr_mult": 100,
         "sho": 100,
         "brf": 40,
-        "bli": 85
+        "bli": 0
     },
     "Rally": {
         "name": "Rally",
@@ -125,7 +125,7 @@ DEFAULT_FACTORY_PRESETS: Dict[str, Dict[str, Any]] = {
         "dpr_mult": 100,
         "sho": 100,
         "brf": 50,
-        "bli": 85
+        "bli": 0
     }
 }
 

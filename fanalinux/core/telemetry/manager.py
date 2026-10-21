@@ -41,21 +41,35 @@ class TelemetryManager:
         )
         self.haptic_engine = HapticEngine(self.device)
         self.dynamic_ffb_engine = DynamicFFBEngine(self.device)
+        self.active_sen = 900
         self._last_gear = None
+        self._last_speed_txt = None
+        self._last_flag_state = None
         self._limiter_strobe = False
+
+    def set_active_sen(self, sen: int):
+        """Update active steering angle range for dynamic FFB damper overlay."""
+        self.active_sen = sen if sen > 0 else 900
 
     def start(self):
         self.enabled = True
+        self._last_gear = None
+        self._last_speed_txt = None
+        self._last_flag_state = None
         self.ac_client.start()
         self.haptic_engine.start()
 
     def stop(self):
         self.enabled = False
+        self._last_gear = None
+        self._last_speed_txt = None
+        self._last_flag_state = None
         self.ac_client.stop()
         self.haptic_engine.stop()
         self.dynamic_ffb_engine.reset()
         if self.device and self.device.connected:
             self.device.set_revleds([(0, 0, 0)] * 9)
+            self.device.set_flagleds([(0, 0, 0)] * 6)
             self.device.clear_display()
 
     def set_car_name(self, car_name: str):
@@ -155,4 +169,11 @@ class TelemetryManager:
         )
 
         # 5. Execute Dynamic FFB Damper Overlay (Speed-Sensitive & Reverse Driving Damper)
-        self.dynamic_ffb_engine.update_telemetry(speed_kmh, gear, steer_angle, wheel_speed=wheel_speed)
+        active_sen = getattr(self.device, "active_sen", self.active_sen)
+        if active_sen <= 0:
+            active_sen = 900
+        self.dynamic_ffb_engine.update_telemetry(
+            speed_kmh, gear, steer_angle,
+            wheel_speed=wheel_speed,
+            active_sen=active_sen
+        )
