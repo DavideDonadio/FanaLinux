@@ -170,6 +170,10 @@ class TestMultiGameTelemetry(unittest.TestCase):
         self.assertIn("suspension", kwargs)
         self.assertAlmostEqual(kwargs["suspension"][0], 0.125, places=3)
         self.assertIn("wheel_slip", kwargs)
+        # Verify signed slip ratios
+        fl_slip, fr_slip, rl_slip, rr_slip = kwargs["wheel_slip"]
+        self.assertAlmostEqual(fl_slip, (27.7 - 27.7778) / 27.7778, places=3)
+        self.assertAlmostEqual(rl_slip, (27.5 - 27.7778) / 27.7778, places=3)
 
     def test_f1_telemetry_dispatch(self):
         received = []

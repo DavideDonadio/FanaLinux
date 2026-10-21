@@ -117,11 +117,11 @@ class F1Telemetry(BaseTelemetryClient):
 
             # Packet 6: Car Telemetry
             if packet_id == self.PACKET_ID_CAR_TELEMETRY:
-                # Car telemetry entry size is 60 bytes (2020..2022) or 60/64 bytes (2023+)
-                # We locate player's car telemetry slice
-                entry_size = 60
+                # Dynamic telemetry stride calculation
+                remaining = len(data) - header_size
+                entry_size = max(60, remaining // 22)
                 offset = header_size + (player_car_index * entry_size)
-                if len(data) >= offset + 12:
+                if len(data) >= offset + 18:
                     speed_kmh = float(struct.unpack_from("<H", data, offset)[0])
                     # offset + 2: throttle (f, 4 bytes)
                     steer = float(struct.unpack_from("<f", data, offset + 6)[0])
@@ -142,7 +142,7 @@ class F1Telemetry(BaseTelemetryClient):
 
             # Packet 7: Car Status
             elif packet_id == self.PACKET_ID_CAR_STATUS:
-                # Dynamic stride: 60 bytes (2020), 47 bytes (2021..2022), 55 bytes (2023+)
+                # Dynamic status stride: remaining // 22 (adapts automatically to 2020..2024 layouts)
                 remaining = len(data) - header_size
                 entry_size = max(45, remaining // 22)
                 offset = header_size + (player_car_index * entry_size)

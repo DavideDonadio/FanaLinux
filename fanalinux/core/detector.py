@@ -240,7 +240,13 @@ class GameDetector:
             new_telemetry_games = {"ea_sports_f1", "dirt_rally_2", "ea_wrc", "beamng"}
             for gid in new_telemetry_games:
                 if gid in self.game_mappings:
-                    self.game_mappings[gid]["auto_telemetry"] = True
+                    mapping = self.game_mappings[gid]
+                    # Only enable if user didn't explicitly opt out
+                    if not mapping.get("auto_telemetry_explicit", False):
+                        mapping["auto_telemetry"] = True
+                        logger.info(f"Migrated game telemetry default for '{gid}' -> enabled")
+                    else:
+                        logger.info(f"Preserved user explicit telemetry preference for '{gid}'")
             self.config_version = 2
             needs_migration_save = True
 

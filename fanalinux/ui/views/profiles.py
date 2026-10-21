@@ -195,7 +195,9 @@ class ProfilesView(Adw.PreferencesPage):
                 telem_sw.set_valign(Gtk.Align.CENTER)
 
                 def _on_telem_toggle(sw, state, g_id=gid):
-                    self.detector.game_mappings.setdefault(g_id, {})["auto_telemetry"] = sw.get_active()
+                    entry = self.detector.game_mappings.setdefault(g_id, {})
+                    entry["auto_telemetry"] = sw.get_active()
+                    entry["auto_telemetry_explicit"] = True
                     self.detector.save_config()
 
                 telem_sw.connect("state-set", _on_telem_toggle)

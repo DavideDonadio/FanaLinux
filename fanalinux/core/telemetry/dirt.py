@@ -129,22 +129,23 @@ class DirtRallyTelemetry(BaseTelemetryClient):
             throttle = float(floats[29])
             brake = float(floats[31])
 
-            # Derive wheel slip and detect brake lock / power spin
+            # Derive signed wheel slip and detect brake lock / power spin
             abs_active = False
             tc_active = False
             if speed_ms > 1.0:
-                fl_slip = abs(wheel_speed[0] - speed_ms) / speed_ms
-                fr_slip = abs(wheel_speed[1] - speed_ms) / speed_ms
-                rl_slip = abs(wheel_speed[2] - speed_ms) / speed_ms
-                rr_slip = abs(wheel_speed[3] - speed_ms) / speed_ms
+                # Signed slip: negative = locking, positive = spinning
+                fl_slip = (wheel_speed[0] - speed_ms) / speed_ms
+                fr_slip = (wheel_speed[1] - speed_ms) / speed_ms
+                rl_slip = (wheel_speed[2] - speed_ms) / speed_ms
+                rr_slip = (wheel_speed[3] - speed_ms) / speed_ms
                 wheel_slip = (fl_slip, fr_slip, rl_slip, rr_slip)
 
-                # Wheel lockup under braking
-                if brake > 0.3 and any(ws < speed_ms * 0.35 for ws in wheel_speed):
+                # Wheel lockup under braking: any tire slipping < -0.35
+                if brake > 0.3 and any(s < -0.35 for s in wheel_slip):
                     abs_active = True
 
-                # Driven wheel spin under acceleration
-                if throttle > 0.4 and any(ws > speed_ms * 1.35 for ws in wheel_speed):
+                # Driven wheel spin under acceleration: any tire slipping > 0.35
+                if throttle > 0.4 and any(s > 0.35 for s in wheel_slip):
                     tc_active = True
             else:
                 wheel_slip = (0.0, 0.0, 0.0, 0.0)
