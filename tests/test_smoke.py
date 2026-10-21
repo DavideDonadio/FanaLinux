@@ -83,6 +83,7 @@ class TestSmoke(unittest.TestCase):
 
         from fanalinux.ui.window import MainWindow
         win = MainWindow()
+        self.addCleanup(win._on_close, None)
         self.assertIsNotNone(win)
         self.assertIsNotNone(win.overview_view)
         self.assertIsNotNone(win.tuning_view)
