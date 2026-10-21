@@ -2,34 +2,87 @@
 Overview View: Hardware Status, Live Gauges, and Button Matrix.
 """
 
+import os
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
+from typing import Optional, Callable
+from gi.repository import Gtk, Adw, GLib, Gdk, Gio
+
+from fanalinux.core.hardware import (
+    load_hardware_config,
+    save_hardware_config,
+    KNOWN_RIMS,
+    get_base_info,
+    get_rim_info,
+    KNOWN_BASES,
+)
+
+RESOURCES_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", "resources"))
 
 
 class OverviewView(Adw.PreferencesPage):
-    def __init__(self, device):
+    def __init__(self, device, on_rim_changed: Optional[Callable[[dict], None]] = None):
         super().__init__()
         self.device = device
+        self.on_rim_changed = on_rim_changed
         self._button_chips = {}
+        self.hardware_config = load_hardware_config()
+        self.current_rim_info = get_rim_info(self.hardware_config.rim_id)
+        if self.device:
+            self.device.rim_name = self.current_rim_info["name"]
         self._build_ui()
+
+    def _create_thumbnail(self, image_path: str, fallback_icon: str, size: int = 102, box_width: int = 128, box_height: int = 108) -> tuple[Gtk.Box, Gtk.Image]:
+        """Create a clean, strictly sized hardware thumbnail centered in a fixed-geometry container."""
+        container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        container.set_size_request(box_width, box_height)
+        container.set_halign(Gtk.Align.START)
+        container.set_valign(Gtk.Align.CENTER)
+        container.set_hexpand(False)
+        container.set_vexpand(False)
+        container.set_margin_end(16)
+
+        if os.path.exists(image_path):
+            f = Gio.File.new_for_path(image_path)
+            tex = Gdk.Texture.new_from_file(f)
+            img = Gtk.Image.new_from_paintable(tex)
+        else:
+            img = Gtk.Image.new_from_icon_name(fallback_icon)
+
+        img.set_pixel_size(size)
+        img.set_valign(Gtk.Align.CENTER)
+        img.set_halign(Gtk.Align.CENTER)
+        img.set_hexpand(True)
+        img.set_vexpand(True)
+        container.append(img)
+        return container, img
 
     def _build_ui(self):
         # 1. Device Info Card
         info_group = Adw.PreferencesGroup()
         info_group.set_title("Hardware Status")
 
+        # Determine appropriate hardware thumbnail images based on connected device
+        base_info = get_base_info(self.device.product_id if self.device else 0x0020)
+        base_img_path = os.path.join(RESOURCES_DIR, "bases", base_info.get("image", "csl_dd.png"))
+        rim_img_path = os.path.join(RESOURCES_DIR, "rims", self.current_rim_info.get("image", "formula_v2.png"))
+
+        # Base Row
         self.status_row = Adw.ActionRow()
-        self.status_row.set_title("Fanatec CSL DD")
-        self.status_row.set_subtitle("Vendor ID: 0x0EB7 | Product ID: 0x0020 | PC Mode (Red)")
-        self.status_row.set_icon_name("input-gaming-symbolic")
+        self.status_row.set_title(base_info["name"])
+        pid_hex = f"0x{self.device.product_id:04X}" if self.device else "0x0020"
+        self.status_row.set_subtitle(f"Vendor ID: 0x0EB7 | Product ID: {pid_hex} | PC Mode (Red)")
+        base_box, self.base_thumbnail = self._create_thumbnail(base_img_path, "input-gaming-symbolic", size=112, box_width=128, box_height=108)
+        self.status_row.add_prefix(base_box)
 
         status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         status_box.set_valign(Gtk.Align.CENTER)
+        status_box.add_css_class("status-indicator-box")
 
-        self.status_dot = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-        self.status_dot.add_css_class("success")
+        self.status_dot = Gtk.Image.new_from_icon_name("media-record-symbolic")
+        self.status_dot.set_pixel_size(10)
+        self.status_dot.add_css_class("status-dot-online")
         status_box.append(self.status_dot)
 
         self.conn_badge = Gtk.Label(label="Online")
@@ -40,12 +93,29 @@ class OverviewView(Adw.PreferencesPage):
         self.status_row.add_suffix(status_box)
         info_group.add(self.status_row)
 
+        # Rim Row
         self.rim_row = Adw.ActionRow()
         self.rim_row.set_title("Steering Wheel Rim")
-        self.rim_row.set_subtitle("ClubSport Steering Wheel Formula V2.5 (15 Multi-Color LEDs)")
-        self.rim_row.set_icon_name("applications-games-symbolic")
-        info_group.add(self.rim_row)
+        self.rim_row.set_subtitle(self.current_rim_info["subtitle"])
+        rim_box, self.rim_thumbnail = self._create_thumbnail(rim_img_path, "applications-games-symbolic", size=102, box_width=128, box_height=108)
+        self.rim_row.add_prefix(rim_box)
 
+        # Dropdown selector for exact steering wheel model
+        rim_names = [r["name"] for r in KNOWN_RIMS]
+        rim_string_list = Gtk.StringList.new(rim_names)
+        self.rim_dropdown = Gtk.DropDown.new(rim_string_list, None)
+        self.rim_dropdown.set_valign(Gtk.Align.CENTER)
+
+        selected_idx = 0
+        for i, r in enumerate(KNOWN_RIMS):
+            if r["id"] == self.hardware_config.rim_id:
+                selected_idx = i
+                break
+        self.rim_dropdown.set_selected(selected_idx)
+        self.rim_dropdown.connect("notify::selected", self._on_rim_selected)
+        self.rim_row.add_suffix(self.rim_dropdown)
+
+        info_group.add(self.rim_row)
         self.add(info_group)
 
         # 2. Live Axes & Telemetry
@@ -140,26 +210,49 @@ class OverviewView(Adw.PreferencesPage):
         btn_group.add(matrix_box)
         self.add(btn_group)
 
+    def _on_rim_selected(self, dropdown, param):
+        idx = dropdown.get_selected()
+        if 0 <= idx < len(KNOWN_RIMS):
+            rim_info = KNOWN_RIMS[idx]
+            self.hardware_config.rim_id = rim_info["id"]
+            save_hardware_config(self.hardware_config)
+            self.current_rim_info = rim_info
+            if self.device:
+                self.device.rim_name = rim_info["name"]
+            self.rim_row.set_subtitle(rim_info["subtitle"])
+
+            # Update prefix image
+            rim_img_path = os.path.join(RESOURCES_DIR, "rims", rim_info.get("image", "formula_v2.png"))
+            if os.path.exists(rim_img_path):
+                f = Gio.File.new_for_path(rim_img_path)
+                tex = Gdk.Texture.new_from_file(f)
+                self.rim_thumbnail.set_from_paintable(tex)
+                self.rim_thumbnail.set_pixel_size(102)
+
+            if self.on_rim_changed:
+                self.on_rim_changed(rim_info)
+
     def set_connection_status(self, is_online: bool):
         """Update hardware status badge and cards based on connection state."""
         if is_online:
-            self.status_dot.set_from_icon_name("emblem-ok-symbolic")
-            self.status_dot.remove_css_class("error")
-            self.status_dot.add_css_class("success")
+            self.status_dot.remove_css_class("status-dot-offline")
+            self.status_dot.add_css_class("status-dot-online")
             self.conn_badge.set_text("Online")
             self.conn_badge.remove_css_class("error")
             self.conn_badge.add_css_class("success")
-            self.status_row.set_title(self.device.product_name if self.device else "Fanatec CSL DD")
-            self.status_row.set_subtitle("Vendor ID: 0x0EB7 | Product ID: 0x0020 | PC Mode (Red)")
-            self.rim_row.set_subtitle(f"{self.device.rim_name if self.device else 'Formula V2.5'} (15 Multi-Color LEDs)")
+            base_info = get_base_info(self.device.product_id if self.device else 0x0020)
+            self.status_row.set_title(base_info["name"])
+            pid_hex = f"0x{self.device.product_id:04X}" if self.device else "0x0020"
+            self.status_row.set_subtitle(f"Vendor ID: 0x0EB7 | Product ID: {pid_hex} | PC Mode (Red)")
+            self.rim_row.set_subtitle(self.current_rim_info["subtitle"])
         else:
-            self.status_dot.set_from_icon_name("network-offline-symbolic")
-            self.status_dot.remove_css_class("success")
-            self.status_dot.add_css_class("error")
+            self.status_dot.remove_css_class("status-dot-online")
+            self.status_dot.add_css_class("status-dot-offline")
             self.conn_badge.set_text("Offline")
             self.conn_badge.remove_css_class("success")
             self.conn_badge.add_css_class("error")
-            self.status_row.set_title("Fanatec CSL DD (Disconnected)")
+            base_info = get_base_info(self.device.product_id if self.device else 0x0020)
+            self.status_row.set_title(f"{base_info['name']} (Disconnected)")
             self.status_row.set_subtitle("Hardware disconnected — connect USB or power on wheelbase")
             self.rim_row.set_subtitle("No steering wheel rim detected")
             # Reset live input gauges

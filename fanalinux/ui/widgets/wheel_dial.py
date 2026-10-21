@@ -13,17 +13,20 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 from typing import Optional, Callable
+from fanalinux.core.hardware import load_hardware_config, get_rim_info
 
-RIM_IMAGE_PATH = os.path.join(
+RESOURCES_RIMS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "resources", "rims", "formula_v25.png"
+    "resources", "rims"
 )
 
 
 class WheelDialWidget(Gtk.Box):
-    def __init__(self, on_calibrate_clicked: Optional[Callable[[], None]] = None):
+    def __init__(self, on_calibrate_clicked: Optional[Callable[[], None]] = None,
+                 on_reset_clicked: Optional[Callable[[], None]] = None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         self.on_calibrate_clicked = on_calibrate_clicked
+        self.on_reset_clicked = on_reset_clicked
         self.angle_deg = 0.0
 
         # Animation state
@@ -34,13 +37,10 @@ class WheelDialWidget(Gtk.Box):
         self._anim_source_id = None
         self._just_calibrated = False
 
-        # Load Rim Surface
+        # Load Rim Surface for currently configured rim
         self._rim_surface = None
-        if os.path.exists(RIM_IMAGE_PATH):
-            try:
-                self._rim_surface = cairo.ImageSurface.create_from_png(RIM_IMAGE_PATH)
-            except Exception as e:
-                print(f"Warning: could not load rim image: {e}")
+        hw_config = load_hardware_config()
+        self.set_rim(get_rim_info(hw_config.rim_id))
 
         self.set_halign(Gtk.Align.CENTER)
         self.set_valign(Gtk.Align.CENTER)
@@ -54,14 +54,38 @@ class WheelDialWidget(Gtk.Box):
         self.drawing_area.set_draw_func(self._draw_dial)
         self.append(self.drawing_area)
 
-        # 2. Calibration Button
-        self.cal_btn = Gtk.Button(label="WHEEL CENTER CALIBRATION")
-        self.cal_btn.set_size_request(240, 40)
+        # 2. Action Buttons (Calibrate + Reset)
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        btn_box.set_halign(Gtk.Align.CENTER)
+
+        self.cal_btn = Gtk.Button(label="Calibrate Center")
+        self.cal_btn.set_size_request(160, 40)
         self.cal_btn.set_halign(Gtk.Align.CENTER)
         self.cal_btn.add_css_class("suggested-action")
         self.cal_btn.add_css_class("pill")
         self.cal_btn.connect("clicked", self._on_btn_clicked)
-        self.append(self.cal_btn)
+        btn_box.append(self.cal_btn)
+
+        self.reset_btn = Gtk.Button(label="Reset to Factory 0°")
+        self.reset_btn.set_size_request(150, 40)
+        self.reset_btn.set_halign(Gtk.Align.CENTER)
+        self.reset_btn.add_css_class("pill")
+        self.reset_btn.connect("clicked", self._on_reset_btn_clicked)
+        btn_box.append(self.reset_btn)
+
+        self.append(btn_box)
+
+    def set_rim(self, rim_info: dict):
+        """Set or update the active steering wheel rim image rendered on the dial."""
+        rim_filename = rim_info.get("image", "formula_v2.png")
+        rim_path = os.path.join(RESOURCES_RIMS_DIR, rim_filename)
+        if os.path.exists(rim_path):
+            try:
+                self._rim_surface = cairo.ImageSurface.create_from_png(rim_path)
+                if hasattr(self, "drawing_area"):
+                    self.drawing_area.queue_draw()
+            except Exception as e:
+                print(f"Warning: could not load rim image: {e}")
 
     def set_angle(self, degrees: float):
         """Update angle from hardware if not currently running the calibration animation."""
@@ -75,6 +99,11 @@ class WheelDialWidget(Gtk.Box):
         self._start_calibration_animation()
         if self.on_calibrate_clicked:
             self.on_calibrate_clicked()
+
+    def _on_reset_btn_clicked(self, btn):
+        self._start_calibration_animation()
+        if self.on_reset_clicked:
+            self.on_reset_clicked()
 
     def _start_calibration_animation(self):
         if self._anim_source_id:

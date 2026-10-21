@@ -70,7 +70,7 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(header)
 
         # Create Views (All are Adw.PreferencesPage with built-in scrolling & clamping)
-        self.overview_view = OverviewView(self.device)
+        self.overview_view = OverviewView(self.device, on_rim_changed=self._on_rim_changed)
         self.tuning_view = TuningView(
             self.device,
             on_toast_requested=self.show_toast,
@@ -139,6 +139,7 @@ class MainWindow(Adw.ApplicationWindow):
             on_button=self.overview_view.update_button,
         )
         self.evdev_listener.start()
+        self.calibration_view.set_evdev_listener(self.evdev_listener)
 
         # Start Auto-Profile Detector
         self.detector.start()
@@ -236,6 +237,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.show_toast(f"{game_info['name']} exited → Restored '{fallback_preset}' preset")
         return False
 
+    def _on_rim_changed(self, rim_info: dict):
+        if hasattr(self, "calibration_view") and self.calibration_view:
+            self.calibration_view.update_rim(rim_info)
+
     def _on_presets_changed(self):
         self.profiles_view.refresh_preset_lists()
 
@@ -250,6 +255,7 @@ class MainWindow(Adw.ApplicationWindow):
             if is_online:
                 if not self.evdev_listener.is_running():
                     self.evdev_listener.start()
+                    self.calibration_view.set_evdev_listener(self.evdev_listener)
                 self.show_toast("Fanatec CSL DD connected and online!")
                 active_profile = getattr(self.tuning_view, "active_profile", None)
                 if active_profile and self.device:

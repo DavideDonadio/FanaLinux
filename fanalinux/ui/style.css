@@ -76,3 +76,21 @@ window {
     font-size: 0.85rem;
 }
 
+.status-indicator-box {
+    padding: 6px 14px;
+    border-radius: 9999px;
+    background-color: alpha(@window_fg_color, 0.04);
+    border: 1px solid alpha(@window_fg_color, 0.08);
+}
+
+.status-dot-online {
+    color: #2ec27e;
+    filter: drop-shadow(0 0 4px alpha(#2ec27e, 0.6));
+}
+
+.status-dot-offline {
+    color: #e01b24;
+    filter: drop-shadow(0 0 4px alpha(#e01b24, 0.4));
+}
+
+

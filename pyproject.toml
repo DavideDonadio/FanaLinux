@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fanalinux"
-version = "0.3.1"
+version = "0.4.0"
 description = "Native Linux Control Panel and Telemetry Suite for Fanatec Hardware"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -44,4 +44,4 @@ where = ["."]
 include = ["fanalinux*"]
 
 [tool.setuptools.package-data]
-fanalinux = ["ui/*.css", "resources/icons/*.svg", "resources/icons/*.jpg", "resources/icons/*.png"]
+fanalinux = ["ui/*.css", "resources/icons/*", "resources/rims/*", "resources/bases/*"]

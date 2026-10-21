@@ -18,12 +18,21 @@ class CalibrationView(Adw.PreferencesPage):
         super().__init__()
         self.device = device
         self.on_toast_requested = on_toast_requested
+        self.evdev_listener = None
+        self._last_raw_steering = 32768
         self._abort_self_test = False
         self._self_test_running = False
 
         # Ensure wide clamp for 2-column layout
         GLib.idle_add(self._widen_page_clamp)
         self._build_ui()
+
+    def set_evdev_listener(self, listener):
+        self.evdev_listener = listener
+
+    def update_rim(self, rim_info: dict):
+        if hasattr(self, "wheel_dial") and self.wheel_dial:
+            self.wheel_dial.set_rim(rim_info)
 
     def _widen_page_clamp(self):
         try:
@@ -111,7 +120,7 @@ class CalibrationView(Adw.PreferencesPage):
         # Automated Full Hardware Self-Test (10s)
         self_test_row = Adw.ActionRow()
         self_test_row.set_title("Full Hardware Self-Test (10s)")
-        self_test_row.set_subtitle("10-second automated sequence verifying RevLEDs, Flags, OLED, DD motor sweeps & haptic rumble")
+        self_test_row.set_subtitle("10-second automated sequence verifying RevLEDs, Flags, OLED, DD motor sweeps &amp; haptic rumble")
         self_test_row.set_icon_name("media-playback-start-symbolic")
 
         self.self_test_btn = Gtk.Button(label="Run Self-Test")
@@ -145,8 +154,18 @@ class CalibrationView(Adw.PreferencesPage):
         )
 
         # Embedded 360° Circular Steering Visualizer Dial (Screenshot 2)
-        self.wheel_dial = WheelDialWidget(on_calibrate_clicked=self._on_calibrate_clicked)
+        self.wheel_dial = WheelDialWidget(
+            on_calibrate_clicked=self._on_calibrate_clicked,
+            on_reset_clicked=self._on_reset_clicked
+        )
         center_group.add(self.wheel_dial)
+
+        # Hardware shortcut helper row
+        hw_tip_row = Adw.ActionRow()
+        hw_tip_row.set_title("Hardware EEPROM Flash Shortcut")
+        hw_tip_row.set_subtitle("To permanently flash center into base memory across all platforms: [Tuning Button] + [FunkySwitch Press]")
+        hw_tip_row.set_icon_name("help-about-symbolic")
+        center_group.add(hw_tip_row)
 
         # 3. Pedal Min / Max Deadzones
         pedal_group = Adw.PreferencesGroup()
@@ -436,6 +455,7 @@ class CalibrationView(Adw.PreferencesPage):
         threading.Thread(target=_worker, daemon=True).start()
 
     def update_steering(self, norm_val: float, raw_val: int):
+        self._last_raw_steering = raw_val
         deg = norm_val * 450.0
         GLib.idle_add(self.wheel_dial.set_angle, deg)
 
@@ -459,11 +479,47 @@ class CalibrationView(Adw.PreferencesPage):
             self.on_toast_requested("Emergency Cutoff: All forces, springs, and vibrations zeroed!")
 
     def _on_calibrate_clicked(self, btn=None):
-        if not self.device or not self.device.connected:
-            if self.on_toast_requested:
-                self.on_toast_requested("Device not connected!")
-            return
+        # 1. Update persistent software calibration offset in evdev listener
+        if self.evdev_listener:
+            self.evdev_listener.set_center_raw(self._last_raw_steering)
 
-        self.device.calibrate_center()
+        # 2. Immediately snap visual dial to 0.0
+        GLib.idle_add(self.wheel_dial.set_angle, 0.0)
+
+        # 3. Physical visual confirmation on Formula V2.5 rim
+        if self.device and self.device.connected:
+            def _feedback():
+                try:
+                    self.device.set_display_text("CAL")
+                    self.device.set_revleds([(0, 255, 0)] * 9)
+                    time.sleep(0.8)
+                    self.device.clear_display()
+                    self.device.set_revleds([(0, 0, 0)] * 9)
+                except Exception:
+                    pass
+
+            threading.Thread(target=_feedback, daemon=True).start()
+            self.device.calibrate_center()
+
         if self.on_toast_requested:
-            self.on_toast_requested("Center calibration command sent to CSL DD!")
+            self.on_toast_requested(f"Wheel center calibrated to 0.0° (Raw: {self._last_raw_steering})!")
+
+    def _on_reset_clicked(self, btn=None):
+        if self.evdev_listener:
+            self.evdev_listener.reset_center()
+
+        GLib.idle_add(self.wheel_dial.set_angle, 0.0)
+
+        if self.device and self.device.connected:
+            def _feedback():
+                try:
+                    self.device.set_display_text("RST")
+                    time.sleep(0.6)
+                    self.device.clear_display()
+                except Exception:
+                    pass
+
+            threading.Thread(target=_feedback, daemon=True).start()
+
+        if self.on_toast_requested:
+            self.on_toast_requested("Steering center reset to factory default (32768)!")

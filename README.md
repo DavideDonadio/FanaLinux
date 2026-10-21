@@ -109,13 +109,14 @@ Fanatec and related product names are used solely to identify compatible hardwar
 * **Reverse Driving Safety Damper:** Automatically applies progressive damping resistance when the vehicle travels in reverse, preventing violent steering wheel snaps caused by inverted caster geometry.
 * **Configurable Curve & Range:** Independent sliders for activation speeds, fade-in speed windows, and damping strength percentages, with one-click restore to defaults.
 
-### 6. Overview & Input Visualizer
+### 6. Overview & Hardware Catalog
+* **Multi-Wheel Hardware Catalog:** Switch between 15 authentic Fanatec steering wheel rims (ClubSport Formula V2 / F1 Esports V2, Formula V2.5 / V2.5 X, Formula V3, McLaren GT3 V2, Podium BMW M4 GT3, Porsche 911 GT3 R, RS Round, Drift V2, SPARCO® GT, CSL WRC, P1 V2, and more) with persistent hardware configuration and pixel-perfect horizontal alignment.
 * **16-bit Steering Angle Gauge:** Sub-millisecond evdev reading with live degrees readout.
 * **Pedal Travel Bars:** Color-coded gauges for Throttle (Green), Brake (Red), Clutch (Blue).
 * **24-Button Matrix:** Monospace pill chips highlighting live button clicks and shifter paddle pulls with generous padding.
 
-### 7. Calibration, Diagnostics & Visual Dial
-* **Interactive 360° Wheel Center Dial:** High-resolution ClubSport Formula V2.5 rim rendering rotating in real-time with cardinal degree markings, angle badge, and smooth 60 FPS cubic ease-out calibration ripple animation.
+### 7. Calibration, Diagnostics & Dynamic Wheel Dial
+* **Interactive 360° Dynamic Wheel Dial:** Real-time steering angle rendering that automatically adapts to the user's selected Fanatec wheel model, featuring smooth 60 FPS cubic ease-out calibration animation, cardinal degree markings, and live angle bubble badge.
 * **Full Hardware Self-Test (10s):** Automated 10-second end-to-end diagnostic sequence verifying RevLEDs, Flag clusters, OLED display segments, Direct Drive motor torque sweeps & centering, and rim/pedal tactile rumble.
 * **Interactive Motor Diagnostics:** Live centering spring with adjustable strength and dynamic rotational friction resistance.
 * **Safety Force Cutoff:** Dedicated emergency stop button instantly canceling all active motor torque, centering springs, and vibrations.

@@ -3,6 +3,8 @@ Vibration View: Telemetry-Driven Haptic Feedback & Dynamic Rim/Pedal Vibration.
 Matches the official Fanatec App / FanaLab Vibration tab.
 """
 
+import threading
+import logging
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
@@ -10,6 +12,8 @@ from gi.repository import Gtk, Adw, GLib
 from typing import Optional, Callable
 
 from fanalinux.core.vibration import VibrationSettings, load_vibration_settings, save_vibration_settings
+
+logger = logging.getLogger("fanalinux.vibration")
 
 
 class VibrationView(Adw.PreferencesPage):
@@ -277,10 +281,21 @@ class VibrationView(Adw.PreferencesPage):
             self.on_toast_requested("Vibration defaults restored")
 
     def _on_test_clicked(self, btn):
-        if self.haptic_engine:
-            self.haptic_engine.trigger_pulse(self.settings.abs_strength * 10, max(0.1, self.settings.abs_duration / 1000.0))
-        elif self.device and self.device.connected:
-            self.device.vibrate_wheel(intensity=60, duration=0.25, freq=18)
+        if not self.device or not self.device.connected:
+            if self.on_toast_requested:
+                self.on_toast_requested("Device not connected!")
+            return
+
+        strength = max(10, min(100, int(self.settings.abs_strength * 10)))
+        duration_s = max(0.2, self.settings.abs_duration / 1000.0)
+
+        def _worker():
+            try:
+                self.device.vibrate_wheel(intensity=strength, duration=duration_s, freq=18)
+            except Exception as e:
+                logger.error(f"Error previewing haptics: {e}")
+
+        threading.Thread(target=_worker, daemon=True).start()
 
         if self.on_toast_requested:
-            self.on_toast_requested("Previewing telemetry haptic pulse (18 Hz)...")
+            self.on_toast_requested(f"Previewing haptic pulse ({strength}% strength, {int(duration_s * 1000)}ms)...")

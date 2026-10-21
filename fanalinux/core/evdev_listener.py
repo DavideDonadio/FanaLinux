@@ -13,6 +13,8 @@ import threading
 import logging
 from typing import Callable, Optional, Dict
 
+from fanalinux.core.calibration import load_calibration_settings, save_calibration_settings, CalibrationSettings
+
 logger = logging.getLogger("fanalinux.evdev")
 
 # struct input_event { timeval time; __u16 type; __u16 code; __s32 value; }
@@ -46,6 +48,22 @@ class EvdevListener:
         self._thread: Optional[threading.Thread] = None
         self._fd: Optional[int] = None
         self.device_node: Optional[str] = None
+
+        # Steering Calibration Offset (Persistent)
+        self.calibration: CalibrationSettings = load_calibration_settings()
+        self.center_raw: int = self.calibration.center_raw
+        self.last_raw_steering: int = self.center_raw
+
+    def set_center_raw(self, raw_val: int):
+        """Set the calibrated center position and persist to disk."""
+        self.center_raw = int(raw_val)
+        self.calibration.center_raw = self.center_raw
+        save_calibration_settings(self.calibration)
+        logger.info(f"Steering center updated to raw value {self.center_raw}")
+
+    def reset_center(self):
+        """Reset steering center to factory default (32768)."""
+        self.set_center_raw(32768)
 
     def find_device_node(self) -> Optional[str]:
         """Locate the Fanatec joystick event node with auto-probing."""
@@ -142,8 +160,10 @@ class EvdevListener:
     def _process_event(self, etype: int, code: int, value: int):
         if etype == EV_ABS:
             if code == ABS_X and self.on_steering:
-                # 0..65535, center ~32768 -> -1.0 .. +1.0
-                normalized = (value - 32768.0) / 32768.0
+                self.last_raw_steering = value
+                # 0..65535, calibrated against self.center_raw
+                normalized = (value - float(self.center_raw)) / 32768.0
+                normalized = max(-1.0, min(1.0, normalized))
                 self.on_steering(normalized, value)
             elif code == ABS_Z and self.on_throttle:
                 # 0..65535, inverting if needed (0 = released, 65535 = pressed)
