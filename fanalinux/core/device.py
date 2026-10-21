@@ -20,6 +20,7 @@ from fanalinux.core.protocol import (
     PID_DD_PRO,
     PID_PODIUM_DD1,
     PID_PODIUM_DD2,
+    PID_CLUBSPORT_V2,
     PID_CLUBSPORT_V25,
     PID_CSL_ELITE,
     PID_CSL_ELITE_PS4,
