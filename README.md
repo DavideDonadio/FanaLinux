@@ -150,27 +150,34 @@ $$\text{BGR565} = ((\text{Blue} \gg 3) \ll 11) \mid ((\text{Green} \gg 2) \ll 5)
 
 ## Installation & Launch
 
-### Prerequisites
-* Fedora Linux, Arch Linux, Ubuntu, or Debian
-* Python >= 3.10
-* GTK4 & Libadwaita (`libadwaita`, `python3-gobject`)
+### Quick 1-Command Installation (Recommended)
 
-### Quick Setup
-
+Clone the repository and run the automated installer:
 ```bash
-# Clone repository
 git clone https://github.com/DavideDonadio/fanalinux.git
 cd fanalinux
-
-# Create virtual environment with system packages (for PyGObject/GTK4)
-python3 -m venv --system-site-packages .venv
-source .venv/bin/activate
-
-# Install dependencies and package
-pip install -e .
-
-# Launch FanaLinux
-fanalinux
+./install.sh
 ```
 
-Or press the **Super (Windows) key** in your desktop environment and search for **"FanaLinux"**!
+The installer automatically:
+1. Verifies system dependencies (GTK4 & Libadwaita).
+2. Sets up an isolated environment (PEP 668 compliant across Fedora, Arch, Ubuntu, Debian).
+3. Installs the `fanalinux` binary into `~/.local/bin/`.
+4. Installs the desktop application launcher and icons into your Application Menu.
+5. Prompts to install the Fanatec USB udev permissions rule (`99-fanatec-fanalinux.rules`) for non-root hardware access.
+
+---
+
+### Launching FanaLinux
+
+- **From Application Menu:** Press the **Super (Windows) key** and launch **"FanaLinux"**.
+- **From Terminal:** Run `fanalinux`.
+
+---
+
+### Uninstallation
+
+To completely remove FanaLinux, its desktop launcher, and udev rules:
+```bash
+./uninstall.sh
+```
