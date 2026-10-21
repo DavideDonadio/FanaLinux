@@ -2,6 +2,11 @@
 Euro Truck Simulator 2 & American Truck Simulator Telemetry Client for Linux.
 Reads from POSIX Shared Memory (/dev/shm/SCSTelemetry or /dev/shm/SimTelemetryETS2)
 created by the SCS SDK plugin on Linux.
+
+Note on Haptics & Channel Support:
+SCS telemetry provides RevLEDs, OLED gear/speed readouts, engine RPM vibration,
+and speed-sensitive steering damping. Wheel slip and suspension kerb haptics
+are not exported by the SCS truck physics interface.
 """
 
 import os
@@ -37,6 +42,8 @@ class SCSTelemetry(BaseTelemetryClient):
         self.poll_interval = 1.0 / max(10.0, min(100.0, poll_rate_hz))
         self._mmap_obj: Optional[mmap.mmap] = None
         self._fd: Optional[int] = None
+        self._last_sim_time: Optional[int] = None
+        self._last_time_change: float = time.time()
 
     def stop(self):
         super().stop()
@@ -55,6 +62,8 @@ class SCSTelemetry(BaseTelemetryClient):
             except Exception:
                 pass
             self._fd = None
+        self._last_sim_time = None
+        self._last_time_change = time.time()
         self.is_connected = False
 
     def _try_open_shm(self) -> bool:
@@ -111,6 +120,18 @@ class SCSTelemetry(BaseTelemetryClient):
 
         # Paused check at offset 4
         paused = struct.unpack_from("<?", mm, 4)[0]
+        sim_time = struct.unpack_from("<Q", mm, 8)[0]
+
+        # Freshness watchdog: if sim_time doesn't advance for >3.0s while unpaused, mark disconnected
+        now = time.time()
+        if self._last_sim_time is None or sim_time != self._last_sim_time:
+            self._last_sim_time = sim_time
+            self._last_time_change = now
+            self.is_connected = True
+        elif not paused and (now - self._last_time_change) > 3.0:
+            self.is_connected = False
+            return
+
         if paused:
             self._dispatch_telemetry(
                 rpm=0,

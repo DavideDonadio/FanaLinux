@@ -19,11 +19,13 @@ class AMS2Telemetry(BaseTelemetryClient):
     Automobilista 2 / Project CARS 2 UDP receiver.
     Listens for eCarPhysics packets (mPacketType == 0).
     """
+    # Bind 0.0.0.0 to permit LAN / console forwarding from external rigs
     UDP_IP = "0.0.0.0"
     UDP_PORT = 5606
 
     HEADER_SIZE = 12
     HEADER_FORMAT = "<IIBBBB"
+    # sTelemetryData (eCarPhysics) packet size in Project CARS 2 / AMS2 spec
     MIN_PACKET_SIZE = 556
 
     # CarFlags bitmask constants
@@ -116,7 +118,7 @@ class AMS2Telemetry(BaseTelemetryClient):
             p_num, cat_num, p_idx, p_total, packet_type, p_ver = struct.unpack_from(self.HEADER_FORMAT, data, 0)
 
             # Only eCarPhysics (packet_type == 0) contains live vehicle telemetry
-            if packet_type != 0 or len(data) < 320:
+            if packet_type != 0 or len(data) < self.MIN_PACKET_SIZE:
                 return
 
             # Car state & Flags

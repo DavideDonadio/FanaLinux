@@ -92,9 +92,9 @@ FanaLinux features an engine-agnostic telemetry ingestion pipeline powering RevL
   * **BeamNG.drive (`beamng_outgauge`):** Listens on `127.0.0.1:4444`. In BeamNG, open *Options → Other → OutGauge Support*, set IP to `127.0.0.1` and Port to `4444`.
   * **DiRT Rally 2.0 & EA Sports WRC (`dirt_udp`):** Listens on `127.0.0.1:20777`. In `hardware_settings_config.xml`, enable UDP telemetry: `<udp enabled="true" extradata="3" ip="127.0.0.1" port="20777" delay="1" />`.
   * **EA Sports F1 Series (`f1_udp`):** Listens on `127.0.0.1:20777`. In F1 *Settings → Telemetry Settings*, set UDP Telemetry to `On`, IP to `127.0.0.1`, Port to `20777`, and Send Rate to `60 Hz`.
-  * **Forza Motorsport & Horizon 4/5 (`forza_udp`):** Listens on `127.0.0.1:5300`. In Forza *Settings → HUD and Gameplay → Data Out*, enable Data Out, set IP to `127.0.0.1`, and Port to `5300`.
-  * **Automobilista 2 (`ams2_udp`):** Listens on `0.0.0.0:5606`. In AMS2 *Options → System*, set *UDP Protocol Version* to `Project CARS 2` and *UDP Frequency* to `1` (or desired rate).
-  * **Euro Truck Simulator 2 & ATS (`scs_shm`):** Reads directly from `/dev/shm/SCSTelemetry` written by the Linux SCS SDK plugin with zero network overhead.
+  * **Forza Motorsport & Horizon 4/5 (`forza_udp`):** Listens on `127.0.0.1:5300`. In Forza *Settings → HUD and Gameplay → Data Out*, enable Data Out, select **Dash / Car Dash** packet format (do not choose Sled), set IP to `127.0.0.1`, and Port to `5300`. Supports both FM7 (311 bytes) and FH/FM2023 (324 bytes).
+  * **Automobilista 2 (`ams2_udp`):** Listens on `0.0.0.0:5606` (binds all interfaces to support console or external PC LAN forwarding). In AMS2 *Options → System*, set *UDP Protocol Version* to `Project CARS 2` and *UDP Frequency* to `1` (or desired rate).
+  * **Euro Truck Simulator 2 & ATS (`scs_shm`):** Reads directly from `/dev/shm/SCSTelemetry` written by the Linux SCS SDK plugin with zero network overhead. Drives RevLEDs, OLED gear/speed, engine vibration, and speed safety damping (truck telemetry does not export tire slip or curb suspension channels).
 * **Dynamic RevLEDs:** Real-time RPM climb across the 9 Formula V2.5 multi-color LEDs with shift point strobe.
 * **In-Game OLED Display:** Automatically renders live Gear (`1`, `2`, `3`, `N`, `R`) or Vehicle Speed (KM/H).
 * **Flag Alerts:** Flashes side Flag clusters on ABS activation or Traction Control intervention.

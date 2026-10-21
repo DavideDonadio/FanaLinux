@@ -23,9 +23,13 @@ class ForzaTelemetry(BaseTelemetryClient):
     UDP_IP = "127.0.0.1"
     UDP_PORT = 5300
 
-    # Minimum packet length for Forza 'Car Dash' packet format
+    # Minimum packet lengths for Forza 'Car Dash' packet format:
+    # - 311 bytes: Forza Motorsport 7 Dash format
+    # - 324 bytes: Forza Horizon 4/5 & Forza Motorsport (2023) Dash format
     MIN_PACKET_SIZE = 311
+    FM7_PACKET_SIZE = 311
     DASH_PACKET_SIZE = 324
+    SLED_PACKET_SIZE = 232
 
     def __init__(self,
                  on_telemetry: Optional[Callable] = None,
@@ -37,6 +41,7 @@ class ForzaTelemetry(BaseTelemetryClient):
                          default_max_rpm=default_max_rpm)
         self.UDP_PORT = port
         self._sock: Optional[socket.socket] = None
+        self._sled_warned = False
 
     def stop(self):
         super().stop()
@@ -75,6 +80,13 @@ class ForzaTelemetry(BaseTelemetryClient):
                             logger.info(f"Connected to Forza telemetry stream ({len(data)} bytes)")
 
                         self.process_packet(data)
+                    elif len(data) == self.SLED_PACKET_SIZE:
+                        if not self._sled_warned:
+                            logger.warning(
+                                "Received 232-byte Forza 'Sled' packet. "
+                                "Please change Data Out Packet Format to 'Dash' or 'Car Dash' in game settings."
+                            )
+                            self._sled_warned = True
 
             except Exception as e:
                 if self._running:
@@ -92,27 +104,16 @@ class ForzaTelemetry(BaseTelemetryClient):
     def process_packet(self, data: bytes):
         """
         Parse raw Forza 'Data Out' packet and dispatch to listener.
-        Standard layout:
-          0: s32 IsRaceOn
-          4: u32 TimestampMS
-          8: f32 EngineMaxRpm
-         12: f32 EngineIdleRpm
-         16: f32 CurrentEngineRpm
-         68-84: f32 NormalizedSuspensionTravel FL, FR, RL, RR
-         84-100: f32 TireSlipRatio FL, FR, RL, RR
-         100-116: f32 WheelRotationSpeed FL, FR, RL, RR
-         256: f32 Speed (m/s)
-         312: u8 Gear (0 = Reverse, 1 = Neutral, 2 = 1st, 3 = 2nd...)
-         313: s8 Steering (-127 to 127)
-         314: u8 Throttle (0 to 255)
-         315: u8 Brake (0 to 255)
-         316: u8 Clutch (0 to 255)
+        Supports both:
+          - FM7 311-byte layout (speed at 244, inputs at 307)
+          - FH4/FH5/FM2023 324-byte layout (speed at 256, inputs at 312)
         """
         try:
-            if len(data) < self.MIN_PACKET_SIZE:
+            pkt_len = len(data)
+            if pkt_len < self.MIN_PACKET_SIZE:
                 return
 
-            # Header & Engine block (first 20 bytes)
+            # Header & Engine block (first 20 bytes, shared by all Dash variants)
             is_race_on, timestamp_ms, engine_max_rpm, engine_idle_rpm, current_engine_rpm = struct.unpack_from(
                 "<iI3f", data, 0
             )
@@ -147,12 +148,17 @@ class ForzaTelemetry(BaseTelemetryClient):
             ws_fl, ws_fr, ws_rl, ws_rr = struct.unpack_from("<4f", data, 100)
             wheel_speed = (float(ws_fl), float(ws_fr), float(ws_rl), float(ws_rr))
 
-            # Speed at offset 256 (m/s)
-            speed_ms = struct.unpack_from("<f", data, 256)[0]
-            speed_kmh = max(0.0, float(speed_ms * 3.6))
+            # Branch offsets by packet version:
+            # - FM7 Dash format: 311 bytes (speed at 244, gear at 307, steer at 308)
+            # - FH4 / FH5 / FM2023 Car Dash format: >= 324 bytes (speed at 256, gear at 312, steer at 313)
+            if pkt_len >= self.DASH_PACKET_SIZE:
+                speed_ms = struct.unpack_from("<f", data, 256)[0]
+                raw_gear, raw_steer, raw_throttle, raw_brake = struct.unpack_from("<BbBB", data, 312)
+            else:
+                speed_ms = struct.unpack_from("<f", data, 244)[0]
+                raw_gear, raw_steer, raw_throttle, raw_brake = struct.unpack_from("<BbBB", data, 307)
 
-            # Gear and inputs at offset 312
-            raw_gear, raw_steer, raw_throttle, raw_brake = struct.unpack_from("<BbBB", data, 312)
+            speed_kmh = max(0.0, float(speed_ms * 3.6))
 
             # Gear mapping: 0 = Reverse (-1), 1 = Neutral (0), 2 = 1st (1), 3 = 2nd (2)...
             if raw_gear == 0:

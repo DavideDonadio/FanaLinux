@@ -258,6 +258,31 @@ class TestMultiGameTelemetry(unittest.TestCase):
         self.assertEqual(client.max_rpm, 8200)
         self.assertAlmostEqual(kwargs["steer_angle"], -64 / 127.0, places=2)
 
+    def test_forza_telemetry_fm7_311_byte_dispatch(self):
+        received = []
+        def _cb(*args, **kwargs):
+            received.append((args, kwargs))
+
+        client = ForzaTelemetry(on_telemetry=_cb)
+        # FM7 layout: exactly 311 bytes, speed at offset 244, inputs at offset 307
+        fm7_pkt = bytearray(311)
+        struct.pack_into("<iI3f", fm7_pkt, 0, 1, 1000, 7500.0, 800.0, 6800.0)
+        struct.pack_into("<4f", fm7_pkt, 68, 0.05, 0.05, 0.06, 0.06)
+        struct.pack_into("<4f", fm7_pkt, 84, 0.1, 0.1, 0.2, 0.2)
+        struct.pack_into("<4f", fm7_pkt, 100, 140.0, 140.0, 140.0, 140.0)
+        struct.pack_into("<f", fm7_pkt, 244, 45.0) # 45 m/s -> 162 km/h
+        struct.pack_into("<BbBB", fm7_pkt, 307, 3, 32, 180, 0) # gear 3 -> 2nd, steer 32
+
+        client.process_packet(bytes(fm7_pkt))
+        self.assertEqual(len(received), 1)
+        args, kwargs = received[0]
+        rpm, gear, speed_kmh, abs_active, tc_active = args
+        self.assertEqual(rpm, 6800)
+        self.assertEqual(gear, 2)
+        self.assertEqual(speed_kmh, 162.0)
+        self.assertEqual(client.max_rpm, 7500)
+        self.assertAlmostEqual(kwargs["steer_angle"], 32 / 127.0, places=2)
+
     def test_ams2_telemetry_dispatch(self):
         received = []
         def _cb(*args, **kwargs):
