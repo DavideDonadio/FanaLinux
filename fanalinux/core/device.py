@@ -255,9 +255,9 @@ class FanatecDevice:
     def apply_tuning_profile(self, profile: TuningProfile):
         """Write all tuning attributes from the profile into the hardware registers."""
         try:
-            sen_val = int(getattr(profile, "sen", 900))
+            sen_val = int(getattr(profile, "sen", 0))
         except (ValueError, TypeError):
-            sen_val = 900
+            sen_val = 0
 
         # Encode SEN: hardware maps raw byte to (raw + 127) * 10 deg
         # (verified on CSL DD: raw 90 -> 2170 deg range, raw 0 -> 1270 deg).
@@ -294,18 +294,18 @@ class FanatecDevice:
             "SEN": raw_sen,
             "FF": max(0, min(100, safe_int("ff", 100))),
             "FFS": 1 if bool(getattr(profile, "ffs", 1)) and str(getattr(profile, "ffs", 1)) not in ("0", "False") else 0,
-            "NDP": max(0, min(100, safe_int("ndp", 20))),
-            "NFR": max(0, min(100, safe_int("nfr", 5))),
+            "NDP": max(0, min(100, safe_int("ndp", 50))),
+            "NFR": max(0, min(100, safe_int("nfr", 0))),
             "NIN": max(0, min(100, safe_int("nin", 0))),
-            "INT": max(0, min(20, safe_int("int_filter", 3))),
+            "INT": max(0, min(20, safe_int("int_filter", 11))),
             "FEI": max(0, min(100, safe_int("fei", 100))),
             "FOR": max(0, min(12, safe_int("for_mult", 100) // 10)),
             "SPR": max(0, min(12, safe_int("spr_mult", 100) // 10)),
             "DPR": max(0, min(12, safe_int("dpr_mult", 100) // 10)),
             "SHO": max(0, min(10, safe_int("sho", 100) // 10)),
-            "BLI": max(0, min(100, safe_int("bli", 85))),
+            "BLI": max(0, min(100, safe_int("bli", 0))),
             "BRF": max(0, min(100, safe_int("brf", 50))),
-            "FUL": max(0, min(100, safe_int("ful", 0))),
+            "FUL": max(0, min(100, safe_int("ful", 100))),
         }
 
         # NOTE: DRI/ACP stay zeroed (no app model: DRI absent from CSL DD

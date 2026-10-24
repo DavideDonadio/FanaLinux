@@ -13,7 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from fanalinux.core.device import FanatecDevice
-from fanalinux.core.tuning import TuningProfile
+from fanalinux.core.tuning import TuningProfile, TUNING_METADATA
 from fanalinux.core.protocol import TUNING_REGISTERS
 
 
@@ -67,6 +67,30 @@ class TestTuningTransfer(unittest.TestCase):
     def test_slot_byte(self):
         buf = capture_full_buffer(self.dev, TuningProfile(slot=1))
         self.assertEqual(reg(buf, "SLOT"), 1)
+
+
+class TestOfficialDefaults(unittest.TestCase):
+    """Dataclass, UI metadata and shipped preset agree on official Fanatec defaults."""
+    def test_metadata_matches_dataclass(self):
+        prof = TuningProfile()
+        for m in TUNING_METADATA:
+            if "default" in m:
+                self.assertEqual(getattr(prof, m["id"]), m["default"], m["id"])
+
+    def test_official_fanatec_values(self):
+        prof = TuningProfile()
+        self.assertEqual((prof.sen, prof.ndp, prof.nfr, prof.int_filter, prof.bli), (0, 50, 0, 11, 0))
+        self.assertEqual((prof.ff, prof.fei, prof.brf, prof.ful), (100, 100, 50, 100))
+        self.assertEqual((prof.for_mult, prof.spr_mult, prof.dpr_mult), (100, 100, 100))
+
+    def test_default_profile_encodes_official_values(self):
+        from fanalinux.core.device import FanatecDevice
+        dev = FanatecDevice()
+        buf = capture_full_buffer(dev, TuningProfile(slot=1))
+        self.assertEqual(reg(buf, "SEN"), 129)  # AUT
+        self.assertEqual(reg(buf, "NDP"), 50)
+        self.assertEqual(reg(buf, "INT"), 11)
+        self.assertEqual(reg(buf, "FUL"), 100)
 
 
 if __name__ == "__main__":

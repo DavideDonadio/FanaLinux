@@ -22,20 +22,21 @@ DEFAULT_FACTORY_PRESETS: Dict[str, Dict[str, Any]] = {
     "Default": {
         "name": "Default",
         "slot": 1,
-        "sen": 900,
+        "sen": 0,
         "ff": 100,
         "ffs": 1,
-        "ndp": 20,
-        "nfr": 5,
+        "ndp": 50,
+        "nfr": 0,
         "nin": 0,
-        "int_filter": 3,
+        "int_filter": 11,
         "fei": 100,
         "for_mult": 100,
         "spr_mult": 100,
         "dpr_mult": 100,
         "sho": 100,
         "brf": 50,
-        "bli": 85
+        "bli": 0,
+        "ful": 100
     },
     "Assetto Corsa - GT3": {
         "name": "Assetto Corsa - GT3",

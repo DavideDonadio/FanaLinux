@@ -10,20 +10,22 @@ from typing import Dict, Any, Optional
 import json
 
 
+# Official parameter defaults per Fanatec support "Tuning Menu parameters"
+# article (help.fanatec.com; scope: Podium DD, CS DD, CSL DD, GT DD Pro).
 @dataclass
 class TuningProfile:
     name: str = "Default"
     slot: int = 1
     # Core Steering and Force Feedback
-    sen: int = 900          # Steering angle in degrees (90 to 2520, 0 = Auto)
+    sen: int = 0            # Steering angle in degrees (90 to 2520, 0 = Auto)
     ff: int = 100           # Overall Force Feedback strength (0 - 100%)
     ffs: int = 1            # FFB Scaling: 0 = Linear, 1 = Peak
     # Mechanical and Dynamic Damping
-    ndp: int = 20           # Natural Damper (0 - 100%)
-    nfr: int = 5            # Natural Friction (0 - 100%)
+    ndp: int = 50           # Natural Damper (0 - 100%)
+    nfr: int = 0            # Natural Friction (0 - 100%)
     nin: int = 0            # Natural Inertia (0 - 100%)
     # Filters and Detail
-    int_filter: int = 3     # FFB Interpolation Filter (0 = Off, 1 - 20)
+    int_filter: int = 11    # FFB Interpolation Filter (0 = Off, 1 - 20)
     fei: int = 100          # Force Effect Intensity (0 - 100%)
     # Game Force Multipliers
     for_mult: int = 100     # Constant Force multiplier (0 - 120%)
@@ -31,9 +33,9 @@ class TuningProfile:
     dpr_mult: int = 100     # Damper Effect multiplier (0 - 120%)
     # Wheel and Pedals Feedback
     sho: int = 100          # Wheel vibration / shock (0 = Off, 10 - 100%)
-    bli: int = 85           # Brake Level Indicator (0 = Off, 1 - 100%)
+    bli: int = 0            # Brake Level Indicator (0 = Off, 1 - 100%)
     brf: int = 50           # Brake Force for load-cell pedals (0 - 100%)
-    ful: int = 0            # FullForce detail effects (0 = Off, 1 - 100%)
+    ful: int = 100          # FullForce detail effects (0 = Off, 1 - 100%)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -52,9 +54,6 @@ class TuningProfile:
                         coerced[k] = int(float(v))
                 except (ValueError, TypeError):
                     coerced[k] = valid_fields[k].default
-        # For legacy presets saved prior to BLI implementation, default to 85%
-        if "bli" not in data:
-            coerced["bli"] = 85
         return cls(**coerced)
 
     def to_json(self) -> str:
@@ -76,7 +75,7 @@ TUNING_METADATA = [
         "max": 2520,
         "step": 10,
         "unit": "°",
-        "default": 900,
+        "default": 0,
         "category": "Steering and Output"
     },
     {
@@ -110,7 +109,7 @@ TUNING_METADATA = [
         "max": 100,
         "step": 1,
         "unit": "%",
-        "default": 20,
+        "default": 50,
         "category": "Damping and Inertia"
     },
     {
@@ -122,7 +121,7 @@ TUNING_METADATA = [
         "max": 100,
         "step": 1,
         "unit": "%",
-        "default": 5,
+        "default": 0,
         "category": "Damping and Inertia"
     },
     {
@@ -146,7 +145,7 @@ TUNING_METADATA = [
         "max": 20,
         "step": 1,
         "unit": "",
-        "default": 3,
+        "default": 11,
         "category": "Filters and Effects"
     },
     {
@@ -218,7 +217,7 @@ TUNING_METADATA = [
         "max": 100,
         "step": 5,
         "unit": "%",
-        "default": 85,
+        "default": 0,
         "category": "Hardware Feedback"
     },
     {
@@ -242,7 +241,7 @@ TUNING_METADATA = [
         "max": 100,
         "step": 1,
         "unit": "%",
-        "default": 0,
+        "default": 100,
         "category": "Filters and Effects"
     },
 ]
