@@ -10,20 +10,6 @@ Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evd
 
 ---
 
-## Legal & Intellectual Property Notice
-
-FanaLinux is an independent, open-source project developed to enable interoperability between Linux systems and compatible Fanatec hardware. It is not affiliated with, endorsed by, or sponsored by Endor AG, Fanatec, Corsair, or their respective affiliates.
-
-The project's implementation is independently authored. No Fanatec proprietary source code, Windows application binaries, firmware images, or proprietary graphical assets are intentionally incorporated into or distributed with this project.
-
-Hardware protocol behaviour is investigated through direct device testing and USB communication analysis for compatibility purposes. The Fanatec Windows application has not been decompiled or disassembled as part of this project's development.
-
-The project is intended to enable interoperability with lawfully possessed hardware while respecting applicable intellectual-property laws. This notice describes the project's development approach and intended scope; it does not constitute a legal determination or guarantee of compliance in every jurisdiction.
-
-Fanatec and related product names are used solely to identify compatible hardware. All trademarks remain the property of their respective owners. FanaLinux is an independent community project and is not an official Fanatec product.
-
----
-
 ## Hardware support
 
 | Base | Status |
@@ -32,9 +18,9 @@ Fanatec and related product names are used solely to identify compatible hardwar
 | Podium DD1/DD2, ClubSport DD/DD+ | ![Expected](https://img.shields.io/badge/Expected-yellow) |
 | CSL Elite / ClubSport V2.5 (belt) | ![Unsupported](https://img.shields.io/badge/Unsupported-red) |
 
-**Validated** — every tuning register confirmed on-wheel (CSL DD 5Nm + Formula V2, base 1.9.2.3 / motor 1.1.2.2). **Expected** — same protocol family and official parameter spec, encodings not yet verified on hardware. **Unsupported** — belt-driven bases are not supported; direct-drive bases only.
-
-Any Fanatec rim works for tuning. RevLED/OLED layouts target Formula-style rims; simpler rims just ignore LED writes. Notes: **BRF** needs load-cell pedals to be visible; **BLI** threshold needs ClubSport V3 pedals; **FUL** is officially Podium/CS-DD-only but present on current CSL DD firmware; firmware version display is **coming soon** (not queried yet).
+**Validated** — every tuning register confirmed on-wheel (CSL DD 5Nm + Formula V2, base 1.9.2.3 / motor 1.1.2.2). \
+**Expected** — same protocol family and official parameter spec, encodings not yet verified on hardware. \
+**Unsupported** — belt-driven bases are not supported; direct-drive bases only.
 
 ## Quick start
 
@@ -43,10 +29,10 @@ git clone https://github.com/DavideDonadio/fanalinux.git
 cd fanalinux
 ./install.sh
 fanalinux
-./uninstall.sh
 ```
 
-Daily flow: **Tuning** → adjust → **Apply to Wheelbase**. Your wheelbase shows a reduced *Standard* menu — **long-press the Tuning button for the full Advanced menu** (all 14 parameters).
+Flow: **Tuning** → adjust → **Apply to Wheelbase**. \
+**Remember to long-press the Tuning button for the full Advanced menu** (all 14 parameters).
 
 ## Features
 
@@ -60,15 +46,30 @@ Daily flow: **Tuning** → adjust → **Apply to Wheelbase**. Your wheelbase sho
 | LED & Display | RevLEDs, flag LEDs, OLED gear/speed |
 | Calibration | Center calibration, motor diagnostics, pedal deadzones, firmware (coming soon) |
 
-**Telemetry in:** AC, BeamNG OutGauge, DiRT/WRC, F1, Forza (FM7 + FH/FM23), AMS2, SCS shm. **Out:** live RevLEDs, OLED gear/speed, ABS/TC flags, haptics, damping.
+**Telemetry in:** AC, BeamNG OutGauge, DiRT/WRC, F1, Forza (FM7 + FH/FM23), AMS2, SCS shm. \
+**Out:** live RevLEDs, OLED gear/speed, ABS/TC flags, haptics, damping.
 
 ## Known limitations
 
-- No read-back: the wheelbase never answers tuning queries, so the app can't display current on-wheel values — verification is eyes-on-OLED.
+- No read-back: The app can't display current on-wheel values — verification is eyes-on-OLED.
 - Every Apply writes all known registers; DRI/ACP (unmodeled) reset to 0/OFF. If you use Drift mode, re-set it on the wheel afterwards.
 - SHO displays On/Off only; granularity unverified beyond that. FFS Linear confirmed by symmetry (Peak verified).
 - BRF can't be validated without load-cell pedals.
 
 ## Firmware updates & Windows companion
 
-Flashing firmware needs official software. A Windows VM with USB passthrough runs the Fanatec App fine for version display and updates. FanaLinux itself never flashes — by design.
+Flashing firmware needs official software. \
+FanaLinux itself never flashes — by design. \
+
+## Legal & Intellectual Property Notice
+
+FanaLinux is an independent, open-source project developed to enable interoperability between Linux systems and compatible Fanatec hardware. It is not affiliated with, endorsed by, or sponsored by Endor AG, Fanatec, Corsair, or their respective affiliates.
+
+The project's implementation is independently authored. No Fanatec proprietary source code, Windows application binaries, firmware images, or proprietary graphical assets are intentionally incorporated into or distributed with this project.
+
+Hardware protocol behaviour is investigated through direct device testing and USB communication analysis for compatibility purposes. The Fanatec Windows application has not been decompiled or disassembled as part of this project's development.
+
+The project is intended to enable interoperability with lawfully possessed hardware while respecting applicable intellectual-property laws. This notice describes the project's development approach and intended scope; it does not constitute a legal determination or guarantee of compliance in every jurisdiction.
+
+Fanatec and related product names are used solely to identify compatible hardware. All trademarks remain the property of their respective owners. **FanaLinux is an independent community project and is not an official Fanatec product.**
+
