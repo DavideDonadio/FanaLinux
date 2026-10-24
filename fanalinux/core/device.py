@@ -115,9 +115,9 @@ class FanatecDevice:
             self.connected = True
             logger.info(f"Connected to Fanatec on {path}")
 
-            # Send initialization handshake
+            # Send initialization handshake (may disconnect on fatal HID errors)
             self.initialize_hardware()
-            return True
+            return self.connected
         except Exception as e:
             logger.error(f"Failed to open hidraw node {path}: {e}")
             self.connected = False

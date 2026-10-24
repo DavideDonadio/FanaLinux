@@ -196,8 +196,16 @@ class EvdevListener:
         if etype == EV_ABS:
             if code == ABS_X and self.on_steering:
                 self.last_raw_steering = value
-                # 0..65535, calibrated against self.center_raw
-                normalized = (value - float(self.center_raw)) / 32768.0
+                # Normalize each side of center against the probed axis range
+                # so off-midpoint centers and non-64k axes stay symmetric.
+                ranges = getattr(self, "_axis_ranges", {})
+                min_v, max_v = ranges.get(ABS_X, (0, 65535))
+                center = float(self.center_raw)
+                if value >= center:
+                    span = max(1.0, float(max_v) - center)
+                else:
+                    span = max(1.0, center - float(min_v))
+                normalized = (value - center) / span
                 normalized = max(-1.0, min(1.0, normalized))
                 self.on_steering(normalized, value)
             elif code == ABS_Z and self.on_throttle:

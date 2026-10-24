@@ -2,6 +2,6 @@
 # Vendor ID: 0x0EB7 (Endor AG / Fanatec)
 # Grants desktop user access to Fanatec direct drive wheelbases, pedals, and accessories.
 
-KERNEL=="hidraw*", ATTRS{idVendor}=="0eb7", MODE="0666", TAG+="uaccess"
-SUBSYSTEMS=="usb", ATTRS{idVendor}=="0eb7", MODE="0666", TAG+="uaccess"
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0eb7", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="0eb7", TAG+="uaccess"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0eb7", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0eb7", TAG+="uaccess"

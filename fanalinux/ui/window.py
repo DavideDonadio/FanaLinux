@@ -51,6 +51,8 @@ class MainWindow(Adw.ApplicationWindow):
             on_game_started=self._on_game_started,
             on_game_stopped=self._on_game_stopped
         )
+        # Last game that owned telemetry (guards direct A->B switches)
+        self._last_game_id = None
 
         # Toast Overlay
         self.toast_overlay = Adw.ToastOverlay()
@@ -207,6 +209,16 @@ class MainWindow(Adw.ApplicationWindow):
             self.device.apply_tuning_profile(profile)
             self.tuning_view.set_active_profile(profile)
 
+        # The detector fires started directly on A->B switches with no
+        # stopped event in between: stop the previous game's session first.
+        # Only game-owned sessions are touched, manual telemetry survives.
+        new_game_id = game_info.get("id")
+        if (self.telemetry_mgr.enabled and self._last_game_id is not None
+                and self._last_game_id != new_game_id):
+            self.telemetry_mgr.stop()
+            self.leds_view.set_telemetry_active(False)
+        self._last_game_id = new_game_id
+
         if auto_telem:
             telem_type = game_info.get("telemetry_type") or "ac_udp"
             self.telemetry_mgr.start(telemetry_type=telem_type)
@@ -223,6 +235,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._apply_game_stopped, game_info, fallback_preset)
 
     def _apply_game_stopped(self, game_info, fallback_preset):
+        self._last_game_id = None
         if self.telemetry_mgr.enabled:
             self.telemetry_mgr.stop()
             self.leds_view.set_telemetry_active(False)
