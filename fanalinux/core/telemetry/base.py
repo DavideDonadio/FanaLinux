@@ -100,8 +100,10 @@ class BaseTelemetryClient:
         if self._thread:
             self._thread.join(timeout=2.5)
             if self._thread.is_alive():
-                logger.warning(f"{self.__class__.__name__} worker did not exit; dropping handle")
-            self._thread = None
+                # Keep the handle so start()'s guard can see the survivor.
+                logger.warning(f"{self.__class__.__name__} worker did not exit; keeping handle for restart guard")
+            else:
+                self._thread = None
         self.is_connected = False
         logger.info(f"{self.__class__.__name__} stopped")
 

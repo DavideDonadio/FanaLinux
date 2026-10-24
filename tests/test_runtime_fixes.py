@@ -132,6 +132,36 @@ class TestTelemetryLifecycle(unittest.TestCase):
         self.assertLess(time.monotonic() - t0, 5.0)
         self.assertFalse(client._thread is not None and client._thread.is_alive())
 
+    def test_unresponsive_worker_blocks_restart(self):
+        """A worker surviving stop() must remain visible to start()'s guard."""
+        import threading
+        import time
+        from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
+        client = AssettoCorsaTelemetry()
+        release = threading.Event()
+
+        def stubborn_worker():
+            while not release.is_set():
+                time.sleep(0.1)
+
+        client._worker = stubborn_worker
+        client.start()
+        first = client._thread
+        self.assertTrue(first.is_alive())
+        client.stop()  # join times out; handle must be preserved
+        self.assertTrue(first.is_alive())
+        self.assertIs(client._thread, first)
+        client.start()  # must refuse: no second worker
+        self.assertIs(client._thread, first)
+        alive = [t for t in threading.enumerate()
+                 if t.name == "AssettoCorsaTelemetryThread" and t.is_alive()]
+        self.assertEqual(len(alive), 1)
+        release.set()
+        first.join(timeout=2.0)
+        client.start()  # survivor gone: restart proceeds with a new thread
+        self.assertIsNot(client._thread, first)
+        client.stop()
+
     def test_no_zombie_accumulation(self):
         """Rapid start/stop cycles must never leave more than one worker."""
         import threading
