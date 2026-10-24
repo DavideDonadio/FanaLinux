@@ -11,7 +11,7 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 
 from fanalinux.ui.widgets.wheel_dial import WheelDialWidget
-from fanalinux.ui.helpers import widen_page_clamp
+from fanalinux.ui.helpers import widen_page_clamp, attach_spin_button
 
 
 class CalibrationView(Adw.PreferencesPage):
@@ -70,6 +70,7 @@ class CalibrationView(Adw.PreferencesPage):
 
         spring_box.append(spring_lbl)
         spring_box.append(spring_scale)
+        attach_spin_button(spring_box, self.spring_adj)
         spring_box.append(self.spring_sw)
         spring_row.add_suffix(spring_box)
         ffb_group.add(spring_row)
@@ -100,6 +101,7 @@ class CalibrationView(Adw.PreferencesPage):
 
         friction_box.append(friction_lbl)
         friction_box.append(friction_scale)
+        attach_spin_button(friction_box, self.friction_adj)
         friction_box.append(self.friction_sw)
         friction_row.add_suffix(friction_box)
         ffb_group.add(friction_row)
@@ -180,6 +182,7 @@ class CalibrationView(Adw.PreferencesPage):
 
             box.append(lbl)
             box.append(scale)
+            attach_spin_button(box, adj)
             row.add_suffix(box)
             return row
 

@@ -14,7 +14,7 @@ from typing import Optional, Callable
 
 from fanalinux.core.tuning import TuningProfile, TUNING_METADATA
 from fanalinux.core.presets import list_presets, load_preset, save_preset, delete_preset, init_default_presets
-from fanalinux.ui.helpers import widen_page_clamp
+from fanalinux.ui.helpers import widen_page_clamp, attach_spin_button
 
 
 class TuningView(Adw.PreferencesPage):
@@ -30,6 +30,7 @@ class TuningView(Adw.PreferencesPage):
         self.on_presets_changed = on_presets_changed
         self.profile = TuningProfile()
         self._controls = {}
+        self._slot_silent = False
 
         # Ensure default presets exist
         init_default_presets()
@@ -136,6 +137,21 @@ class TuningView(Adw.PreferencesPage):
         motor_two_col.append(motor_left_list)
         motor_two_col.append(motor_right_list)
         motor_group.add(motor_two_col)
+
+        # Quick-set chips for precise SEN values (slider alone can't hit them)
+        sen_chips = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        sen_chips.set_halign(Gtk.Align.CENTER)
+        sen_chips.set_margin_top(4)
+        sen_label = Gtk.Label(label="SEN quick-set:")
+        sen_label.add_css_class("dim-label")
+        sen_label.set_valign(Gtk.Align.CENTER)
+        sen_chips.append(sen_label)
+        for chip_label, chip_val in [("Auto", 0), ("360", 360), ("540", 540), ("900", 900), ("2520", 2520)]:
+            chip = Gtk.Button(label=chip_label)
+            chip.set_valign(Gtk.Align.CENTER)
+            chip.connect("clicked", lambda _b, v=chip_val: self._controls["sen"].set_value(v))
+            sen_chips.append(chip)
+        motor_group.add(sen_chips)
         self.add(motor_group)
 
         # 3. Section with MORE elements: Filters & Force Multipliers (Divided into 2 columns of elements)
@@ -191,13 +207,13 @@ class TuningView(Adw.PreferencesPage):
         reset_btn.connect("clicked", self._on_reset_defaults)
         actions_box.append(reset_btn)
 
-        apply_btn = Gtk.Button(label="Apply to Wheelbase")
-        apply_btn.set_size_request(180, 42)
-        apply_btn.set_valign(Gtk.Align.CENTER)
-        apply_btn.add_css_class("suggested-action")
-        apply_btn.add_css_class("pill")
-        apply_btn.connect("clicked", self._on_apply_clicked)
-        actions_box.append(apply_btn)
+        self._apply_btn = Gtk.Button(label="Apply to Wheelbase")
+        self._apply_btn.set_size_request(180, 42)
+        self._apply_btn.set_valign(Gtk.Align.CENTER)
+        self._apply_btn.add_css_class("suggested-action")
+        self._apply_btn.add_css_class("pill")
+        self._apply_btn.connect("clicked", self._on_apply_clicked)
+        actions_box.append(self._apply_btn)
 
         actions_group.add(actions_box)
         self.add(actions_group)
@@ -229,6 +245,7 @@ class TuningView(Adw.PreferencesPage):
                 mode_label.set_text("Peak" if sw.get_active() else "Linear")
 
             switch.connect("state-set", _on_switch_changed)
+            switch.connect("state-set", lambda *a: self._mark_dirty())
 
             switch_box.append(mode_label)
             switch_box.append(switch)
@@ -275,9 +292,11 @@ class TuningView(Adw.PreferencesPage):
                 lbl.set_text(f"{raw_v}{unit}")
 
             adj.connect("value-changed", _on_val_changed)
+            adj.connect("value-changed", lambda *a: self._mark_dirty())
 
             val_box.append(val_label)
             val_box.append(scale)
+            attach_spin_button(val_box, adj)
             row.add_suffix(val_box)
             self._controls[param_id] = adj
 
@@ -286,11 +305,21 @@ class TuningView(Adw.PreferencesPage):
         else:
             container.append(row)
 
+    def _mark_dirty(self):
+        if not self._apply_btn.get_label().endswith("•"):
+            self._apply_btn.set_label("Apply to Wheelbase •")
+
+    def _clear_dirty(self):
+        self._apply_btn.set_label("Apply to Wheelbase")
+
     def _on_slot_changed(self, dropdown, param):
         slot_num = dropdown.get_selected() + 1
         self.profile.slot = slot_num
+        if self._slot_silent:
+            return
+        self._mark_dirty()
         if self.on_toast_requested:
-            self.on_toast_requested(f"Switched to Hardware Profile Slot {slot_num}")
+            self.on_toast_requested(f"Target: Hardware Profile Slot {slot_num} — press Apply to write")
 
     def _on_load_preset_clicked(self, btn):
         idx = self.preset_dropdown.get_selected()
@@ -300,8 +329,9 @@ class TuningView(Adw.PreferencesPage):
             p = load_preset(name)
             if p:
                 self.set_active_profile(p)
+                self._mark_dirty()
                 if self.on_toast_requested:
-                    self.on_toast_requested(f"Loaded preset '{name}'")
+                    self.on_toast_requested(f"Loaded preset '{name}' — press Apply to write")
             else:
                 if self.on_toast_requested:
                     self.on_toast_requested(f"Could not load preset '{name}': invalid or corrupt JSON")
@@ -311,8 +341,11 @@ class TuningView(Adw.PreferencesPage):
         self.profile = profile
         self.preset_entry.set_text(profile.name)
         if 1 <= profile.slot <= 5:
+            self._slot_silent = True
             self.slot_dropdown.set_selected(profile.slot - 1)
+            self._slot_silent = False
         self._sync_ui_to_profile()
+        self._clear_dirty()
 
     def _on_save_preset(self, btn):
         preset_name = self.preset_entry.get_text().strip() or "Custom"
@@ -356,8 +389,9 @@ class TuningView(Adw.PreferencesPage):
     def _on_reset_defaults(self, btn):
         self.profile = TuningProfile()
         self._sync_ui_to_profile()
+        self._mark_dirty()
         if self.on_toast_requested:
-            self.on_toast_requested("Reset parameters to baseline defaults")
+            self.on_toast_requested("Reset parameters to baseline defaults — press Apply to write")
 
     def _sync_ui_to_profile(self):
         for meta in TUNING_METADATA:
@@ -387,6 +421,7 @@ class TuningView(Adw.PreferencesPage):
 
         if self.device and self.device.connected:
             self.device.apply_tuning_profile(self.profile)
+            self._clear_dirty()
             if self.on_toast_requested:
                 self.on_toast_requested(f"Tuning parameters flashed to CSL DD (Slot {self.profile.slot})!")
         else:

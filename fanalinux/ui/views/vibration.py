@@ -12,7 +12,7 @@ from gi.repository import Gtk, Adw, GLib
 from typing import Optional, Callable
 
 from fanalinux.core.vibration import VibrationSettings, load_vibration_settings, save_vibration_settings
-from fanalinux.ui.helpers import widen_page_clamp
+from fanalinux.ui.helpers import widen_page_clamp, attach_spin_button
 
 logger = logging.getLogger("fanalinux.vibration")
 
@@ -238,6 +238,7 @@ class VibrationView(Adw.PreferencesPage):
 
         box.append(lbl)
         box.append(scale)
+        attach_spin_button(box, adj, 1 if is_float else 0)
         row.add_suffix(box)
         expander.add_row(row)
         self._controls[attr_name] = (adj, lbl, unit, is_float)

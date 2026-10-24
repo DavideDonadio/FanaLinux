@@ -16,7 +16,7 @@ from fanalinux.core.dynamic_ffb import (
     load_dynamic_ffb_settings,
     save_dynamic_ffb_settings,
 )
-from fanalinux.ui.helpers import widen_page_clamp
+from fanalinux.ui.helpers import widen_page_clamp, attach_spin_button
 
 
 class DynamicFFBView(Adw.PreferencesPage):
@@ -173,6 +173,7 @@ class DynamicFFBView(Adw.PreferencesPage):
 
         box.append(lbl)
         box.append(scale)
+        attach_spin_button(box, adj)
         row.add_suffix(box)
         return row
 
