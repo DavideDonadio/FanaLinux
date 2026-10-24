@@ -8,9 +8,6 @@
 
 Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evdev`** driver engine, it eliminates the need for proprietary Windows software or Wine wrappers to configure and tune Fanatec sim racing hardware.
 
-> **Scope: direct-drive bases only** (CSL DD, GT DD Pro, Podium DD1/DD2, ClubSport DD/DD+). Belt-driven bases are not supported.
-> **Validated on:** CSL DD 5Nm + Formula V2, base 1.9.2.3 / motor 1.1.2.2.
-
 ---
 
 ## Legal & Intellectual Property Notice
@@ -31,9 +28,11 @@ Fanatec and related product names are used solely to identify compatible hardwar
 
 | Base | Status |
 |---|---|
-| CSL DD / GT DD Pro | ![Validated](https://img.shields.io/badge/Validated-brightgreen) every tuning register confirmed on-wheel |
-| Podium DD1/DD2, ClubSport DD/DD+ | ![Expected](https://img.shields.io/badge/Expected-yellow) same protocol family and official parameter spec, encodings not yet verified on hardware |
-| CSL Elite / ClubSport V2.5 (belt) | ![Unsupported](https://img.shields.io/badge/Unsupported-red) not supported |
+| CSL DD / GT DD Pro | ![Validated](https://img.shields.io/badge/Validated-brightgreen) |
+| Podium DD1/DD2, ClubSport DD/DD+ | ![Expected](https://img.shields.io/badge/Expected-yellow) |
+| CSL Elite / ClubSport V2.5 (belt) | ![Unsupported](https://img.shields.io/badge/Unsupported-red) |
+
+**Validated** — every tuning register confirmed on-wheel (CSL DD 5Nm + Formula V2, base 1.9.2.3 / motor 1.1.2.2). **Expected** — same protocol family and official parameter spec, encodings not yet verified on hardware. **Unsupported** — belt-driven bases are not supported; direct-drive bases only.
 
 Any Fanatec rim works for tuning. RevLED/OLED layouts target Formula-style rims; simpler rims just ignore LED writes. Notes: **BRF** needs load-cell pedals to be visible; **BLI** threshold needs ClubSport V3 pedals; **FUL** is officially Podium/CS-DD-only but present on current CSL DD firmware; firmware version display is **coming soon** (not queried yet).
 
@@ -62,10 +61,6 @@ Daily flow: **Tuning** → adjust → **Apply to Wheelbase**. Your wheelbase sho
 | Calibration | Center calibration, motor diagnostics, pedal deadzones, firmware (coming soon) |
 
 **Telemetry in:** AC, BeamNG OutGauge, DiRT/WRC, F1, Forza (FM7 + FH/FM23), AMS2, SCS shm. **Out:** live RevLEDs, OLED gear/speed, ABS/TC flags, haptics, damping.
-
-## Tuning defaults
-
-Factory defaults match [Fanatec's official parameters](https://help.fanatec.com/) (DD scope): SEN **Auto**, FF 100, FFS Peak, NDP 50, NFR Off, NIN Off, INT 11, FEI 100, FOR/SPR/DPR 100, SHO On, BLI Off, BRF 50, FUL 100. Reset restores these. (SEN range: Standard menu 180–1080, Advanced 90–2520; the wheel shows `252` at max — 3-digit OLED limit, range is correct.)
 
 ## Known limitations
 
