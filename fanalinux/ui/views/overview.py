@@ -68,34 +68,49 @@ class OverviewView(Adw.PreferencesPage):
         return container, img
 
     def _build_ui(self):
-        # 0. About & Updates (first: most visible)
+        # 0. About & Updates in one centered row (space is tight on this tab)
         about_group = Adw.PreferencesGroup()
-        about_group.set_title("About FanaLinux")
-        app_row = Adw.ActionRow()
-        app_row.set_title("FanaLinux")
-        app_row.set_subtitle("Native Linux control suite for Fanatec hardware")
-        ver_badge = Gtk.Label(label=get_local_version())
-        ver_badge.set_width_chars(7)
-        ver_badge.add_css_class("val-badge")
-        app_row.add_suffix(ver_badge)
-        details_btn = Gtk.Button(label="Details")
-        details_btn.set_valign(Gtk.Align.CENTER)
-        details_btn.connect("clicked", self._on_about_details)
-        app_row.add_suffix(details_btn)
-        about_group.add(app_row)
+        about_row = Gtk.ListBoxRow()
+        about_row.set_activatable(False)
+        about_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        about_box.set_halign(Gtk.Align.CENTER)
+        about_box.set_valign(Gtk.Align.CENTER)
+        about_box.set_margin_top(6)
+        about_box.set_margin_bottom(6)
 
-        self.update_row = Adw.ActionRow()
-        self.update_row.set_title("Application Updates")
+        info_btn = Gtk.Button()
+        info_btn.set_icon_name("dialog-information-symbolic")
+        info_btn.add_css_class("flat")
+        info_btn.set_tooltip_text("About FanaLinux")
+        info_btn.set_valign(Gtk.Align.CENTER)
+        info_btn.connect("clicked", self._on_about_details)
+        about_box.append(info_btn)
+
+        self.about_title = Gtk.Label(label=f"FanaLinux {get_local_version()}")
+        self.about_title.add_css_class("heading")
+        about_box.append(self.about_title)
+
+        sep = Gtk.Label(label="•")
+        sep.add_css_class("dim-label")
+        about_box.append(sep)
+
         self.update_status = Gtk.Label(label="Checking…")
         self.update_status.add_css_class("dim-label")
-        self.update_row.add_suffix(self.update_status)
+        about_box.append(self.update_status)
         self.update_btn = Gtk.Button(label="Update")
         self.update_btn.add_css_class("update-btn")
         self.update_btn.set_valign(Gtk.Align.CENTER)
         self.update_btn.set_visible(False)
         self.update_btn.connect("clicked", self._on_update_clicked)
-        self.update_row.add_suffix(self.update_btn)
-        about_group.add(self.update_row)
+        about_box.append(self.update_btn)
+
+        gh_link = Gtk.LinkButton.new_with_label(
+            "https://github.com/DavideDonadio/fanalinux", "GitHub")
+        gh_link.set_valign(Gtk.Align.CENTER)
+        about_box.append(gh_link)
+
+        about_row.set_child(about_box)
+        about_group.add(about_row)
         self.add(about_group)
 
         self._update_url = None
