@@ -68,16 +68,12 @@ class OverviewView(Adw.PreferencesPage):
         return container, img
 
     def _build_ui(self):
-        # 0. About & Updates in one centered row (space is tight on this tab)
-        about_group = Adw.PreferencesGroup()
-        # Row 1: name + GitHub mark
-        name_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        name_box.set_halign(Gtk.Align.CENTER)
-        name_box.set_valign(Gtk.Align.CENTER)
-        name_box.set_margin_top(6)
-        name_lbl = Gtk.Label(label="FanaLinux")
-        name_lbl.add_css_class("heading")
-        name_box.append(name_lbl)
+        # 0. About footer: single centered line, no card chrome
+        about_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        about_box.set_halign(Gtk.Align.CENTER)
+        about_box.set_valign(Gtk.Align.CENTER)
+        about_box.set_margin_top(12)
+        about_box.set_margin_bottom(4)
         gh_img = Gtk.Image()
         gh_img.set_pixel_size(18)
         gh_btn = Gtk.Button()
@@ -86,38 +82,30 @@ class OverviewView(Adw.PreferencesPage):
         gh_btn.set_valign(Gtk.Align.CENTER)
         gh_btn.set_child(gh_img)
         gh_btn.connect("clicked", self._on_github_clicked)
-        name_box.append(gh_btn)
-        name_row = Gtk.ListBoxRow()
-        name_row.set_activatable(False)
-        name_row.set_child(name_box)
-        about_group.add(name_row)
+        about_box.append(gh_btn)
+        self.about_title = Gtk.Label(label=f"FanaLinux {get_local_version()}")
+        self.about_title.add_css_class("heading")
+        about_box.append(self.about_title)
         self._gh_img = gh_img
         self._update_gh_icon()
         Adw.StyleManager.get_default().connect("notify::dark", lambda *a: self._update_gh_icon())
 
-        # Row 2: version + update status/button
-        ver_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        ver_box.set_halign(Gtk.Align.CENTER)
-        ver_box.set_valign(Gtk.Align.CENTER)
-        ver_box.set_margin_bottom(6)
-        ver_lbl = Gtk.Label(label=get_local_version())
-        ver_lbl.add_css_class("val-badge")
-        ver_box.append(ver_lbl)
+        sep = Gtk.Label(label="·")
+        sep.add_css_class("dim-label")
+        about_box.append(sep)
         self.update_status = Gtk.Label(label="Checking…")
         self.update_status.add_css_class("dim-label")
-        ver_box.append(self.update_status)
+        about_box.append(self.update_status)
         self.update_btn = Gtk.Button(label="Update")
         self.update_btn.add_css_class("update-btn")
         self.update_btn.set_valign(Gtk.Align.CENTER)
         self.update_btn.set_visible(False)
         self.update_btn.connect("clicked", self._on_update_clicked)
-        ver_box.append(self.update_btn)
-        ver_row = Gtk.ListBoxRow()
-        ver_row.set_activatable(False)
-        ver_row.set_child(ver_box)
-        about_group.add(ver_row)
-
+        about_box.append(self.update_btn)
+        about_group = Adw.PreferencesGroup()
+        about_group.add(about_box)
         self._about_group = about_group
+
         self._update_url = None
         self._refresh_update_row()
         threading.Thread(target=self._check_updates_bg, daemon=True).start()
@@ -280,7 +268,7 @@ class OverviewView(Adw.PreferencesPage):
         btn_group.add(matrix_box)
         self.add(btn_group)
 
-        # About & Updates last (keeps hardware sections first)
+        # About footer last (keeps hardware sections first)
         self.add(self._about_group)
 
     def _create_and_add_chip(self, chip_id, label_text: str) -> Gtk.Label:
