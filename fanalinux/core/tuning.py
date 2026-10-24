@@ -201,7 +201,7 @@ TUNING_METADATA = [
         "id": "sho",
         "reg": "SHO",
         "name": "Wheel Vibration / Shock (SHO)",
-        "desc": "Controls the vibration intensity of motors inside the wheel handles.",
+        "desc": "Controls the vibration intensity of motors inside the wheel handles (wheel display shows On/Off).",
         "min": 0,
         "max": 100,
         "step": 10,

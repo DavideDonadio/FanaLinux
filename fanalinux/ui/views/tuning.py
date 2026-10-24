@@ -111,7 +111,7 @@ class TuningView(Adw.PreferencesPage):
         # 2. Section with MORE elements: Motor Dynamics & Steering (Divided into 2 columns of elements)
         motor_group = Adw.PreferencesGroup()
         motor_group.set_title("Direct-Drive Motor &amp; Steering Dynamics")
-        motor_group.set_description("Master torque strength, rotation limit, and dynamic mechanical resistance.")
+        motor_group.set_description("Master torque strength, rotation limit, and dynamic mechanical resistance. The wheel shows a reduced menu; long-press its Tuning button for all parameters.")
 
         motor_two_col = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         motor_two_col.set_hexpand(True)
