@@ -59,7 +59,7 @@ Flow: **Tuning** → adjust → **Apply to Wheelbase**. \
 ## Firmware updates & Windows companion
 
 Flashing firmware needs official software. \
-FanaLinux itself never flashes — by design. \
+FanaLinux itself never flashes — by design.
 
 ## Legal & Intellectual Property Notice
 
