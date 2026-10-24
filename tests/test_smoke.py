@@ -38,7 +38,9 @@ class TestSmoke(unittest.TestCase):
         
         # Must execute cleanly without NameError (e.g. PID definitions) or unhandled exceptions
         hidraw_path = dev.find_hidraw_path()
-        self.assertIn(hidraw_path, (None, str(hidraw_path)))
+        if hidraw_path is not None:
+            self.skipTest("Fanatec hardware present; cold-path test requires no hardware")
+        self.assertIsNone(hidraw_path)
 
         is_connected = dev.check_connection()
         self.assertIsInstance(is_connected, bool)

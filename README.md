@@ -76,6 +76,7 @@ Fanatec and related product names are used solely to identify compatible hardwar
 * **BLI:** Brake Level Indicator / ABS Vibration Threshold (off or 1% to 100%). Controls the pedal threshold or telemetry trigger point for haptic vibration alerts.
 * **Hardware Profile Slots:** Save / switch directly across Base Memory Slots 1 through 5.
 * **Car / Game Preset Manager:** Save and load custom tuning configurations to disk (`~/.config/fanalinux/presets/`).
+* **Standard vs Advanced Menu:** The wheelbase shows a reduced Standard tuning menu; long-press the Tuning Menu button to access the full Advanced menu with all parameters.
 
 ### 2. Auto-Profile Game Detection & Preset Management
 * **Background Process Scanner:** Non-intrusive Linux `/proc` scanner (<5ms overhead) actively monitoring for running racing simulators.
