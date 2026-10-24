@@ -68,18 +68,20 @@ class OverviewView(Adw.PreferencesPage):
         return container, img
 
     def _build_ui(self):
-        # 0. About footer: name row, update pill below, all centered
-        about_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        # 0. About footer: name, pill, mark on one centered line
+        about_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         about_box.set_halign(Gtk.Align.CENTER)
         about_box.set_valign(Gtk.Align.CENTER)
         about_box.set_margin_top(12)
         about_box.set_margin_bottom(4)
-        name_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        name_row.set_halign(Gtk.Align.CENTER)
-        name_row.set_valign(Gtk.Align.CENTER)
         self.about_title = Gtk.Label(label=f"FanaLinux {get_local_version()}")
         self.about_title.add_css_class("about-title")
-        name_row.append(self.about_title)
+        about_box.append(self.about_title)
+        self.update_btn = Gtk.Button(label="Update")
+        self.update_btn.add_css_class("update-btn")
+        self.update_btn.set_valign(Gtk.Align.CENTER)
+        self.update_btn.set_visible(False)
+        self.update_btn.connect("clicked", self._on_update_clicked)
         gh_img = Gtk.Image()
         gh_img.set_pixel_size(22)
         gh_btn = Gtk.Button()
@@ -88,14 +90,7 @@ class OverviewView(Adw.PreferencesPage):
         gh_btn.set_valign(Gtk.Align.CENTER)
         gh_btn.set_child(gh_img)
         gh_btn.connect("clicked", self._on_github_clicked)
-        name_row.append(gh_btn)
-        about_box.append(name_row)
-        self.update_btn = Gtk.Button(label="Update")
-        self.update_btn.add_css_class("update-btn")
-        self.update_btn.set_halign(Gtk.Align.CENTER)
-        self.update_btn.set_valign(Gtk.Align.CENTER)
-        self.update_btn.set_visible(False)
-        self.update_btn.connect("clicked", self._on_update_clicked)
+        about_box.append(gh_btn)
         about_box.append(self.update_btn)
         self._gh_img = gh_img
         self._update_gh_icon()
