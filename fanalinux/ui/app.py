@@ -23,6 +23,8 @@ class FanaLinuxApp(Adw.Application):
         if not win:
             win = MainWindow(application=self)
         win.present()
+        # Re-assert after present: some compositors ignore pre-map maximize()
+        win.maximize()
 
 
 def run_app():

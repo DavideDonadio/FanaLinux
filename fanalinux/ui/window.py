@@ -169,6 +169,8 @@ class MainWindow(Adw.ApplicationWindow):
         ]
         for page in views:
             widen_page_clamp(page)
+        # Tuning content outgrew the shared width: give that tab alone more room
+        widen_page_clamp(self.tuning_view, 1360)
         return False
 
     def _load_stylesheet(self):

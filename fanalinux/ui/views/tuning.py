@@ -141,7 +141,7 @@ class TuningView(Adw.PreferencesPage):
         # Quick-set chips for precise SEN values (slider alone can't hit them)
         sen_chips = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         sen_chips.set_halign(Gtk.Align.CENTER)
-        sen_chips.set_margin_top(4)
+        sen_chips.set_margin_top(14)
         sen_label = Gtk.Label(label="SEN quick-set:")
         sen_label.add_css_class("dim-label")
         sen_label.set_valign(Gtk.Align.CENTER)
@@ -220,6 +220,7 @@ class TuningView(Adw.PreferencesPage):
 
     def _create_control_row(self, container, meta, compact=False):
         row = Adw.ActionRow()
+        row.set_title_lines(1)
         row.set_title(meta["name"])
         if compact:
             row.set_tooltip_text(meta["desc"])
