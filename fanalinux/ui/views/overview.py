@@ -70,40 +70,14 @@ class OverviewView(Adw.PreferencesPage):
     def _build_ui(self):
         # 0. About & Updates in one centered row (space is tight on this tab)
         about_group = Adw.PreferencesGroup()
-        about_row = Gtk.ListBoxRow()
-        about_row.set_activatable(False)
-        about_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        about_box.set_halign(Gtk.Align.CENTER)
-        about_box.set_valign(Gtk.Align.CENTER)
-        about_box.set_margin_top(6)
-        about_box.set_margin_bottom(6)
-
-        info_btn = Gtk.Button()
-        info_btn.set_icon_name("dialog-question-symbolic")
-        info_btn.add_css_class("flat")
-        info_btn.set_tooltip_text("About FanaLinux")
-        info_btn.set_valign(Gtk.Align.CENTER)
-        info_btn.connect("clicked", self._on_about_details)
-        about_box.append(info_btn)
-
-        self.about_title = Gtk.Label(label=f"FanaLinux {get_local_version()}")
-        self.about_title.add_css_class("heading")
-        about_box.append(self.about_title)
-
-        sep = Gtk.Label(label="•")
-        sep.add_css_class("dim-label")
-        about_box.append(sep)
-
-        self.update_status = Gtk.Label(label="Checking…")
-        self.update_status.add_css_class("dim-label")
-        about_box.append(self.update_status)
-        self.update_btn = Gtk.Button(label="Update")
-        self.update_btn.add_css_class("update-btn")
-        self.update_btn.set_valign(Gtk.Align.CENTER)
-        self.update_btn.set_visible(False)
-        self.update_btn.connect("clicked", self._on_update_clicked)
-        about_box.append(self.update_btn)
-
+        # Row 1: name + GitHub mark
+        name_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        name_box.set_halign(Gtk.Align.CENTER)
+        name_box.set_valign(Gtk.Align.CENTER)
+        name_box.set_margin_top(6)
+        name_lbl = Gtk.Label(label="FanaLinux")
+        name_lbl.add_css_class("heading")
+        name_box.append(name_lbl)
         gh_img = Gtk.Image()
         gh_img.set_pixel_size(18)
         gh_btn = Gtk.Button()
@@ -112,13 +86,36 @@ class OverviewView(Adw.PreferencesPage):
         gh_btn.set_valign(Gtk.Align.CENTER)
         gh_btn.set_child(gh_img)
         gh_btn.connect("clicked", self._on_github_clicked)
-        about_box.append(gh_btn)
+        name_box.append(gh_btn)
+        name_row = Gtk.ListBoxRow()
+        name_row.set_activatable(False)
+        name_row.set_child(name_box)
+        about_group.add(name_row)
         self._gh_img = gh_img
         self._update_gh_icon()
         Adw.StyleManager.get_default().connect("notify::dark", lambda *a: self._update_gh_icon())
 
-        about_row.set_child(about_box)
-        about_group.add(about_row)
+        # Row 2: version + update status/button
+        ver_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        ver_box.set_halign(Gtk.Align.CENTER)
+        ver_box.set_valign(Gtk.Align.CENTER)
+        ver_box.set_margin_bottom(6)
+        ver_lbl = Gtk.Label(label=get_local_version())
+        ver_lbl.add_css_class("val-badge")
+        ver_box.append(ver_lbl)
+        self.update_status = Gtk.Label(label="Checking…")
+        self.update_status.add_css_class("dim-label")
+        ver_box.append(self.update_status)
+        self.update_btn = Gtk.Button(label="Update")
+        self.update_btn.add_css_class("update-btn")
+        self.update_btn.set_valign(Gtk.Align.CENTER)
+        self.update_btn.set_visible(False)
+        self.update_btn.connect("clicked", self._on_update_clicked)
+        ver_box.append(self.update_btn)
+        ver_row = Gtk.ListBoxRow()
+        ver_row.set_activatable(False)
+        ver_row.set_child(ver_box)
+        about_group.add(ver_row)
 
         self._about_group = about_group
         self._update_url = None
@@ -395,17 +392,6 @@ class OverviewView(Adw.PreferencesPage):
     def _on_github_clicked(self, _btn):
         Gio.AppInfo.launch_default_for_uri(
             "https://github.com/DavideDonadio/fanalinux", None)
-
-    def _on_about_details(self, _btn):
-        Adw.AboutWindow(
-            application_name="FanaLinux",
-            application_icon="io.github.davidedonadio.fanalinux",
-            version=get_local_version(),
-            developer_name="Davide Donadio",
-            license_type=Gtk.License.GPL_3_0,
-            website="https://github.com/DavideDonadio/fanalinux",
-            issue_url="https://github.com/DavideDonadio/fanalinux/issues",
-        ).present()
 
     def set_connection_status(self, is_online: bool):
         """Update hardware status badge and cards based on connection state."""
