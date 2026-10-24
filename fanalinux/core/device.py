@@ -259,16 +259,18 @@ class FanatecDevice:
         except (ValueError, TypeError):
             sen_val = 900
 
-        # Encode SEN safely: 0 = Auto, 90..2520 deg mapped to 9..252
+        # Encode SEN: hardware maps raw byte to (raw + 127) * 10 deg
+        # (verified on CSL DD: raw 90 -> 2170 deg range, raw 0 -> 1270 deg).
+        # Invert: raw = deg // 10 - 127 (mod 256); raw 129 = AUT.
         if sen_val <= 0 or sen_val < 45:
-            raw_sen = 0
+            raw_sen = 129  # AUT code
             self.active_sen = 900
         elif sen_val < 90:
-            raw_sen = 9
+            raw_sen = (9 - 127) & 0xFF
             self.active_sen = 90
         else:
-            raw_sen = max(9, min(252, sen_val // 10))
-            self.active_sen = sen_val
+            raw_sen = ((min(sen_val, 2520) // 10) - 127) & 0xFF
+            self.active_sen = min(sen_val, 2520)
 
         try:
             slot = max(1, min(5, int(float(getattr(profile, "slot", 1)))))
@@ -314,7 +316,9 @@ class FanatecDevice:
         time.sleep(0.01)
 
     def read_tuning_profile(self, slot: int = 1) -> Optional[TuningProfile]:
-        """Request and parse the active tuning report from the wheel base."""
+        """Request and parse the active tuning report from the wheel base.
+        Note: CSL DD does not answer the slot-query report on hidraw,
+        so this returns None on that hardware (verified live)."""
         if self._fd is None or not self.connected:
             return None
         try:
@@ -343,7 +347,8 @@ class FanatecDevice:
                     prof = TuningProfile(slot=clamped_slot)
                     # Parse all registers from buffer
                     raw_sen = data[TUNING_REGISTERS["SEN"] + 1]
-                    prof.sen = 0 if raw_sen == 0 else raw_sen * 10
+                    signed_sen = raw_sen if raw_sen < 128 else raw_sen - 256
+                    prof.sen = 0 if raw_sen == 129 else (signed_sen + 127) * 10
                     prof.ff = data[TUNING_REGISTERS["FF"] + 1]
                     prof.ndp = data[TUNING_REGISTERS["NDP"] + 1]
                     prof.nfr = data[TUNING_REGISTERS["NFR"] + 1]
