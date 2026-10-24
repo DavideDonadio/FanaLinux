@@ -5,6 +5,7 @@ Integrates Hardware Device, Evdev Listener, Telemetry Manager, and Auto-Profile 
 
 import logging
 import os
+import time
 
 import gi
 
@@ -154,6 +155,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Hardware connection state & live hotplug/unplug monitor (1 sec interval)
         self._hardware_online = self.device.connected if self.device else False
+        self._last_evdev_retry = 0.0
         self.overview_view.set_connection_status(self._hardware_online)
         GLib.timeout_add_seconds(1, self._check_hardware_connection)
 
@@ -268,6 +270,7 @@ class MainWindow(Adw.ApplicationWindow):
                 if not self.evdev_listener.is_running():
                     self.evdev_listener.start()
                     self.calibration_view.set_evdev_listener(self.evdev_listener)
+                self._last_evdev_retry = time.monotonic()
                 self.show_toast("Fanatec CSL DD connected and online!")
                 # Only re-apply profile if an auto-profile sim session is actively in progress
                 active_game = getattr(self.detector, "active_game", None) if self.detector else None
@@ -279,6 +282,15 @@ class MainWindow(Adw.ApplicationWindow):
             else:
                 self.evdev_listener.stop()
                 self.show_toast("Fanatec hardware disconnected!")
+
+        # Watchdog: evdev may have failed to open at startup or its worker
+        # may have died while HID stayed healthy. Retry with backoff.
+        if is_online and not self.evdev_listener.is_running():
+            now = time.monotonic()
+            if now - self._last_evdev_retry >= 5.0:
+                self._last_evdev_retry = now
+                if self.evdev_listener.start():
+                    self.calibration_view.set_evdev_listener(self.evdev_listener)
 
         return True
 

@@ -22,6 +22,7 @@ class BaseTelemetryClient:
         self.max_rpm = default_max_rpm
         self.car_name = "Unknown"
         self._running = False
+        self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self.is_connected = False
         self._callback_takes_extended = True
@@ -78,6 +79,15 @@ class BaseTelemetryClient:
         """Start background polling thread."""
         if self._running:
             return
+        old = self._thread
+        if old is not None and old.is_alive():
+            # Previous worker outlived stop()'s join; wait it out so two
+            # workers never run against the same client and socket.
+            old.join(timeout=2.0)
+            if old.is_alive():
+                logger.warning(f"{self.__class__.__name__} previous worker still alive; not starting a second one")
+                return
+        self._stop_event.clear()
         self._running = True
         self._thread = threading.Thread(target=self._worker, daemon=True, name=f"{self.__class__.__name__}Thread")
         self._thread.start()
@@ -86,8 +96,11 @@ class BaseTelemetryClient:
     def stop(self):
         """Stop background worker thread."""
         self._running = False
+        self._stop_event.set()
         if self._thread:
-            self._thread.join(timeout=1.0)
+            self._thread.join(timeout=2.5)
+            if self._thread.is_alive():
+                logger.warning(f"{self.__class__.__name__} worker did not exit; dropping handle")
             self._thread = None
         self.is_connected = False
         logger.info(f"{self.__class__.__name__} stopped")

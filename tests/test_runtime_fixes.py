@@ -26,7 +26,7 @@ class TestConnectReturnValue(unittest.TestCase):
 
 class TestSteeringNormalization(unittest.TestCase):
     def _listener(self, center, min_v, max_v):
-        from fanalinux.core.evdev_listener import EvdevListener, EV_ABS, ABS_X
+        from fanalinux.core.evdev_listener import ABS_X, EV_ABS, EvdevListener
         l = EvdevListener()
         l.center_raw = center
         l._axis_ranges = {ABS_X: (min_v, max_v)}
@@ -106,6 +106,94 @@ class TestGameSwitchTelemetry(unittest.TestCase):
             win._apply_game_started(game_a, "Default", True)
             win._apply_game_started(game_a, "Default", True)
             self.assertNotIn(("stop",), calls)
+        finally:
+            win.detector.stop()
+
+
+class TestTelemetryLifecycle(unittest.TestCase):
+    def test_stop_wakes_blocked_worker(self):
+        """stop() must interrupt a worker stuck in backoff and leave no zombie."""
+        import threading
+        import time
+
+        from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
+        client = AssettoCorsaTelemetry()
+        entered = threading.Event()
+
+        def slow_worker():
+            entered.set()
+            client._stop_event.wait(30.0)
+
+        client._worker = slow_worker
+        client.start()
+        self.assertTrue(entered.wait(2.0))
+        t0 = time.monotonic()
+        client.stop()
+        self.assertLess(time.monotonic() - t0, 5.0)
+        self.assertFalse(client._thread is not None and client._thread.is_alive())
+
+    def test_no_zombie_accumulation(self):
+        """Rapid start/stop cycles must never leave more than one worker."""
+        import threading
+        import time
+
+        from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
+        client = AssettoCorsaTelemetry()
+
+        def quick_worker():
+            while client._running:
+                client._stop_event.wait(0.05)
+
+        client._worker = quick_worker
+
+        def alive_workers():
+            return [t for t in threading.enumerate()
+                    if t.name == "AssettoCorsaTelemetryThread" and t.is_alive()]
+
+        for _ in range(3):
+            client.start()
+            client.stop()
+        time.sleep(0.2)
+        self.assertEqual(len(alive_workers()), 0)
+        client.start()
+        self.assertEqual(len(alive_workers()), 1)
+        client.stop()
+
+
+class TestEvdevWatchdog(unittest.TestCase):
+    def test_retry_recovers_listener(self):
+        """Failed evdev start must be retried with backoff while HID is online."""
+        from gi.repository import Adw
+        Adw.init()
+        from fanalinux.ui.window import MainWindow
+        win = MainWindow()
+        try:
+            class FakeListener:
+                def __init__(self):
+                    self.calls = 0
+                    self.running = False
+
+                def is_running(self):
+                    return self.running
+
+                def start(self):
+                    self.calls += 1
+                    if self.calls >= 2:
+                        self.running = True
+                        return True
+                    return False
+
+            win.evdev_listener = FakeListener()
+            win.device.check_connection = lambda: True
+            win._last_evdev_retry = 0.0
+            win._check_hardware_connection()  # transition: attempt 1 fails
+            self.assertEqual(win.evdev_listener.calls, 1)
+            win._check_hardware_connection()  # backoff: no immediate retry
+            self.assertEqual(win.evdev_listener.calls, 1)
+            win._last_evdev_retry -= 6.0  # 6s pass
+            win._check_hardware_connection()  # watchdog: attempt 2 succeeds
+            self.assertEqual(win.evdev_listener.calls, 2)
+            self.assertTrue(win.evdev_listener.is_running())
         finally:
             win.detector.stop()
 

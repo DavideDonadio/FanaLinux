@@ -7,7 +7,6 @@ import logging
 import select
 import socket
 import struct
-import time
 from collections.abc import Callable
 
 from fanalinux.core.telemetry.base import BaseTelemetryClient
@@ -77,7 +76,7 @@ class DirtRallyTelemetry(BaseTelemetryClient):
                 if self._running:
                     logger.debug(f"DiRT telemetry socket error: {e}")
                 self.is_connected = False
-                time.sleep(2.0)
+                self._stop_event.wait(2.0)
             finally:
                 if self._sock:
                     try:

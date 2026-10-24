@@ -90,7 +90,7 @@ class SCSTelemetry(BaseTelemetryClient):
         while self._running:
             if not self.is_connected or not self._mmap_obj:
                 if not self._try_open_shm():
-                    time.sleep(1.0)
+                    self._stop_event.wait(1.0)
                     continue
 
             try:
@@ -98,10 +98,10 @@ class SCSTelemetry(BaseTelemetryClient):
             except Exception as e:
                 logger.debug(f"Error reading SCS shared memory: {e}")
                 self._close_shm()
-                time.sleep(1.0)
+                self._stop_event.wait(1.0)
                 continue
 
-            time.sleep(self.poll_interval)
+            self._stop_event.wait(self.poll_interval)
 
     def process_frame(self, mm: mmap.mmap):
         """

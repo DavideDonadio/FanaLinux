@@ -9,7 +9,6 @@ import logging
 import select
 import socket
 import struct
-import time
 from collections.abc import Callable
 
 from fanalinux.core.telemetry.base import BaseTelemetryClient
@@ -81,7 +80,7 @@ class AssettoCorsaTelemetry(BaseTelemetryClient):
                         self._send_command(self.SUBSCRIBE_UPDATE)
                         self.is_connected = True
                         break
-                    time.sleep(1.0)
+                    self._stop_event.wait(1.0)
 
                 # Stream packets loop
                 timeout_count = 0
@@ -132,7 +131,7 @@ class AssettoCorsaTelemetry(BaseTelemetryClient):
                 if self._running:
                     logger.debug(f"Telemetry socket reconnecting: {e}")
                 self.is_connected = False
-                time.sleep(2.0)
+                self._stop_event.wait(2.0)
             finally:
                 if self._sock:
                     try:
