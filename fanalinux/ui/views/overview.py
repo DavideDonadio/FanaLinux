@@ -79,7 +79,7 @@ class OverviewView(Adw.PreferencesPage):
         about_box.set_margin_bottom(6)
 
         info_btn = Gtk.Button()
-        info_btn.set_icon_name("dialog-information-symbolic")
+        info_btn.set_icon_name("dialog-question-symbolic")
         info_btn.add_css_class("flat")
         info_btn.set_tooltip_text("About FanaLinux")
         info_btn.set_valign(Gtk.Align.CENTER)
@@ -104,15 +104,23 @@ class OverviewView(Adw.PreferencesPage):
         self.update_btn.connect("clicked", self._on_update_clicked)
         about_box.append(self.update_btn)
 
-        gh_link = Gtk.LinkButton.new_with_label(
-            "https://github.com/DavideDonadio/fanalinux", "GitHub")
-        gh_link.set_valign(Gtk.Align.CENTER)
-        about_box.append(gh_link)
+        gh_img = Gtk.Image()
+        gh_img.set_pixel_size(18)
+        gh_btn = Gtk.Button()
+        gh_btn.add_css_class("flat")
+        gh_btn.set_tooltip_text("GitHub repository")
+        gh_btn.set_valign(Gtk.Align.CENTER)
+        gh_btn.set_child(gh_img)
+        gh_btn.connect("clicked", self._on_github_clicked)
+        about_box.append(gh_btn)
+        self._gh_img = gh_img
+        self._update_gh_icon()
+        Adw.StyleManager.get_default().connect("notify::dark", lambda *a: self._update_gh_icon())
 
         about_row.set_child(about_box)
         about_group.add(about_row)
-        self.add(about_group)
 
+        self._about_group = about_group
         self._update_url = None
         self._refresh_update_row()
         threading.Thread(target=self._check_updates_bg, daemon=True).start()
@@ -275,6 +283,9 @@ class OverviewView(Adw.PreferencesPage):
         btn_group.add(matrix_box)
         self.add(btn_group)
 
+        # About & Updates last (keeps hardware sections first)
+        self.add(self._about_group)
+
     def _create_and_add_chip(self, chip_id, label_text: str) -> Gtk.Label:
         lbl = Gtk.Label(label=label_text)
         lbl.add_css_class("btn-chip")
@@ -366,6 +377,24 @@ class OverviewView(Adw.PreferencesPage):
     def _on_update_clicked(self, _btn):
         if self._update_url:
             Gio.AppInfo.launch_default_for_uri(self._update_url, None)
+
+    def _update_gh_icon(self):
+        try:
+            dark = Adw.StyleManager.get_default().get_dark()
+        except Exception:
+            dark = True
+        name = "github-mark-white.svg" if dark else "github-mark.svg"
+        try:
+            tex = Gdk.Texture.new_from_file(
+                Gio.File.new_for_path(os.path.join(RESOURCES_DIR, "icons", name)))
+            self._gh_img.set_from_paintable(tex)
+        except Exception:
+            pass
+        return False
+
+    def _on_github_clicked(self, _btn):
+        Gio.AppInfo.launch_default_for_uri(
+            "https://github.com/DavideDonadio/fanalinux", None)
 
     def _on_about_details(self, _btn):
         Adw.AboutWindow(
