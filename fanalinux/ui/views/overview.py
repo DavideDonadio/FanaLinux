@@ -345,9 +345,9 @@ class OverviewView(Adw.PreferencesPage):
             GLib.idle_add(self._refresh_update_row)
 
     def _launch_url(self, url):
-        ctx = Gdk.Display.get_default().get_app_launch_context()
-        ctx.set_timestamp(Gtk.get_current_event_time())
-        Gio.AppInfo.launch_default_for_uri(url, ctx)
+        root = self.get_root()
+        parent = root if isinstance(root, Gtk.Window) else None
+        Gtk.show_uri_full(parent, url, Gdk.CURRENT_TIME)
 
     def _on_update_clicked(self, _btn):
         if self._update_url:
