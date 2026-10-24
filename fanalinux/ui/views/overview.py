@@ -101,7 +101,8 @@ class OverviewView(Adw.PreferencesPage):
 
         self._update_url = None
         self._refresh_update_row()
-        threading.Thread(target=self._check_updates_bg, daemon=True).start()
+        if not os.environ.get("FANALINUX_NO_UPDATE_CHECK"):
+            threading.Thread(target=self._check_updates_bg, daemon=True).start()
 
         # 1. Device Info Card
         info_group = Adw.PreferencesGroup()
