@@ -8,6 +8,9 @@
 
 Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evdev`** driver engine, it eliminates the need for proprietary Windows software or Wine wrappers to configure and tune Fanatec sim racing hardware.
 
+> **Scope: direct-drive bases only** (CSL DD, GT DD Pro, Podium DD1/DD2, ClubSport DD/DD+). Belt-driven bases are not supported.
+> **Validated on:** CSL DD 5Nm + Formula V2, base 1.9.2.3 / motor 1.1.2.2.
+
 ---
 
 ## Legal & Intellectual Property Notice
@@ -24,169 +27,53 @@ Fanatec and related product names are used solely to identify compatible hardwar
 
 ---
 
-## Architecture Overview
+## Hardware support
 
-```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                            FanaLinux UI (GTK4 + Libadwaita)                            │
-│  [Overview]  [Tuning]  [Dynamic FFB]  [Vibration]  [LED & Display]  [Profiles]  [Calibration]   │
-└────────────────────────────────────────┬───────────────────────────────────────────────┘
-                                         │ Python GObject / Evdev
-                                         ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                               Fanatec Device Controller                                │
-├────────────────────────────────────────┬───────────────────────────────────────────────┤
-│           Native Linux /dev/hidraw     │        evdev (/dev/input/event*)              │
-│   • Multi-color RevLEDs (BGR565)       │   • Sub-ms 16-bit steering angle              │
-│   • Flag LEDs (Left/Right)             │   • 16-bit throttle / brake axes              │
-│   • OLED Display Segments              │   • Button matrix & shift paddles             │
-│   • EEPROM Tuning Parameter Write      │                                               │
-├────────────────────────────────────────┴───────────────────────────────────────────────┤
-│                   Auto-Profile Sim Game Detector                                       │
-│   • Background /proc process scanner detecting Steam/Proton/Wine/native sims           │
-│   • Auto-switches wheelbase tuning presets (AC, ACC, F1, iRacing, AMS2, Rally, etc.)   │
-│   • Auto-launches in-game telemetry engine (AC, BeamNG, DiRT/WRC, F1, Forza, AMS2, SCS)│
-│   • Restores baseline fallback profile upon simulator exit                             │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│                       In-Game Telemetry & Dynamic FFB Engine                           │
-│   • Ingests AC, BeamNG OutGauge, DiRT D-BOX, F1 UDP, Forza Data Out, AMS2, & SCS SHM  │
-│   • Computes live RPM percentage & drives Formula V2.5 RevLEDs                         │
-│   • Renders active Gear (1, 2, 3, N, R) or Speed directly to OLED                      │
-│   • Flashes Flag LEDs on ABS, Traction Control, or Pit Limiter                         │
-│   • Overlays Speed-Sensitive & Reverse Driving Safety Damping                          │
-└────────────────────────────────────────┬───────────────────────────────────────────────┘
-                                         │ USB (VID: 0x0EB7, PID: 0x0020)
-                                         ▼
-                    Fanatec CSL DD Wheelbase + Formula V2.5 Rim
-```
+| Base | Status |
+|---|---|
+| CSL DD / GT DD Pro | ![Validated](https://img.shields.io/badge/Validated-brightgreen) every tuning register confirmed on-wheel |
+| Podium DD1/DD2, ClubSport DD/DD+ | ![Expected](https://img.shields.io/badge/Expected-yellow) same protocol family and official parameter spec, encodings not yet verified on hardware |
+| CSL Elite / ClubSport V2.5 (belt) | ![Unsupported](https://img.shields.io/badge/Unsupported-red) not supported |
 
----
+Any Fanatec rim works for tuning. RevLED/OLED layouts target Formula-style rims; simpler rims just ignore LED writes. Notes: **BRF** needs load-cell pedals to be visible; **BLI** threshold needs ClubSport V3 pedals; **FUL** is officially Podium/CS-DD-only but present on current CSL DD firmware; firmware version display is **coming soon** (not queried yet).
 
-## Features & Capabilities
+## Quick start
 
-### 1. Hardware Tuning Menu
-* **SEN:** Wheel Sensitivity / Rotation degrees (90° to 2520°, 0 = Auto) with toggleable Auto mode and direct numeric input for exact degree precision.
-* **FF:** Overall Force Feedback Master Strength (0% to 100%).
-* **FFS:** Force Feedback Scaling (Linear mode vs Peak torque mode).
-* **NDP / NFR / NIN:** Natural Damper, Natural Friction, and Natural Inertia.
-* **INT / FEI:** Interpolation smoothing filter and Force Effect Intensity.
-* **FOR / SPR / DPR:** In-game physics multipliers (Constant Force, Spring, Damper).
-* **SHO:** Wheel rim handle vibration / shock motor intensity.
-* **BRF:** Load-cell brake force sensitivity.
-* **BLI:** Brake Level Indicator / ABS Vibration Threshold (off or 1% to 100%). Controls the pedal threshold or telemetry trigger point for haptic vibration alerts.
-* **Hardware Profile Slots:** Save / switch directly across Base Memory Slots 1 through 5.
-* **Car / Game Preset Manager:** Save and load custom tuning configurations to disk (`~/.config/fanalinux/presets/`).
-* **Standard vs Advanced Menu:** The wheelbase shows a reduced Standard tuning menu; long-press the Tuning Menu button to access the full Advanced menu with all parameters.
-
-### 2. Auto-Profile Game Detection & Preset Management
-* **Background Process Scanner:** Non-intrusive Linux `/proc` scanner (<5ms overhead) actively monitoring for running racing simulators.
-* **Proton / Wine / Native Interoperability:** Automatically detects games whether launched natively or via Steam Proton / Wine / Content Manager (e.g., `acs.exe`, `acc.exe`, `iRacingSim64DX11.exe`, `F1_24.exe`, `AMS2AVX.exe`, `BeamNG.drive.x64.exe`, `dirtrally2.exe`, `wrc.exe`, `eurotrucks2.exe`, `lemansultimate.exe`).
-* **Instant Profile Switching:** Automatically applies associated tuning profile to wheelbase EEPROM memory on game start.
-* **Auto Telemetry Launch:** Automatically starts background telemetry listeners (e.g. Assetto Corsa UDP port 9996) when a compatible sim starts.
-* **Fallback & Recovery:** Seamlessly reverts to desktop fallback profile (e.g. `Default`) and stops telemetry when the simulator process exits.
-* **Factory Preset Catalog:** Pre-seeded with optimized profiles (`Default`, `Assetto Corsa - GT3`, `Assetto Corsa - Formula`, `F1 24`, `Drift`, `Rally`) in `~/.config/fanalinux/presets/`.
-
-### 3. Live In-Game Telemetry Engine
-FanaLinux features an engine-agnostic telemetry ingestion pipeline powering RevLEDs, OLED gear/speed readouts, flag alerts, vibration haptics, and dynamic FFB damping:
-* **Multi-Simulator Telemetry Support:**
-  * **Assetto Corsa (`ac_udp`):** Connects to native UDP broadcast on `127.0.0.1:9996` out of the box with zero setup.
-  * **BeamNG.drive (`beamng_outgauge`):** Listens on `127.0.0.1:4444`. In BeamNG, open *Options → Other → OutGauge Support*, set IP to `127.0.0.1` and Port to `4444`.
-  * **DiRT Rally 2.0 & EA Sports WRC (`dirt_udp`):** Listens on `127.0.0.1:20777`. In `hardware_settings_config.xml`, enable UDP telemetry: `<udp enabled="true" extradata="3" ip="127.0.0.1" port="20777" delay="1" />`.
-  * **EA Sports F1 Series (`f1_udp`):** Listens on `127.0.0.1:20777`. In F1 *Settings → Telemetry Settings*, set UDP Telemetry to `On`, IP to `127.0.0.1`, Port to `20777`, and Send Rate to `60 Hz`.
-  * **Forza Motorsport & Horizon 4/5 (`forza_udp`):** Listens on `127.0.0.1:5300`. In Forza *Settings → HUD and Gameplay → Data Out*, enable Data Out, select **Dash / Car Dash** packet format (do not choose Sled), set IP to `127.0.0.1`, and Port to `5300`. Supports both FM7 (311 bytes) and FH/FM2023 (324 bytes).
-  * **Automobilista 2 (`ams2_udp`):** Listens on `0.0.0.0:5606` (binds all interfaces to support console or external PC LAN forwarding). In AMS2 *Options → System*, set *UDP Protocol Version* to `Project CARS 2` and *UDP Frequency* to `1` (or desired rate).
-  * **Euro Truck Simulator 2 & ATS (`scs_shm`):** Reads directly from `/dev/shm/SCSTelemetry` written by the Linux SCS SDK plugin with zero network overhead. Drives RevLEDs, OLED gear/speed, engine vibration, and speed safety damping (truck telemetry does not export tire slip or curb suspension channels).
-* **Dynamic RevLEDs:** Real-time RPM climb across the 9 Formula V2.5 multi-color LEDs with shift point strobe.
-* **In-Game OLED Display:** Automatically renders live Gear (`1`, `2`, `3`, `N`, `R`) or Vehicle Speed (KM/H).
-* **Flag Alerts:** Flashes side Flag clusters on ABS activation or Traction Control intervention.
-
-### 4. Vibration & Dynamic Haptics
-* **Braking & Engine Dynamics:**
-  * **ABS Vibration:** Programmable tactile pulse frequency (18 Hz) and duration upon brake lockups.
-  * **Engine Vibration:** Continuous subtle motor and rim vibration dynamically scaled with engine RPM.
-  * **Rev Limiter Vibration:** Sharp rhythmic shudder when bumping against maximum redline revs.
-* **Suspension & Surface Displacement:**
-  * **Curb Strikes:** Simulates rough rumble strips and kerb strikes through steering rim haptics.
-* **Traction & Tire Slip:**
-  * **Traction Control Intervention:** Haptic alerts when ECU traction control engages under acceleration.
-  * **Wheel Lock & Spin:** Directional vibration warnings when driven wheels break traction or tires lock.
-* **Chassis Balance:**
-  * **Understeer & Oversteer Alerts:** Tactile warnings when front scrub or rear yaw exceed optimal slip angles.
-
-### 5. Dynamic FFB (Telemetry Damper Overlay)
-* **Speed-Sensitive Damper:** Automatically increases wheel damping resistance as vehicle speed rises above a configurable threshold, stabilizing high-speed straight-line tracking without deadening low-speed turn-in agility.
-* **Reverse Driving Safety Damper:** Automatically applies progressive damping resistance when the vehicle travels in reverse, preventing violent steering wheel snaps caused by inverted caster geometry.
-* **Configurable Curve & Range:** Independent sliders for activation speeds, fade-in speed windows, and damping strength percentages, with one-click restore to defaults.
-
-### 6. Overview & Hardware Catalog
-* **Multi-Wheel Hardware Catalog:** Switch between 15 authentic Fanatec steering wheel rims (ClubSport Formula V2 / F1 Esports V2, Formula V2.5 / V2.5 X, Formula V3, McLaren GT3 V2, Podium BMW M4 GT3, Porsche 911 GT3 R, RS Round, Drift V2, SPARCO® GT, CSL WRC, P1 V2, and more) with persistent hardware configuration and pixel-perfect horizontal alignment.
-* **16-bit Steering Angle Gauge:** Sub-millisecond evdev reading with live degrees readout.
-* **Pedal Travel Bars:** Color-coded gauges for Throttle (Green), Brake (Red), Clutch (Blue).
-* **24-Button Matrix:** Monospace pill chips highlighting live button clicks and shifter paddle pulls with generous padding.
-
-### 7. Calibration, Diagnostics & Dynamic Wheel Dial
-* **Interactive 360° Dynamic Wheel Dial:** Real-time steering angle rendering that automatically adapts to the user's selected Fanatec wheel model, featuring smooth 60 FPS cubic ease-out calibration animation, cardinal degree markings, and live angle bubble badge.
-* **Full Hardware Self-Test (10s):** Automated 10-second end-to-end diagnostic sequence verifying RevLEDs, Flag clusters, OLED display segments, Direct Drive motor torque sweeps & centering, and rim/pedal tactile rumble.
-* **Interactive Motor Diagnostics:** Live centering spring with adjustable strength and dynamic rotational friction resistance.
-* **Safety Force Cutoff:** Dedicated emergency stop button instantly canceling all active motor torque, centering springs, and vibrations.
-* **Pedal Deadzones:** Customizable lower threshold deadbands for Throttle, Brake, and Clutch (220 px standardized sliders).
-* **Hardware Firmware Display:** Real-time reporting of Wheelbase Base, Motor Controller, and Steering Rim revisions.
-
----
-
-## Technical Protocol Specification (For Maintainers & Developers)
-
-### 1. USB Identification
-* **Vendor ID:** `0x0EB7` (Endor AG / Fanatec)
-* **CSL DD Product ID (PID):** `0x0020` (Native PC Mode, Red LED)
-
-### 2. HID Endpoints & Report IDs
-* **Report ID `0x01` (Standard / Legacy):** 8 bytes (`[0x01, CMD, ...]`).
-  * Used for: Base initialization (`0xF5`), OLED display (`0xF8 0x09 0x01 0x02`), and Center Calibration (`0xF8 0x09 0x01 0x06 0x01`).
-* **Report ID `0xFF` (DirectDrive Protocol Pipe):** 64 bytes (`[0xFF, SubCommand, ...]`).
-  * Used for: Multi-color LED states (RPM & Flags) and internal EEPROM Tuning parameters.
-
-### 3. Multi-Color LEDs (Formula V2.5 / Podium Wheels)
-Multicolor LEDs use **BGR565** encoding:
-$$\text{BGR565} = ((\text{Blue} \gg 3) \ll 11) \mid ((\text{Green} \gg 2) \ll 5) \mid (\text{Red} \gg 3)$$
-
-* **RevLEDs (9 LEDs):**
-  * Header: `[0xFF, 0x01, 0x00]` followed by 9x 16-bit BGR565 words (High byte first), padded to 64 bytes.
-* **Flag LEDs (6 LEDs: 3 Left, 3 Right):**
-  * Header: `[0xFF, 0x01, 0x01]` followed by 6x 16-bit BGR565 words, padded to 64 bytes.
-
----
-
-## Installation & Launch
-
-### Quick 1-Command Installation (Recommended)
-
-Clone the repository and run the automated installer:
 ```bash
 git clone https://github.com/DavideDonadio/fanalinux.git
 cd fanalinux
 ./install.sh
-```
-
-The installer automatically:
-1. Verifies system dependencies (GTK4 & Libadwaita).
-2. Sets up an isolated environment (PEP 668 compliant across Fedora, Arch, Ubuntu, Debian).
-3. Installs the `fanalinux` binary into `~/.local/bin/`.
-4. Installs the desktop application launcher and icons into your Application Menu.
-5. Prompts to install the Fanatec USB udev permissions rule (`99-fanatec-fanalinux.rules`) for non-root hardware access.
-
----
-
-### Launching FanaLinux
-
-- **From Application Menu:** Press the **Super (Windows) key** and launch **"FanaLinux"**.
-- **From Terminal:** Run `fanalinux`.
-
----
-
-### Uninstallation
-
-To completely remove FanaLinux, its desktop launcher, and udev rules:
-```bash
+fanalinux
 ./uninstall.sh
 ```
+
+Daily flow: **Tuning** → adjust → **Apply to Wheelbase**. Your wheelbase shows a reduced *Standard* menu — **long-press the Tuning button for the full Advanced menu** (all 14 parameters).
+
+## Features
+
+| Tab | What it does |
+|---|---|
+| Overview | Hardware status, live 16-bit steering/pedals/buttons, about + version + update check |
+| Tuning | Full parameter set (SEN/FF/FFS/NDP/NFR/NIN/INT/FEI/FOR/SPR/DPR/SHO/BLI/BRF/FUL), slots 1–5, disk presets with exact numeric entry + SEN quick-chips |
+| Profiles | Per-game auto-switching via `/proc` scan (Steam/Proton/Wine), auto telemetry start, fallback preset |
+| Dynamic FFB | Speed-sensitive + reverse-safety damping overlays |
+| Vibration | ABS/engine/rev/suspension/TC/lock/spin/under-oversteer haptics with preview |
+| LED & Display | RevLEDs, flag LEDs, OLED gear/speed |
+| Calibration | Center calibration, motor diagnostics, pedal deadzones, firmware (coming soon) |
+
+**Telemetry in:** AC, BeamNG OutGauge, DiRT/WRC, F1, Forza (FM7 + FH/FM23), AMS2, SCS shm. **Out:** live RevLEDs, OLED gear/speed, ABS/TC flags, haptics, damping.
+
+## Tuning defaults
+
+Factory defaults match [Fanatec's official parameters](https://help.fanatec.com/) (DD scope): SEN **Auto**, FF 100, FFS Peak, NDP 50, NFR Off, NIN Off, INT 11, FEI 100, FOR/SPR/DPR 100, SHO On, BLI Off, BRF 50, FUL 100. Reset restores these. (SEN range: Standard menu 180–1080, Advanced 90–2520; the wheel shows `252` at max — 3-digit OLED limit, range is correct.)
+
+## Known limitations
+
+- No read-back: the wheelbase never answers tuning queries, so the app can't display current on-wheel values — verification is eyes-on-OLED.
+- Every Apply writes all known registers; DRI/ACP (unmodeled) reset to 0/OFF. If you use Drift mode, re-set it on the wheel afterwards.
+- SHO displays On/Off only; granularity unverified beyond that. FFS Linear confirmed by symmetry (Peak verified).
+- BRF can't be validated without load-cell pedals.
+
+## Firmware updates & Windows companion
+
+Flashing firmware needs official software. A Windows VM with USB passthrough runs the Fanatec App fine for version display and updates. FanaLinux itself never flashes — by design.
