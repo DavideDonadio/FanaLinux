@@ -344,9 +344,14 @@ class OverviewView(Adw.PreferencesPage):
             save_update_state(tag, url)
             GLib.idle_add(self._refresh_update_row)
 
+    def _launch_url(self, url):
+        ctx = Gdk.Display.get_default().get_app_launch_context()
+        ctx.set_timestamp(Gtk.get_current_event_time())
+        Gio.AppInfo.launch_default_for_uri(url, ctx)
+
     def _on_update_clicked(self, _btn):
         if self._update_url:
-            Gio.AppInfo.launch_default_for_uri(self._update_url, None)
+            self._launch_url(self._update_url)
 
     def _update_gh_icon(self):
         try:
@@ -363,8 +368,7 @@ class OverviewView(Adw.PreferencesPage):
         return False
 
     def _on_github_clicked(self, _btn):
-        Gio.AppInfo.launch_default_for_uri(
-            "https://github.com/DavideDonadio/fanalinux", None)
+        self._launch_url("https://github.com/DavideDonadio/fanalinux")
 
     def set_connection_status(self, is_online: bool):
         """Update hardware status badge and cards based on connection state."""
