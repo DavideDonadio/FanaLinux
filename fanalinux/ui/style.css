@@ -94,11 +94,16 @@ window {
 }
 
 .update-btn {
-    background-color: @success_color;
+    background-color: mix(@success_color, black, 0.25);
     color: #ffffff;
     font-weight: bold;
     border-radius: 9999px;
     padding: 6px 18px;
+}
+
+.about-title {
+    font-size: 1.25rem;
+    font-weight: bold;
 }
 
 
