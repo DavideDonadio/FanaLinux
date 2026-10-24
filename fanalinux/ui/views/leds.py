@@ -4,14 +4,27 @@ Includes Native Assetto Corsa UDP Telemetry Ingestion.
 """
 
 import gi
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
 import threading
 import time
 
+from gi.repository import Adw, GLib, Gtk
+
 from fanalinux.core.telemetry.manager import TelemetryManager
 from fanalinux.ui.helpers import widen_page_clamp
+
+
+def led_zone_class(index: int) -> str:
+    """CSS class for the RevLED preview zone of a 0-based LED index."""
+    if index < 3:
+        return "led-zone-green"
+    if index < 6:
+        return "led-zone-yellow"
+    if index < 8:
+        return "led-zone-red"
+    return "led-zone-blue"
 
 
 class LedsView(Adw.PreferencesPage):
@@ -195,7 +208,6 @@ class LedsView(Adw.PreferencesPage):
 
     def set_telemetry_active(self, active: bool):
         """Telemetry engine state is managed autonomously by Auto-Profile."""
-        pass
 
     def _on_mode_changed(self, dropdown, param):
         idx = dropdown.get_selected()
@@ -285,18 +297,10 @@ class LedsView(Adw.PreferencesPage):
             if self.on_toast_requested:
                 self.on_toast_requested("OLED display cleared")
 
-    def _set_gui_dots(self, active_count, color_css=None):
+    def _set_gui_dots(self, active_count):
         for i, dot in enumerate(self._led_dots):
             if i < active_count:
-                dot.set_css_classes(["led-preview-dot"])
-                if i < 3:
-                    c = "#2ec27e"
-                elif i < 6:
-                    c = "#f6d32d"
-                elif i < 8:
-                    c = "#e01b24"
-                else:
-                    c = "#3584e4"
+                dot.set_css_classes(["led-preview-dot", led_zone_class(i)])
                 dot.set_opacity(1.0)
             else:
                 dot.set_css_classes(["led-preview-dot"])

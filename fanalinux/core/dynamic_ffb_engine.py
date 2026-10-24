@@ -5,17 +5,16 @@ Calculates and injects real-time PC-side telemetry damping overlays:
 2. Reverse Driving Safety Damper (Prevents violent DD wheel snapping when rolling backwards)
 """
 
-import time
-import math
 import logging
-from typing import Optional
+import time
+
 from fanalinux.core.dynamic_ffb import DynamicFFBSettings, load_dynamic_ffb_settings
 
 logger = logging.getLogger("fanalinux.dynamic_ffb")
 
 
 class DynamicFFBEngine:
-    def __init__(self, device, settings: Optional[DynamicFFBSettings] = None):
+    def __init__(self, device, settings: DynamicFFBSettings | None = None):
         self.device = device
         self.settings = settings or load_dynamic_ffb_settings()
         self._last_applied_damping = -1

@@ -3,11 +3,11 @@ Fanatec Telemetry-Driven Vibration & Haptics Configuration Model.
 Matches Fanatec App / FanaLab vibration settings.
 """
 
-from dataclasses import dataclass, asdict
-from typing import Dict, Any
-import os
 import json
 import logging
+import os
+from dataclasses import asdict, dataclass
+from typing import Any
 
 logger = logging.getLogger("fanalinux.vibration")
 
@@ -54,11 +54,11 @@ class VibrationSettings:
     wheel_spin_enabled: bool = False
     wheel_spin_strength: int = 2   # 1 - 10
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "VibrationSettings":
+    def from_dict(cls, data: dict[str, Any]) -> "VibrationSettings":
         valid_fields = cls.__dataclass_fields__
         coerced = {}
         for k, v in data.items():

@@ -3,18 +3,17 @@ Hardware Profile Detection & Management for Fanatec Wheelbases and Steering Whee
 Handles auto-detection from USB Vendor/Product IDs and user-selected rim hardware.
 """
 
-import os
 import json
 import logging
-from dataclasses import dataclass, asdict
-from typing import Dict, Any, Optional
+import os
+from dataclasses import asdict, dataclass
 
 logger = logging.getLogger("fanalinux.hardware")
 
 CONFIG_PATH = os.path.expanduser("~/.config/fanalinux/hardware.json")
 
 # Known Wheelbases by USB Product ID (Vendor ID always 0x0EB7)
-KNOWN_BASES: Dict[int, Dict[str, str]] = {
+KNOWN_BASES: dict[int, dict[str, str]] = {
     0x0020: {
         "name": "Fanatec CSL DD",
         "desc": "Direct Drive Wheel Base (PC Mode, Red LED)",
@@ -201,7 +200,7 @@ def save_hardware_config(config: HardwareConfig):
         logger.error(f"Could not save hardware config: {e}")
 
 
-def get_base_info(product_id: int) -> Dict[str, str]:
+def get_base_info(product_id: int) -> dict[str, str]:
     """Retrieve wheelbase model name and image by USB Product ID."""
     return KNOWN_BASES.get(product_id, {
         "name": f"Fanatec Wheelbase (PID 0x{product_id:04X})",
@@ -210,7 +209,7 @@ def get_base_info(product_id: int) -> Dict[str, str]:
     })
 
 
-def get_rim_info(rim_id: str) -> Dict[str, str]:
+def get_rim_info(rim_id: str) -> dict[str, str]:
     """Retrieve steering wheel rim details by rim ID."""
     for rim in KNOWN_RIMS:
         if rim["id"] == rim_id:

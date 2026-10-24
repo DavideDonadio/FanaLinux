@@ -3,12 +3,13 @@ DiRT Rally 2.0 & EA Sports WRC Telemetry Client for Linux.
 Connects via Codemasters D-BOX / UDP extradata protocol (default port 20777).
 """
 
-import socket
+import logging
 import select
+import socket
 import struct
 import time
-import logging
-from typing import Callable, Optional
+from collections.abc import Callable
+
 from fanalinux.core.telemetry.base import BaseTelemetryClient
 
 logger = logging.getLogger("fanalinux.telemetry.dirt")
@@ -24,15 +25,15 @@ class DirtRallyTelemetry(BaseTelemetryClient):
     MIN_PACKET_SIZE = 256
 
     def __init__(self,
-                 on_telemetry: Optional[Callable] = None,
-                 on_car_detected: Optional[Callable[[str], None]] = None,
+                 on_telemetry: Callable | None = None,
+                 on_car_detected: Callable[[str], None] | None = None,
                  default_max_rpm: int = 7500,
                  port: int = 20777):
         super().__init__(on_telemetry=on_telemetry,
                          on_car_detected=on_car_detected,
                          default_max_rpm=default_max_rpm)
         self.UDP_PORT = port
-        self._sock: Optional[socket.socket] = None
+        self._sock: socket.socket | None = None
 
     def stop(self):
         super().stop()

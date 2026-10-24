@@ -4,12 +4,13 @@ Connects via Turn 10 / Playground Games "Data Out" UDP protocol (default port 53
 Supports Forza Motorsport (2023 / FM7) and Forza Horizon 4 / 5.
 """
 
-import socket
+import logging
 import select
+import socket
 import struct
 import time
-import logging
-from typing import Callable, Optional
+from collections.abc import Callable
+
 from fanalinux.core.telemetry.base import BaseTelemetryClient
 
 logger = logging.getLogger("fanalinux.telemetry.forza")
@@ -32,15 +33,15 @@ class ForzaTelemetry(BaseTelemetryClient):
     SLED_PACKET_SIZE = 232
 
     def __init__(self,
-                 on_telemetry: Optional[Callable] = None,
-                 on_car_detected: Optional[Callable[[str], None]] = None,
+                 on_telemetry: Callable | None = None,
+                 on_car_detected: Callable[[str], None] | None = None,
                  default_max_rpm: int = 7000,
                  port: int = 5300):
         super().__init__(on_telemetry=on_telemetry,
                          on_car_detected=on_car_detected,
                          default_max_rpm=default_max_rpm)
         self.UDP_PORT = port
-        self._sock: Optional[socket.socket] = None
+        self._sock: socket.socket | None = None
         self._sled_warned = False
 
     def stop(self):

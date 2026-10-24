@@ -3,13 +3,23 @@ Overview View: Hardware Status, Live Gauges, and Button Matrix.
 """
 
 import os
+
 import gi
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 import threading
-from typing import Optional, Callable
-from gi.repository import Gtk, Adw, GLib, Gdk, Gio
+from collections.abc import Callable
 
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+
+from fanalinux.core.hardware import (
+    KNOWN_RIMS,
+    get_base_info,
+    get_rim_info,
+    load_hardware_config,
+    save_hardware_config,
+)
 from fanalinux.core.updates import (
     check_latest,
     get_local_version,
@@ -18,28 +28,17 @@ from fanalinux.core.updates import (
     save_update_state,
 )
 
-from fanalinux.core.hardware import (
-    load_hardware_config,
-    save_hardware_config,
-    KNOWN_RIMS,
-    get_base_info,
-    get_rim_info,
-    KNOWN_BASES,
-)
-
 RESOURCES_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", "resources"))
 
 
 class OverviewView(Adw.PreferencesPage):
-    def __init__(self, device, on_rim_changed: Optional[Callable[[dict], None]] = None):
+    def __init__(self, device, on_rim_changed: Callable[[dict], None] | None = None):
         super().__init__()
         self.device = device
         self.on_rim_changed = on_rim_changed
         self._button_chips = {}
         self.hardware_config = load_hardware_config()
         self.current_rim_info = get_rim_info(self.hardware_config.rim_id)
-        if self.device:
-            self.device.rim_name = self.current_rim_info["name"]
         self._build_ui()
 
     def _create_thumbnail(self, image_path: str, fallback_icon: str, size: int = 102, box_width: int = 128, box_height: int = 108) -> tuple[Gtk.Box, Gtk.Image]:
@@ -101,6 +100,8 @@ class OverviewView(Adw.PreferencesPage):
 
         self._update_url = None
         self._refresh_update_row()
+        # Test hook: FANALINUX_NO_UPDATE_CHECK=1 skips the startup check
+        # (offline demos), stored state still drives the button.
         if not os.environ.get("FANALINUX_NO_UPDATE_CHECK"):
             threading.Thread(target=self._check_updates_bg, daemon=True).start()
 
@@ -307,8 +308,6 @@ class OverviewView(Adw.PreferencesPage):
             self.hardware_config.rim_id = rim_info["id"]
             save_hardware_config(self.hardware_config)
             self.current_rim_info = rim_info
-            if self.device:
-                self.device.rim_name = rim_info["name"]
             self.rim_row.set_subtitle(rim_info["subtitle"])
 
             # Dynamically rebuild button matrix to match newly selected rim

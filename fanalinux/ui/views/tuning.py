@@ -3,26 +3,30 @@ Tuning Menu View: 1:1 Hardware Motor & Steering Tuning Controls.
 Includes Preset Management (Save, Load, Export/Import JSON).
 """
 
-import os
-import json
-import pathlib
 import gi
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
-from typing import Optional, Callable
+from collections.abc import Callable
 
-from fanalinux.core.tuning import TuningProfile, TUNING_METADATA
-from fanalinux.core.presets import list_presets, load_preset, save_preset, delete_preset, init_default_presets
-from fanalinux.ui.helpers import widen_page_clamp, attach_spin_button
+from gi.repository import Adw, GLib, Gtk
+
+from fanalinux.core.presets import (
+    init_default_presets,
+    list_presets,
+    load_preset,
+    save_preset,
+)
+from fanalinux.core.tuning import TUNING_METADATA, TuningProfile
+from fanalinux.ui.helpers import slider_cluster, widen_page_clamp
 
 
 class TuningView(Adw.PreferencesPage):
     def __init__(
         self,
         device,
-        on_toast_requested: Optional[Callable[[str], None]] = None,
-        on_presets_changed: Optional[Callable[[], None]] = None
+        on_toast_requested: Callable[[str], None] | None = None,
+        on_presets_changed: Callable[[], None] | None = None
     ):
         super().__init__()
         self.device = device
@@ -253,53 +257,33 @@ class TuningView(Adw.PreferencesPage):
             row.add_suffix(switch_box)
             self._controls[param_id] = switch
         else:
-            val_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-            val_box.set_valign(Gtk.Align.CENTER)
-
             def _format_display_val(v):
                 if param_id == "sen" and int(v) <= 0:
                     return "Auto"
                 return f"{int(v)}{meta['unit']}"
 
-            val_label = Gtk.Label(label=_format_display_val(current_val))
-            val_label.set_width_chars(6)
-            val_label.set_xalign(1.0)
-            val_label.add_css_class("val-badge")
-
-            adj = Gtk.Adjustment(
-                value=current_val,
-                lower=meta["min"],
-                upper=meta["max"],
-                step_increment=meta.get("step", 1),
-                page_increment=meta.get("step", 1) * 5
-            )
-            scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj)
-            scale_w = 180 if compact else 220
-            scale.set_size_request(scale_w, -1)
-            scale.set_valign(Gtk.Align.CENTER)
-            scale.set_draw_value(False)
-
-            def _on_val_changed(adjustment, lbl=val_label, pid=param_id, unit=meta['unit']):
-                raw_v = int(adjustment.get_value())
-                if pid == "sen":
+            def _on_val_changed(raw_v):
+                raw_v = int(raw_v)
+                if param_id == "sen":
                     # Snap 1..89 to 0 (Auto) if < 45, else 90
                     if 0 < raw_v < 90:
                         raw_v = 0 if raw_v < 45 else 90
-                        adjustment.set_value(raw_v)
+                        val_adj.set_value(raw_v)
                         return
                     if raw_v <= 0:
-                        lbl.set_text("Auto")
+                        val_lbl.set_text("Auto")
                         return
-                lbl.set_text(f"{raw_v}{unit}")
+                val_lbl.set_text(f"{raw_v}{meta['unit']}")
 
-            adj.connect("value-changed", _on_val_changed)
-            adj.connect("value-changed", lambda *a: self._mark_dirty())
-
-            val_box.append(val_label)
-            val_box.append(scale)
-            attach_spin_button(val_box, adj)
+            val_box, val_adj, val_lbl = slider_cluster(
+                meta["min"], meta["max"], meta.get("step", 1), current_val,
+                unit=meta["unit"], width=180 if compact else 220,
+                on_change=_on_val_changed,
+            )
+            val_lbl.set_text(_format_display_val(current_val))
+            val_adj.connect("value-changed", lambda *a: self._mark_dirty())
             row.add_suffix(val_box)
-            self._controls[param_id] = adj
+            self._controls[param_id] = val_adj
 
         if hasattr(container, "add"):
             container.add(row)

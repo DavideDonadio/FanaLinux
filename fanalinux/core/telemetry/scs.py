@@ -9,12 +9,13 @@ and speed-sensitive steering damping. Wheel slip and suspension kerb haptics
 are not exported by the SCS truck physics interface.
 """
 
-import os
-import mmap
-import time
-import struct
 import logging
-from typing import Callable, Optional
+import mmap
+import os
+import struct
+import time
+from collections.abc import Callable
+
 from fanalinux.core.telemetry.base import BaseTelemetryClient
 
 logger = logging.getLogger("fanalinux.telemetry.scs")
@@ -32,17 +33,17 @@ class SCSTelemetry(BaseTelemetryClient):
     Reads binary shared memory at ~40Hz.
     """
     def __init__(self,
-                 on_telemetry: Optional[Callable] = None,
-                 on_car_detected: Optional[Callable[[str], None]] = None,
+                 on_telemetry: Callable | None = None,
+                 on_car_detected: Callable[[str], None] | None = None,
                  default_max_rpm: int = 2500,
                  poll_rate_hz: float = 40.0):
         super().__init__(on_telemetry=on_telemetry,
                          on_car_detected=on_car_detected,
                          default_max_rpm=default_max_rpm)
         self.poll_interval = 1.0 / max(10.0, min(100.0, poll_rate_hz))
-        self._mmap_obj: Optional[mmap.mmap] = None
-        self._fd: Optional[int] = None
-        self._last_sim_time: Optional[int] = None
+        self._mmap_obj: mmap.mmap | None = None
+        self._fd: int | None = None
+        self._last_sim_time: int | None = None
         self._last_time_change: float = time.time()
 
     def stop(self):

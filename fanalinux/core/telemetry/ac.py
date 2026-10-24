@@ -5,12 +5,13 @@ Connects directly to Assetto Corsa's native UDP remote telemetry server (port 99
 to stream RPM, gear, speed, ABS, and TC events in real time.
 """
 
+import logging
+import select
 import socket
 import struct
-import select
 import time
-import logging
-from typing import Callable, Optional
+from collections.abc import Callable
+
 from fanalinux.core.telemetry.base import BaseTelemetryClient
 
 logger = logging.getLogger("fanalinux.telemetry.ac")
@@ -26,13 +27,13 @@ class AssettoCorsaTelemetry(BaseTelemetryClient):
     DISMISS = 3
 
     def __init__(self,
-                 on_telemetry: Optional[Callable] = None,
-                 on_car_detected: Optional[Callable[[str], None]] = None,
+                 on_telemetry: Callable | None = None,
+                 on_car_detected: Callable[[str], None] | None = None,
                  default_max_rpm: int = 6500):
         super().__init__(on_telemetry=on_telemetry,
                          on_car_detected=on_car_detected,
                          default_max_rpm=default_max_rpm)
-        self._sock: Optional[socket.socket] = None
+        self._sock: socket.socket | None = None
 
     def stop(self):
         """Stop telemetry thread and send dismiss packet."""

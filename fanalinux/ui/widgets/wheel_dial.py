@@ -4,16 +4,20 @@ Features high-resolution Formula V2.5 rim rendering with real-time rotation
 and an interactive calibration animation.
 """
 
-import os
 import math
+import os
 import time
+
 import cairo
 import gi
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
-from typing import Optional, Callable
-from fanalinux.core.hardware import load_hardware_config, get_rim_info
+from collections.abc import Callable
+
+from gi.repository import GLib, Gtk
+
+from fanalinux.core.hardware import get_rim_info, load_hardware_config
 
 RESOURCES_RIMS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -22,8 +26,8 @@ RESOURCES_RIMS_DIR = os.path.join(
 
 
 class WheelDialWidget(Gtk.Box):
-    def __init__(self, on_calibrate_clicked: Optional[Callable[[], None]] = None,
-                 on_reset_clicked: Optional[Callable[[], None]] = None):
+    def __init__(self, on_calibrate_clicked: Callable[[], None] | None = None,
+                 on_reset_clicked: Callable[[], None] | None = None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         self.on_calibrate_clicked = on_calibrate_clicked
         self.on_reset_clicked = on_reset_clicked

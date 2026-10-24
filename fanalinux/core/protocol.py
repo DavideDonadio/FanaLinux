@@ -5,7 +5,6 @@ Reverse-engineered specifications for Fanatec Wheelbases, Rims, and Peripherals.
 Clean-room implementation designed for Linux interoperability.
 """
 
-from typing import Dict, Tuple
 
 # USB Identifiers
 FANATEC_VENDOR_ID = 0x0EB7
@@ -64,7 +63,7 @@ TUNING_REGISTERS = {
 }
 
 # Steering Wheel Rim Type IDs (Extracted from wheel report)
-RIM_TYPES: Dict[int, str] = {
+RIM_TYPES: dict[int, str] = {
     0x0A: "ClubSport Steering Wheel Formula V2 / V2.5",
     0x0D: "Podium Button Module Endurance",
     0x0E: "CSL Elite Steering Wheel WRC",
@@ -81,7 +80,7 @@ RIM_TYPES: Dict[int, str] = {
 }
 
 # 7-Segment / OLED character font mapping table
-SEVEN_SEGMENT_MAP: Dict[str, int] = {
+SEVEN_SEGMENT_MAP: dict[str, int] = {
     '': 0x00, ' ': 0x00,
     '0': 0x3F, '1': 0x06, '2': 0x5B, '3': 0x4F, '4': 0x66,
     '5': 0x6D, '6': 0x7D, '7': 0x07, '8': 0x7F, '9': 0x6F,
@@ -102,7 +101,7 @@ def encode_bgr565(r: int, g: int, b: int) -> int:
     return ((b_clamped >> 3) << 11) | ((g_clamped >> 2) << 5) | (r_clamped >> 3)
 
 
-def text_to_segment_bytes(text: str) -> Tuple[int, int, int]:
+def text_to_segment_bytes(text: str) -> tuple[int, int, int]:
     """Convert up to a 3-character string into 7-segment / OLED font bytes."""
     cleaned = text.upper().ljust(3)[:3]
     return (

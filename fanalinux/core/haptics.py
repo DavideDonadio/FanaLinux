@@ -3,10 +3,9 @@ Telemetry-Driven Haptic Feedback Engine.
 Executes real-time rim & pedal vibration pulses responding to in-game telemetry events.
 """
 
-import time
-import threading
 import logging
-from typing import Optional
+import threading
+import time
 
 from fanalinux.core.vibration import VibrationSettings, load_vibration_settings
 
@@ -14,7 +13,7 @@ logger = logging.getLogger("fanalinux.haptics")
 
 
 class HapticEngine:
-    def __init__(self, device, settings: Optional[VibrationSettings] = None):
+    def __init__(self, device, settings: VibrationSettings | None = None):
         self.device = device
         self.settings = settings or load_vibration_settings()
         self._running = False
@@ -40,7 +39,7 @@ class HapticEngine:
         self._suspension_primed = False
 
         # Worker thread
-        self._worker_thread: Optional[threading.Thread] = None
+        self._worker_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
     def start(self):

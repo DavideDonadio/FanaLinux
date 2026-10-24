@@ -3,10 +3,13 @@ Telemetry Manager: Bridges sim games to Fanatec LEDs and OLED Display.
 Includes Adaptive Peak RPM Auto-Calibration and Car Database.
 """
 
-import os
 import json
 import logging
-from typing import Optional, Callable, Dict, Any
+import os
+from typing import Any
+
+from fanalinux.core.dynamic_ffb_engine import DynamicFFBEngine
+from fanalinux.core.haptics import HapticEngine
 from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
 from fanalinux.core.telemetry.ams2 import AMS2Telemetry
 from fanalinux.core.telemetry.beamng import BeamNGTelemetry
@@ -14,9 +17,6 @@ from fanalinux.core.telemetry.dirt import DirtRallyTelemetry
 from fanalinux.core.telemetry.f1 import F1Telemetry
 from fanalinux.core.telemetry.forza import ForzaTelemetry
 from fanalinux.core.telemetry.scs import SCSTelemetry
-from fanalinux.core.haptics import HapticEngine
-from fanalinux.core.vibration import load_vibration_settings
-from fanalinux.core.dynamic_ffb_engine import DynamicFFBEngine
 
 logger = logging.getLogger("fanalinux.telemetry.manager")
 
@@ -50,7 +50,7 @@ class TelemetryManager:
         self.peak_rpm_seen = 0
         self.auto_detect_rpm = True
 
-        self._clients: Dict[str, Any] = {}
+        self._clients: dict[str, Any] = {}
         self.active_telemetry_type = "ac_udp"
         self.active_client = self._get_client("ac_udp")
         self.ac_client = self.active_client  # Backwards compatibility
@@ -79,7 +79,7 @@ class TelemetryManager:
     def is_running(self) -> bool:
         return bool(self.enabled or (self.active_client and getattr(self.active_client, "is_running", False)))
 
-    def start(self, telemetry_type: Optional[str] = None):
+    def start(self, telemetry_type: str | None = None):
         self.enabled = True
         self._last_gear = None
         self._last_speed_txt = None

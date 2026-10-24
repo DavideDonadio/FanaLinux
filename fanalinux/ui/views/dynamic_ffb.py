@@ -6,21 +6,23 @@ Replicates FanaLab's 'FFB Dynamique' / 'Surcouche d'Amortissement':
 """
 
 import gi
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
-from typing import Optional, Callable
+from collections.abc import Callable
+
+from gi.repository import Adw, GLib, Gtk
 
 from fanalinux.core.dynamic_ffb import (
     DynamicFFBSettings,
     load_dynamic_ffb_settings,
     save_dynamic_ffb_settings,
 )
-from fanalinux.ui.helpers import widen_page_clamp, attach_spin_button
+from fanalinux.ui.helpers import slider_cluster, widen_page_clamp
 
 
 class DynamicFFBView(Adw.PreferencesPage):
-    def __init__(self, device, telemetry_mgr=None, on_toast_requested: Optional[Callable[[str], None]] = None):
+    def __init__(self, device, telemetry_mgr=None, on_toast_requested: Callable[[str], None] | None = None):
         super().__init__()
         self.device = device
         self.telemetry_mgr = telemetry_mgr
@@ -142,38 +144,18 @@ class DynamicFFBView(Adw.PreferencesPage):
         row.set_title(title)
         row.set_subtitle(subtitle)
 
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        box.set_valign(Gtk.Align.CENTER)
-
-        current_val = getattr(self.settings, attr_name, min_val)
-        lbl = Gtk.Label(label=f"{int(current_val)}{unit}")
-        lbl.set_width_chars(8)
-        lbl.set_xalign(1.0)
-        lbl.add_css_class("val-badge")
-
-        adj = Gtk.Adjustment(
-            value=float(current_val),
-            lower=float(min_val),
-            upper=float(max_val),
-            step_increment=float(step),
-            page_increment=float(step) * 5
-        )
-        scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj)
-        scale.set_size_request(220, -1)
-        scale.set_valign(Gtk.Align.CENTER)
-        scale.set_draw_value(False)
-
-        def _on_val_changed(adjustment):
-            v = int(adjustment.get_value())
-            lbl.set_text(f"{v}{unit}")
+        def _on_val_changed(v):
+            v = int(v)
+            row_lbl.set_text(f"{v}{unit}")
             setattr(self.settings, attr_name, v)
             self._save()
 
-        adj.connect("value-changed", _on_val_changed)
-
-        box.append(lbl)
-        box.append(scale)
-        attach_spin_button(box, adj)
+        box, _adj, row_lbl = slider_cluster(
+            float(min_val), float(max_val), float(step),
+            float(getattr(self.settings, attr_name, min_val)),
+            unit=unit, width=220, badge_width=8,
+            on_change=_on_val_changed,
+        )
         row.add_suffix(box)
         return row
 

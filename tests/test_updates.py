@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from fanalinux.core import updates
-from fanalinux.core.updates import is_newer, get_local_version
+from fanalinux.core.updates import get_local_version, is_newer
 
 
 class TestUpdates(unittest.TestCase):

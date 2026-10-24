@@ -5,9 +5,9 @@ Handles parameter normalization, hardware conversion functions,
 and JSON preset loading/saving.
 """
 
-from dataclasses import dataclass, field, asdict
-from typing import Dict, Any, Optional
 import json
+from dataclasses import asdict, dataclass
+from typing import Any
 
 
 # Official parameter defaults per Fanatec support "Tuning Menu parameters"
@@ -37,11 +37,11 @@ class TuningProfile:
     brf: int = 50           # Brake Force for load-cell pedals (0 - 100%)
     ful: int = 100          # FullForce detail effects (0 = Off, 1 - 100%)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TuningProfile":
+    def from_dict(cls, data: dict[str, Any]) -> "TuningProfile":
         valid_fields = cls.__dataclass_fields__
         coerced = {}
         for k, v in data.items():

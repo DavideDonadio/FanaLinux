@@ -4,22 +4,20 @@ Monitors running processes for racing simulators and automatically switches
 hardware tuning presets and telemetry engines.
 """
 
-import os
 import json
-import time
 import logging
+import os
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Callable
-
-from fanalinux.core.presets import list_presets, load_preset, init_default_presets
+from typing import Any
 
 logger = logging.getLogger("fanalinux.detector")
 
 CONFIG_PATH = Path.home() / ".config" / "fanalinux" / "game_profiles.json"
 OLD_CONFIG_PATH = Path.home() / ".config" / "open-fanactrl" / "game_profiles.json"
 
-BUILTIN_GAMES: List[Dict[str, Any]] = [
+BUILTIN_GAMES: list[dict[str, Any]] = [
     {
         "id": "assetto_corsa",
         "name": "Assetto Corsa",
@@ -170,9 +168,9 @@ BUILTIN_GAMES: List[Dict[str, Any]] = [
 class GameDetector:
     def __init__(
         self,
-        on_game_started: Optional[Callable[[Dict[str, Any], str, bool], None]] = None,
-        on_game_stopped: Optional[Callable[[Dict[str, Any], str], None]] = None,
-        on_scan_tick: Optional[Callable[[Optional[Dict[str, Any]]], None]] = None
+        on_game_started: Callable[[dict[str, Any], str, bool], None] | None = None,
+        on_game_stopped: Callable[[dict[str, Any], str], None] | None = None,
+        on_scan_tick: Callable[[dict[str, Any] | None], None] | None = None
     ):
         self.on_game_started = on_game_started
         self.on_game_stopped = on_game_stopped
@@ -180,18 +178,18 @@ class GameDetector:
 
         self.running = False
         self._stop_event = threading.Event()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
 
-        self.active_game: Optional[Dict[str, Any]] = None
-        self.active_pid: Optional[int] = None
-        self.active_exe: Optional[str] = None
+        self.active_game: dict[str, Any] | None = None
+        self.active_pid: int | None = None
+        self.active_exe: str | None = None
 
         # Load configuration
         self.enabled = True
         self._poll_interval = 1.5
         self.fallback_preset = "Default"
-        self.game_mappings: Dict[str, Dict[str, Any]] = {}
-        self.custom_games: List[Dict[str, Any]] = []
+        self.game_mappings: dict[str, dict[str, Any]] = {}
+        self.custom_games: list[dict[str, Any]] = []
 
         self._load_config()
 
@@ -294,19 +292,19 @@ class GameDetector:
         except Exception as e:
             logger.error(f"Error saving game profiles config: {e}")
 
-    def get_all_games(self) -> List[Dict[str, Any]]:
+    def get_all_games(self) -> list[dict[str, Any]]:
         """Return combined list of builtin and custom games."""
         games = list(BUILTIN_GAMES)
         games.extend(self.custom_games)
         return games
 
-    def get_game_by_id(self, game_id: str) -> Optional[Dict[str, Any]]:
+    def get_game_by_id(self, game_id: str) -> dict[str, Any] | None:
         for g in self.get_all_games():
             if g["id"] == game_id:
                 return g
         return None
 
-    def get_game_icon_path(self, game_id: str) -> Optional[str]:
+    def get_game_icon_path(self, game_id: str) -> str | None:
         """Return the filesystem path to the official icon for a game."""
         base_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
         # Check for real official image (jpg / png) first, then vector svg
@@ -339,14 +337,14 @@ class GameDetector:
             self._thread = None
         logger.info("GameDetector background scanner stopped.")
 
-    def scan_once(self) -> Optional[Dict[str, Any]]:
+    def scan_once(self) -> dict[str, Any] | None:
         """
         Perform a single scan of /proc looking for active sim games.
         Returns match dict if found: {'game': game_dict, 'exe': str, 'pid': int}
         """
         all_games = self.get_all_games()
         # Build quick lookup: lower_exe -> list of game dicts
-        exe_map: Dict[str, List[Dict[str, Any]]] = {}
+        exe_map: dict[str, list[dict[str, Any]]] = {}
         for g in all_games:
             gid = g["id"]
             mapping = self.game_mappings.get(gid, {})

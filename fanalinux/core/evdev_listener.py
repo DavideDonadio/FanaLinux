@@ -5,15 +5,19 @@ Reads low-latency steering, pedal axes, and button matrix states
 from /dev/input/ event nodes.
 """
 
-import os
 import glob
-import struct
-import select
-import threading
 import logging
-from typing import Callable, Optional, Dict
+import os
+import select
+import struct
+import threading
+from collections.abc import Callable
 
-from fanalinux.core.calibration import load_calibration_settings, save_calibration_settings, CalibrationSettings
+from fanalinux.core.calibration import (
+    CalibrationSettings,
+    load_calibration_settings,
+    save_calibration_settings,
+)
 
 logger = logging.getLogger("fanalinux.evdev")
 
@@ -35,11 +39,11 @@ ABS_HAT0Y = 0x11   # D-Pad / FunkySwitch Hat Y
 
 class EvdevListener:
     def __init__(self,
-                 on_steering: Optional[Callable[[float, int], None]] = None,
-                 on_throttle: Optional[Callable[[float], None]] = None,
-                 on_brake: Optional[Callable[[float], None]] = None,
-                 on_clutch: Optional[Callable[[float], None]] = None,
-                 on_button: Optional[Callable[[int, bool], None]] = None):
+                 on_steering: Callable[[float, int], None] | None = None,
+                 on_throttle: Callable[[float], None] | None = None,
+                 on_brake: Callable[[float], None] | None = None,
+                 on_clutch: Callable[[float], None] | None = None,
+                 on_button: Callable[[int, bool], None] | None = None):
         self.on_steering = on_steering
         self.on_throttle = on_throttle
         self.on_brake = on_brake
@@ -47,9 +51,9 @@ class EvdevListener:
         self.on_button = on_button
 
         self._running = False
-        self._thread: Optional[threading.Thread] = None
-        self._fd: Optional[int] = None
-        self.device_node: Optional[str] = None
+        self._thread: threading.Thread | None = None
+        self._fd: int | None = None
+        self.device_node: str | None = None
 
         # Steering Calibration Offset (Persistent)
         self.calibration: CalibrationSettings = load_calibration_settings()
@@ -67,7 +71,7 @@ class EvdevListener:
         """Reset steering center to factory default (32768)."""
         self.set_center_raw(32768)
 
-    def find_device_node(self) -> Optional[str]:
+    def find_device_node(self) -> str | None:
         """Locate the Fanatec joystick event node with auto-probing."""
         # Check by-id symlinks first
         patterns = [

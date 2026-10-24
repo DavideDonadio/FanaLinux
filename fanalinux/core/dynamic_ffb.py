@@ -5,10 +5,10 @@ Replicates FanaLab's 'FFB Dynamique' / 'Surcouche d'Amortissement':
 - Reverse Driving Safety Damper
 """
 
-import os
 import json
 import logging
-from dataclasses import dataclass, asdict, fields
+import os
+from dataclasses import asdict, dataclass, fields
 
 logger = logging.getLogger("fanalinux.dynamic_ffb_settings")
 

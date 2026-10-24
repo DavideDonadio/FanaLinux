@@ -5,37 +5,34 @@ Native Linux hidraw implementation that does not detach the kernel driver.
 Maintains concurrent compatibility with evdev gaming inputs.
 """
 
-import os
-import glob
-import time
-import select
-import logging
-import threading
 import errno
-from typing import Optional, List, Tuple, Dict, Any
+import glob
+import logging
+import os
+import select
+import threading
+import time
 
 from fanalinux.core.protocol import (
+    CMD_DISPLAY_PREFIX,
+    CMD_INIT,
+    CMD_LED_MC,
     FANATEC_VENDOR_ID,
+    LED_SUB_FLAGS,
+    LED_SUB_RPM,
+    PID_CLUBSPORT_V2,
+    PID_CLUBSPORT_V25,
     PID_CSL_DD,
+    PID_CSL_ELITE,
+    PID_CSL_ELITE_PS4,
     PID_DD_PRO,
     PID_PODIUM_DD1,
     PID_PODIUM_DD2,
-    PID_CLUBSPORT_V2,
-    PID_CLUBSPORT_V25,
-    PID_CSL_ELITE,
-    PID_CSL_ELITE_PS4,
-    CMD_INIT,
-    CMD_DISPLAY_PREFIX,
-    CMD_LEGACY_LED_PREFIX,
     REPORT_ID_DIRECT_DRIVE,
     REPORT_ID_LEGACY_CMD,
-    CMD_LED_MC,
-    LED_SUB_RPM,
-    LED_SUB_FLAGS,
+    TUNING_REGISTERS,
     encode_bgr565,
     text_to_segment_bytes,
-    TUNING_REGISTERS,
-    RIM_TYPES,
 )
 from fanalinux.core.tuning import TuningProfile
 
@@ -46,20 +43,15 @@ class FanatecDevice:
     def __init__(self, vendor_id: int = FANATEC_VENDOR_ID, product_id: int = PID_CSL_DD):
         self.vendor_id = vendor_id
         self.product_id = product_id
-        self._fd: Optional[int] = None
-        self.hidraw_path: Optional[str] = None
+        self._fd: int | None = None
+        self.hidraw_path: str | None = None
         self.connected = False
-        self.product_name = "Fanatec CSL DD"
-        self.rim_name = "ClubSport Steering Wheel Formula V2.5"
-        self.firmware_base = "1.1.8.4"
-        self.firmware_motor = "1.0.3.2"
-        self.firmware_rim = "45"
         self._abort_vibration = False
         self._vibration_token = 0
         self.active_sen = 900
         self._lock = threading.RLock()
 
-    def find_hidraw_path(self) -> Optional[str]:
+    def find_hidraw_path(self) -> str | None:
         """
         Locate the Fanatec hidraw device node with intelligent preference for
         wheelbases over peripheral accessories (e.g. standalone USB pedals/shifters).
@@ -174,7 +166,7 @@ class FanatecDevice:
 
         return True
 
-    def write_report(self, data: List[int]) -> int:
+    def write_report(self, data: list[int]) -> int:
         """Write raw HID report buffer directly to hidraw with thread safety and non-blocking retry."""
         if self._fd is None or not self.connected:
             return 0
@@ -215,7 +207,7 @@ class FanatecDevice:
         self.write_report(payload)
         time.sleep(0.02)
 
-    def set_revleds(self, colors: List[Tuple[int, int, int]]):
+    def set_revleds(self, colors: list[tuple[int, int, int]]):
         """
         Set the 9 multi-color RevLEDs on the rim.
         colors: list of 9 (r, g, b) tuples, each component 0..255.
@@ -228,7 +220,7 @@ class FanatecDevice:
         buf.extend([0x00] * (64 - len(buf)))
         self.write_report(buf)
 
-    def set_flagleds(self, colors: List[Tuple[int, int, int]]):
+    def set_flagleds(self, colors: list[tuple[int, int, int]]):
         """
         Set the 6 multi-color Flag LEDs on the rim (3 left, 3 right).
         colors: list of 6 (r, g, b) tuples.
@@ -317,59 +309,6 @@ class FanatecDevice:
                 out_buf[addr + 1] = int(raw_val) & 0xFF
         self.write_report(out_buf)
         time.sleep(0.01)
-
-    def read_tuning_profile(self, slot: int = 1) -> Optional[TuningProfile]:
-        """Request and parse the active tuning report from the wheel base.
-        Note: CSL DD does not answer the slot-query report on hidraw,
-        so this returns None on that hardware (verified live)."""
-        if self._fd is None or not self.connected:
-            return None
-        try:
-            clamped_slot = max(1, min(5, int(float(slot))))
-        except (ValueError, TypeError):
-            clamped_slot = 1
-
-        try:
-            # Send slot query command: [0xFF, 0x03, 0x01, clamped_slot]
-            buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x01, clamped_slot & 0xFF] + [0x00] * 60
-            self.write_report(buf)
-            time.sleep(0.02)
-
-            if self._fd is None or not self.connected:
-                return None
-
-            # Check if an input report is ready (outside the USB lock)
-            r, _, _ = select.select([self._fd], [], [], 0.08)
-            if r and self._fd is not None:
-                with self._lock:
-                    if self._fd is None:
-                        return None
-                    data = os.read(self._fd, 64)
-
-                if len(data) >= 32 and data[0] == 0xFF and data[1] == 0x03:
-                    prof = TuningProfile(slot=clamped_slot)
-                    # Parse all registers from buffer
-                    raw_sen = data[TUNING_REGISTERS["SEN"] + 1]
-                    signed_sen = raw_sen if raw_sen < 128 else raw_sen - 256
-                    prof.sen = 0 if raw_sen == 129 else (signed_sen + 127) * 10
-                    prof.ff = data[TUNING_REGISTERS["FF"] + 1]
-                    prof.ndp = data[TUNING_REGISTERS["NDP"] + 1]
-                    prof.nfr = data[TUNING_REGISTERS["NFR"] + 1]
-                    prof.nin = data[TUNING_REGISTERS["NIN"] + 1]
-                    prof.int_filter = data[TUNING_REGISTERS["INT"] + 1]
-                    prof.fei = data[TUNING_REGISTERS["FEI"] + 1]
-                    prof.for_mult = data[TUNING_REGISTERS["FOR"] + 1] * 10
-                    prof.spr_mult = data[TUNING_REGISTERS["SPR"] + 1] * 10
-                    prof.dpr_mult = data[TUNING_REGISTERS["DPR"] + 1] * 10
-                    prof.sho = data[TUNING_REGISTERS["SHO"] + 1] * 10
-                    prof.bli = data[TUNING_REGISTERS["BLI"] + 1]
-                    prof.brf = data[TUNING_REGISTERS["BRF"] + 1]
-                    prof.ful = data[TUNING_REGISTERS["FUL"] + 1]
-                    prof.ffs = data[TUNING_REGISTERS["FFS"] + 1]
-                    return prof
-        except Exception as e:
-            logger.debug(f"Could not read tuning report: {e}")
-        return None
 
     def calibrate_center(self):
         """Trigger center calibration sequence in hardware."""

@@ -3,8 +3,8 @@
 FanaLinux - Main Entrypoint
 """
 
-import sys
 import os
+import sys
 
 # Ensure package root is in python path
 current_dir = os.path.dirname(os.path.abspath(__file__))

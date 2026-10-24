@@ -3,15 +3,17 @@ Calibration, Diagnostics & Force Feedback Motor Test Suite.
 Matches Fanatec Control Panel calibration and motor diagnostic tabs.
 """
 
-import time
 import threading
+import time
+
 import gi
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
+from gi.repository import Adw, GLib, Gtk
 
+from fanalinux.ui.helpers import slider_cluster, widen_page_clamp
 from fanalinux.ui.widgets.wheel_dial import WheelDialWidget
-from fanalinux.ui.helpers import widen_page_clamp, attach_spin_button
 
 
 class CalibrationView(Adw.PreferencesPage):
@@ -50,27 +52,18 @@ class CalibrationView(Adw.PreferencesPage):
         spring_row.set_subtitle("Engages direct-drive motor autocenter force pulling toward 0.0°")
         spring_row.set_icon_name("emblem-synchronizing-symbolic")
 
-        spring_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        spring_box.set_valign(Gtk.Align.CENTER)
+        def _on_spring_changed(v):
+            spring_lbl.set_text(f"{int(v)}%")
 
-        spring_lbl = Gtk.Label(label="50%")
-        spring_lbl.set_width_chars(5)
-        spring_lbl.add_css_class("val-badge")
-
-        self.spring_adj = Gtk.Adjustment(value=50, lower=10, upper=100, step_increment=5, page_increment=20)
-        spring_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.spring_adj)
-        spring_scale.set_size_request(220, -1)
-        spring_scale.set_valign(Gtk.Align.CENTER)
-        spring_scale.set_draw_value(False)
-        self.spring_adj.connect("value-changed", lambda a: spring_lbl.set_text(f"{int(a.get_value())}%"))
+        spring_box, self.spring_adj, spring_lbl = slider_cluster(
+            10, 100, 5, 50, unit="%", width=220, badge_width=5,
+            on_change=_on_spring_changed,
+        )
 
         self.spring_sw = Gtk.Switch()
         self.spring_sw.set_valign(Gtk.Align.CENTER)
         self.spring_sw.connect("state-set", self._on_spring_toggled)
 
-        spring_box.append(spring_lbl)
-        spring_box.append(spring_scale)
-        attach_spin_button(spring_box, self.spring_adj)
         spring_box.append(self.spring_sw)
         spring_row.add_suffix(spring_box)
         ffb_group.add(spring_row)
@@ -81,27 +74,18 @@ class CalibrationView(Adw.PreferencesPage):
         friction_row.set_subtitle("Applies rotational resistance to feel motor damping while turning the wheel")
         friction_row.set_icon_name("preferences-system-symbolic")
 
-        friction_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        friction_box.set_valign(Gtk.Align.CENTER)
+        def _on_friction_changed(v):
+            friction_lbl.set_text(f"{int(v)}%")
 
-        friction_lbl = Gtk.Label(label="40%")
-        friction_lbl.set_width_chars(5)
-        friction_lbl.add_css_class("val-badge")
-
-        self.friction_adj = Gtk.Adjustment(value=40, lower=10, upper=100, step_increment=5, page_increment=20)
-        friction_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.friction_adj)
-        friction_scale.set_size_request(220, -1)
-        friction_scale.set_valign(Gtk.Align.CENTER)
-        friction_scale.set_draw_value(False)
-        self.friction_adj.connect("value-changed", lambda a: friction_lbl.set_text(f"{int(a.get_value())}%"))
+        friction_box, self.friction_adj, friction_lbl = slider_cluster(
+            10, 100, 5, 40, unit="%", width=220, badge_width=5,
+            on_change=_on_friction_changed,
+        )
 
         self.friction_sw = Gtk.Switch()
         self.friction_sw.set_valign(Gtk.Align.CENTER)
         self.friction_sw.connect("state-set", self._on_friction_toggled)
 
-        friction_box.append(friction_lbl)
-        friction_box.append(friction_scale)
-        attach_spin_button(friction_box, self.friction_adj)
         friction_box.append(self.friction_sw)
         friction_row.add_suffix(friction_box)
         ffb_group.add(friction_row)
@@ -166,23 +150,15 @@ class CalibrationView(Adw.PreferencesPage):
             row.set_title(title)
             row.set_subtitle(subtitle)
 
-            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-            box.set_valign(Gtk.Align.CENTER)
+            def _on_deadzone_changed(v):
+                dead_lbl.set_text(f"{int(v)}%")
 
-            lbl = Gtk.Label(label=f"{default_val}%")
-            lbl.set_width_chars(5)
-            lbl.add_css_class("val-badge")
-
-            adj = Gtk.Adjustment(value=default_val, lower=0, upper=25, step_increment=1, page_increment=5)
-            scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj)
-            scale.set_size_request(220, -1)
-            scale.set_valign(Gtk.Align.CENTER)
-            scale.set_draw_value(False)
-            adj.connect("value-changed", lambda a: lbl.set_text(f"{int(a.get_value())}%"))
-
-            box.append(lbl)
-            box.append(scale)
-            attach_spin_button(box, adj)
+            # shortcut: deadzone sliders are display-only until evdev gains
+            # deadband support; preserved as-is while unifying the widget.
+            box, _adj, dead_lbl = slider_cluster(
+                0, 25, 1, default_val, unit="%", width=220, badge_width=5,
+                on_change=_on_deadzone_changed,
+            )
             row.add_suffix(box)
             return row
 

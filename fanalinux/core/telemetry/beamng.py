@@ -3,12 +3,13 @@ BeamNG.drive Telemetry Client for Linux.
 Connects via native OutGauge UDP protocol (default port 4444).
 """
 
-import socket
+import logging
 import select
+import socket
 import struct
 import time
-import logging
-from typing import Callable, Optional
+from collections.abc import Callable
+
 from fanalinux.core.telemetry.base import BaseTelemetryClient
 
 logger = logging.getLogger("fanalinux.telemetry.beamng")
@@ -37,15 +38,15 @@ class BeamNGTelemetry(BaseTelemetryClient):
     DL_ABS = 1 << 10  # 1024
 
     def __init__(self,
-                 on_telemetry: Optional[Callable] = None,
-                 on_car_detected: Optional[Callable[[str], None]] = None,
+                 on_telemetry: Callable | None = None,
+                 on_car_detected: Callable[[str], None] | None = None,
                  default_max_rpm: int = 6500,
                  port: int = 4444):
         super().__init__(on_telemetry=on_telemetry,
                          on_car_detected=on_car_detected,
                          default_max_rpm=default_max_rpm)
         self.UDP_PORT = port
-        self._sock: Optional[socket.socket] = None
+        self._sock: socket.socket | None = None
 
     def stop(self):
         super().stop()

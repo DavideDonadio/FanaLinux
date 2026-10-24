@@ -4,14 +4,17 @@ Allows configuring per-game tuning presets, auto-telemetry, and background detec
 """
 
 import gi
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
 import os
-from typing import Optional, Dict, Any, Callable
+from collections.abc import Callable
+from typing import Any
 
-from fanalinux.core.presets import list_presets, load_preset
+from gi.repository import Adw, Gtk
+
 from fanalinux.core.detector import GameDetector
+from fanalinux.core.presets import list_presets, load_preset
 
 
 class ProfilesView(Adw.PreferencesPage):
@@ -20,8 +23,8 @@ class ProfilesView(Adw.PreferencesPage):
         device,
         telemetry_mgr,
         detector: GameDetector,
-        on_toast_requested: Optional[Callable[[str], None]] = None,
-        on_preset_applied: Optional[Callable[[str], None]] = None
+        on_toast_requested: Callable[[str], None] | None = None,
+        on_preset_applied: Callable[[str], None] | None = None
     ):
         super().__init__()
         self.device = device
@@ -232,7 +235,7 @@ class ProfilesView(Adw.PreferencesPage):
         self.fallback_dropdown.set_model(Gtk.StringList.new(presets))
         self._select_dropdown_text(self.fallback_dropdown, curr_fb_text)
 
-    def update_status(self, game_info: Optional[Dict[str, Any]]):
+    def update_status(self, game_info: dict[str, Any] | None):
         """Update the status row when a game is detected or exits."""
         if game_info:
             self.status_row.set_title(f"Active Simulator: {game_info['name']}")

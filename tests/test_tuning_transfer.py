@@ -13,8 +13,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from fanalinux.core.device import FanatecDevice
-from fanalinux.core.tuning import TuningProfile, TUNING_METADATA
 from fanalinux.core.protocol import TUNING_REGISTERS
+from fanalinux.core.tuning import TUNING_METADATA, TuningProfile
 
 
 def capture_full_buffer(dev, profile):

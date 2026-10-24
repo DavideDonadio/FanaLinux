@@ -40,6 +40,11 @@ window {
     transition: all 100ms ease-out;
 }
 
+.led-preview-dot.led-zone-green { background-color: #2ec27e; }
+.led-preview-dot.led-zone-yellow { background-color: #f6d32d; }
+.led-preview-dot.led-zone-red { background-color: #e01b24; }
+.led-preview-dot.led-zone-blue { background-color: #3584e4; }
+
 .gauge-throttle progress {
     background-color: #2ec27e;
 }

@@ -3,10 +3,8 @@ Automated unit tests for multi-game telemetry parsers and TelemetryManager.
 Replays packet fixtures for BeamNG.drive, DiRT Rally 2.0 / WRC, and EA F1.
 """
 
-import os
-import sys
 import struct
-import tempfile
+import sys
 import unittest
 from pathlib import Path
 
@@ -14,15 +12,15 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from fanalinux.core.telemetry.manager import TelemetryManager
+from fanalinux.core.detector import GameDetector
+from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
+from fanalinux.core.telemetry.ams2 import AMS2Telemetry
 from fanalinux.core.telemetry.beamng import BeamNGTelemetry
 from fanalinux.core.telemetry.dirt import DirtRallyTelemetry
 from fanalinux.core.telemetry.f1 import F1Telemetry
 from fanalinux.core.telemetry.forza import ForzaTelemetry
-from fanalinux.core.telemetry.ams2 import AMS2Telemetry
+from fanalinux.core.telemetry.manager import TelemetryManager
 from fanalinux.core.telemetry.scs import SCSTelemetry
-from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
-from fanalinux.core.detector import GameDetector, BUILTIN_GAMES
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 FIXTURES_DIR.mkdir(parents=True, exist_ok=True)

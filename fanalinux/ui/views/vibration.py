@@ -3,22 +3,29 @@ Vibration View: Telemetry-Driven Haptic Feedback & Dynamic Rim/Pedal Vibration.
 Matches the official Fanatec App / FanaLab Vibration tab.
 """
 
-import threading
 import logging
+import threading
+
 import gi
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
-from typing import Optional, Callable
+from collections.abc import Callable
 
-from fanalinux.core.vibration import VibrationSettings, load_vibration_settings, save_vibration_settings
-from fanalinux.ui.helpers import widen_page_clamp, attach_spin_button
+from gi.repository import Adw, GLib, Gtk
+
+from fanalinux.core.vibration import (
+    VibrationSettings,
+    load_vibration_settings,
+    save_vibration_settings,
+)
+from fanalinux.ui.helpers import slider_cluster, widen_page_clamp
 
 logger = logging.getLogger("fanalinux.vibration")
 
 
 class VibrationView(Adw.PreferencesPage):
-    def __init__(self, device, haptic_engine=None, on_toast_requested: Optional[Callable[[str], None]] = None):
+    def __init__(self, device, haptic_engine=None, on_toast_requested: Callable[[str], None] | None = None):
         super().__init__()
         self.device = device
         self.haptic_engine = haptic_engine
@@ -94,7 +101,7 @@ class VibrationView(Adw.PreferencesPage):
         expander = Adw.ExpanderRow()
         expander.set_title("ABS Vibration")
         expander.set_subtitle("Tactile feedback triggered when anti-lock brakes engage under heavy deceleration")
-        sw = self._add_toggle_prefix(expander, "abs_enabled")
+        self._add_toggle_prefix(expander, "abs_enabled")
 
         self._add_slider_row(expander, "abs_strength", "Vibration Strength", 1, 10, 1, "")
         self._add_slider_row(expander, "abs_duration", "Vibration Duration", 20, 300, 10, "ms")
@@ -104,7 +111,7 @@ class VibrationView(Adw.PreferencesPage):
         expander = Adw.ExpanderRow()
         expander.set_title("Engine Vibration")
         expander.set_subtitle("Continuous subtle engine rumble scaled with vehicle engine RPM")
-        sw = self._add_toggle_prefix(expander, "engine_enabled")
+        self._add_toggle_prefix(expander, "engine_enabled")
 
         self._add_slider_row(expander, "engine_strength", "Vibration Strength", 1, 10, 1, "")
         self._add_slider_row(expander, "engine_initial", "Initial Vibration", 0, 100, 5, "%")
@@ -114,7 +121,7 @@ class VibrationView(Adw.PreferencesPage):
         expander = Adw.ExpanderRow()
         expander.set_title("Rev Limiter Vibration")
         expander.set_subtitle("Sharp rhythmic vibration shudder when approaching maximum engine revs")
-        sw = self._add_toggle_prefix(expander, "rev_enabled")
+        self._add_toggle_prefix(expander, "rev_enabled")
 
         self._add_slider_row(expander, "rev_strength", "Vibration Strength", 1, 10, 1, "")
         self._add_slider_row(expander, "rev_threshold", "Threshold", 80.0, 100.0, 0.5, "%", is_float=True)
@@ -124,7 +131,7 @@ class VibrationView(Adw.PreferencesPage):
         expander = Adw.ExpanderRow()
         expander.set_title("Suspension Travel Vibration")
         expander.set_subtitle("Simulates curb strikes and rough road surface displacements")
-        sw = self._add_toggle_prefix(expander, "suspension_enabled")
+        self._add_toggle_prefix(expander, "suspension_enabled")
 
         self._add_slider_row(expander, "suspension_strength", "Vibration Strength", 1, 10, 1, "")
         self._add_slider_row(expander, "suspension_threshold", "Threshold", 0.1, 50.0, 0.5, "%", is_float=True)
@@ -134,7 +141,7 @@ class VibrationView(Adw.PreferencesPage):
         expander = Adw.ExpanderRow()
         expander.set_title("Understeer Vibration")
         expander.set_subtitle("Alerts you when front tires exceed grip angle and scrub across asphalt")
-        sw = self._add_toggle_prefix(expander, "understeer_enabled")
+        self._add_toggle_prefix(expander, "understeer_enabled")
 
         self._add_slider_row(expander, "understeer_strength", "Vibration Strength", 1, 10, 1, "")
         self._add_slider_row(expander, "understeer_friction_limit", "Friction Limit", 0.0, 30.0, 0.5, "°", is_float=True)
@@ -144,7 +151,7 @@ class VibrationView(Adw.PreferencesPage):
         expander = Adw.ExpanderRow()
         expander.set_title("Oversteer Vibration")
         expander.set_subtitle("Alerts you when rear slip angle exceeds recovery threshold (rear slide)")
-        sw = self._add_toggle_prefix(expander, "oversteer_enabled")
+        self._add_toggle_prefix(expander, "oversteer_enabled")
 
         self._add_slider_row(expander, "oversteer_strength", "Vibration Strength", 1, 10, 1, "")
         self._add_slider_row(expander, "oversteer_friction_limit", "Friction Limit", 0.0, 30.0, 0.5, "°", is_float=True)
@@ -154,7 +161,7 @@ class VibrationView(Adw.PreferencesPage):
         expander = Adw.ExpanderRow()
         expander.set_title("Traction Control Vibration")
         expander.set_subtitle("Tactile pulse when ECU traction control cuts engine power during acceleration")
-        sw = self._add_toggle_prefix(expander, "tc_enabled")
+        self._add_toggle_prefix(expander, "tc_enabled")
 
         self._add_slider_row(expander, "tc_strength", "Vibration Strength", 1, 10, 1, "")
         self._add_slider_row(expander, "tc_duration", "Vibration Duration", 20, 300, 10, "ms")
@@ -164,7 +171,7 @@ class VibrationView(Adw.PreferencesPage):
         expander = Adw.ExpanderRow()
         expander.set_title("Wheel Lock Vibration")
         expander.set_subtitle("Direct tactile shudder whenever individual tires lock up under braking")
-        sw = self._add_toggle_prefix(expander, "wheel_lock_enabled")
+        self._add_toggle_prefix(expander, "wheel_lock_enabled")
 
         self._add_slider_row(expander, "wheel_lock_strength", "Vibration Strength", 1, 10, 1, "")
         group.add(expander)
@@ -173,7 +180,7 @@ class VibrationView(Adw.PreferencesPage):
         expander = Adw.ExpanderRow()
         expander.set_title("Wheel Spin Vibration")
         expander.set_subtitle("Tactile warning when driven tires break traction and spin faster than car speed")
-        sw = self._add_toggle_prefix(expander, "wheel_spin_enabled")
+        self._add_toggle_prefix(expander, "wheel_spin_enabled")
 
         self._add_slider_row(expander, "wheel_spin_strength", "Vibration Strength", 1, 10, 1, "")
         group.add(expander)
@@ -200,48 +207,24 @@ class VibrationView(Adw.PreferencesPage):
         row = Adw.ActionRow()
         row.set_title(title)
 
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        box.set_valign(Gtk.Align.CENTER)
-
-        current_val = getattr(self.settings, attr_name, min_val)
-        display_txt = f"{current_val:.1f}{unit}" if is_float else f"{int(current_val)}{unit}"
-        lbl = Gtk.Label(label=display_txt)
-        lbl.set_width_chars(7)
-        lbl.set_xalign(1.0)
-        lbl.add_css_class("val-badge")
-
-        adj = Gtk.Adjustment(
-            value=float(current_val),
-            lower=float(min_val),
-            upper=float(max_val),
-            step_increment=float(step),
-            page_increment=float(step) * 5
-        )
-        scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj)
-        scale.set_size_request(220, -1)
-        scale.set_valign(Gtk.Align.CENTER)
-        scale.set_draw_value(False)
-
-        def _on_val_changed(adjustment):
-            v = adjustment.get_value()
+        def _on_val_changed(v):
             if is_float:
                 v = round(v, 1)
-                lbl.set_text(f"{v:.1f}{unit}")
-                setattr(self.settings, attr_name, v)
             else:
                 v = int(v)
-                lbl.set_text(f"{v}{unit}")
-                setattr(self.settings, attr_name, v)
+            row_lbl.set_text(f"{v:.1f}{unit}" if is_float else f"{v}{unit}")
+            setattr(self.settings, attr_name, v)
             self._save()
 
-        adj.connect("value-changed", _on_val_changed)
-
-        box.append(lbl)
-        box.append(scale)
-        attach_spin_button(box, adj, 1 if is_float else 0)
+        box, adj, row_lbl = slider_cluster(
+            float(min_val), float(max_val), float(step),
+            float(getattr(self.settings, attr_name, min_val)),
+            unit=unit, digits=1 if is_float else 0, width=220, badge_width=7,
+            on_change=_on_val_changed,
+        )
         row.add_suffix(box)
         expander.add_row(row)
-        self._controls[attr_name] = (adj, lbl, unit, is_float)
+        self._controls[attr_name] = (adj, row_lbl, unit, is_float)
 
     def _save(self):
         save_vibration_settings(self.settings)

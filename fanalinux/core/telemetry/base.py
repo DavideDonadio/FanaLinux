@@ -6,15 +6,15 @@ Provides thread management, callback signature inspection, and safe dispatching.
 import inspect
 import logging
 import threading
-from typing import Callable, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger("fanalinux.telemetry.base")
 
 
 class BaseTelemetryClient:
     def __init__(self,
-                 on_telemetry: Optional[Callable] = None,
-                 on_car_detected: Optional[Callable[[str], None]] = None,
+                 on_telemetry: Callable | None = None,
+                 on_car_detected: Callable[[str], None] | None = None,
                  default_max_rpm: int = 6500):
         self._on_telemetry = on_telemetry
         self.on_car_detected = on_car_detected
@@ -22,7 +22,7 @@ class BaseTelemetryClient:
         self.max_rpm = default_max_rpm
         self.car_name = "Unknown"
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self.is_connected = False
         self._callback_takes_extended = True
         self._inspect_callback()

@@ -3,27 +3,29 @@ Main Application Window using Libadwaita.
 Integrates Hardware Device, Evdev Listener, Telemetry Manager, and Auto-Profile Game Detector.
 """
 
-import os
 import logging
+import os
+
 import gi
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 gi.require_version('Gdk', '4.0')
-from gi.repository import Gtk, Adw, Gdk, GLib
+from gi.repository import Adw, Gdk, GLib, Gtk
 
+from fanalinux.core.detector import GameDetector
 from fanalinux.core.device import FanatecDevice
 from fanalinux.core.evdev_listener import EvdevListener
-from fanalinux.core.telemetry.manager import TelemetryManager
-from fanalinux.core.detector import GameDetector
 from fanalinux.core.presets import load_preset
-from fanalinux.ui.views.overview import OverviewView
-from fanalinux.ui.views.tuning import TuningView
-from fanalinux.ui.views.vibration import VibrationView
+from fanalinux.core.telemetry.manager import TelemetryManager
+from fanalinux.ui.helpers import widen_page_clamp
+from fanalinux.ui.views.calibration import CalibrationView
 from fanalinux.ui.views.dynamic_ffb import DynamicFFBView
 from fanalinux.ui.views.leds import LedsView
+from fanalinux.ui.views.overview import OverviewView
 from fanalinux.ui.views.profiles import ProfilesView
-from fanalinux.ui.views.calibration import CalibrationView
-from fanalinux.ui.helpers import widen_page_clamp
+from fanalinux.ui.views.tuning import TuningView
+from fanalinux.ui.views.vibration import VibrationView
 
 logger = logging.getLogger("fanalinux.window")
 

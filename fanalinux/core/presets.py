@@ -3,12 +3,11 @@ Preset Management for FanaLinux.
 Handles listing, loading, saving, and auto-seeding baseline tuning presets.
 """
 
-import os
 import json
-import shutil
 import logging
+import shutil
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 from fanalinux.core.tuning import TuningProfile
 
@@ -18,7 +17,7 @@ PRESETS_DIR = Path.home() / ".config" / "fanalinux" / "presets"
 OLD_PRESETS_DIR = Path.home() / ".config" / "open-fanactrl" / "presets"
 
 # Factory baseline profiles tailored for common sim setups on CSL DD
-DEFAULT_FACTORY_PRESETS: Dict[str, Dict[str, Any]] = {
+DEFAULT_FACTORY_PRESETS: dict[str, dict[str, Any]] = {
     "Default": {
         "name": "Default",
         "slot": 1,
@@ -153,7 +152,7 @@ def init_default_presets() -> None:
                 logger.error(f"Failed to seed factory preset {name}: {e}")
 
 
-def list_presets() -> List[str]:
+def list_presets() -> list[str]:
     """Return sorted list of preset names without extension."""
     init_default_presets()
     presets = []
@@ -168,7 +167,7 @@ def list_presets() -> List[str]:
     return presets
 
 
-def load_preset(name: str) -> Optional[TuningProfile]:
+def load_preset(name: str) -> TuningProfile | None:
     """Load a tuning profile by name."""
     filepath = PRESETS_DIR / f"{name}.json"
     if not filepath.exists():

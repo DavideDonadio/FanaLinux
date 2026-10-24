@@ -5,9 +5,9 @@ and calls hardware discovery routines without hardware present to ensure zero
 NameError, AttributeError, or syntax errors on startup.
 """
 
-import sys
-import pkgutil
 import importlib
+import pkgutil
+import sys
 import unittest
 from pathlib import Path
 
@@ -51,7 +51,7 @@ class TestSmoke(unittest.TestCase):
 
     def test_detector_catalog_and_icons(self):
         """Instantiate GameDetector and verify game catalog and icon path resolutions."""
-        from fanalinux.core.detector import GameDetector, BUILTIN_GAMES
+        from fanalinux.core.detector import BUILTIN_GAMES, GameDetector
         detector = GameDetector()
         self.assertGreaterEqual(len(detector.get_all_games()), 14)
 
@@ -64,7 +64,10 @@ class TestSmoke(unittest.TestCase):
     def test_telemetry_manager_initialization(self):
         """Instantiate TelemetryManager and verify clients can be retrieved cleanly."""
         from fanalinux.core.device import FanatecDevice
-        from fanalinux.core.telemetry.manager import TelemetryManager, TELEMETRY_FACTORIES
+        from fanalinux.core.telemetry.manager import (
+            TELEMETRY_FACTORIES,
+            TelemetryManager,
+        )
         dev = FanatecDevice()
         mgr = TelemetryManager(dev)
         self.assertFalse(mgr.is_connected)
