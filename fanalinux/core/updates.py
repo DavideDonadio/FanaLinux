@@ -4,10 +4,12 @@ Network failures degrade to (None, None); never raises.
 """
 
 import json
+import os
 import urllib.request
 
 REPO = "DavideDonadio/fanalinux"
 API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
+STATE_PATH = os.path.expanduser("~/.config/fanalinux/update_state.json")
 
 
 def get_local_version() -> str:
@@ -44,3 +46,25 @@ def check_latest(timeout: int = 8):
     except Exception:
         pass
     return None, None
+
+
+def load_update_state() -> dict:
+    """Last known release from a previous check ({} when never checked)."""
+    try:
+        with open(STATE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict) and data.get("tag"):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def save_update_state(tag: str, url: str) -> None:
+    """Persist latest release so the update button survives restarts."""
+    try:
+        os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
+        with open(STATE_PATH, "w", encoding="utf-8") as f:
+            json.dump({"tag": tag, "url": url}, f, indent=2)
+    except Exception:
+        pass

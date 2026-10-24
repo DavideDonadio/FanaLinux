@@ -93,4 +93,12 @@ window {
     filter: drop-shadow(0 0 4px alpha(#e01b24, 0.4));
 }
 
+.update-btn {
+    background-color: @success_color;
+    color: #ffffff;
+    font-weight: bold;
+    border-radius: 9999px;
+    padding: 6px 18px;
+}
+
 

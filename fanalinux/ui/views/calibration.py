@@ -190,27 +190,9 @@ class CalibrationView(Adw.PreferencesPage):
         pedal_group.add(make_deadzone_row("Brake Lower Deadzone", "Initial pedal travel deadband before hydraulic/load-cell engagement", 3))
         pedal_group.add(make_deadzone_row("Clutch Engagement Threshold", "Disengagement buffer zone for launch control", 5))
 
-        # 4. Hardware Firmware Versions
-        fw_group = Adw.PreferencesGroup()
-        fw_group.set_title("Hardware Firmware Versions")
-        fw_group.set_description("Hardware revision reporting is not implemented yet")
-
-        def make_fw_row(title):
-            row = Adw.ActionRow()
-            row.set_title(title)
-            lbl = Gtk.Label(label="Not queried yet")
-            lbl.add_css_class("dim-label")
-            row.add_suffix(lbl)
-            return row
-
-        fw_group.add(make_fw_row("Wheelbase Mainboard Firmware"))
-        fw_group.add(make_fw_row("DirectDrive Motor Controller Firmware"))
-        fw_group.add(make_fw_row("Steering Wheel Rim Firmware"))
-
         # Build Single Column Calibration Layout (Full Horizontal Space)
         self.add(ffb_group)
         self.add(pedal_group)
-        self.add(fw_group)
         self.add(center_group)
 
     def _on_spring_toggled(self, switch, state):

@@ -6,8 +6,17 @@ import os
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
+import threading
 from typing import Optional, Callable
 from gi.repository import Gtk, Adw, GLib, Gdk, Gio
+
+from fanalinux.core.updates import (
+    check_latest,
+    get_local_version,
+    is_newer,
+    load_update_state,
+    save_update_state,
+)
 
 from fanalinux.core.hardware import (
     load_hardware_config,
@@ -59,6 +68,40 @@ class OverviewView(Adw.PreferencesPage):
         return container, img
 
     def _build_ui(self):
+        # 0. About & Updates (first: most visible)
+        about_group = Adw.PreferencesGroup()
+        about_group.set_title("About FanaLinux")
+        app_row = Adw.ActionRow()
+        app_row.set_title("FanaLinux")
+        app_row.set_subtitle("Native Linux control suite for Fanatec hardware")
+        ver_badge = Gtk.Label(label=get_local_version())
+        ver_badge.set_width_chars(7)
+        ver_badge.add_css_class("val-badge")
+        app_row.add_suffix(ver_badge)
+        details_btn = Gtk.Button(label="Details")
+        details_btn.set_valign(Gtk.Align.CENTER)
+        details_btn.connect("clicked", self._on_about_details)
+        app_row.add_suffix(details_btn)
+        about_group.add(app_row)
+
+        self.update_row = Adw.ActionRow()
+        self.update_row.set_title("Application Updates")
+        self.update_status = Gtk.Label(label="Checking…")
+        self.update_status.add_css_class("dim-label")
+        self.update_row.add_suffix(self.update_status)
+        self.update_btn = Gtk.Button(label="Update")
+        self.update_btn.add_css_class("update-btn")
+        self.update_btn.set_valign(Gtk.Align.CENTER)
+        self.update_btn.set_visible(False)
+        self.update_btn.connect("clicked", self._on_update_clicked)
+        self.update_row.add_suffix(self.update_btn)
+        about_group.add(self.update_row)
+        self.add(about_group)
+
+        self._update_url = None
+        self._refresh_update_row()
+        threading.Thread(target=self._check_updates_bg, daemon=True).start()
+
         # 1. Device Info Card
         info_group = Adw.PreferencesGroup()
         info_group.set_title("Hardware Status")
@@ -116,6 +159,20 @@ class OverviewView(Adw.PreferencesPage):
         self.rim_row.add_suffix(self.rim_dropdown)
 
         info_group.add(self.rim_row)
+
+        # Firmware revisions: shown here once USB discovery lands
+        def make_fw_row(title):
+            row = Adw.ActionRow()
+            row.set_title(title)
+            lbl = Gtk.Label(label="Coming soon")
+            lbl.add_css_class("val-badge")
+            lbl.add_css_class("accent")
+            row.add_suffix(lbl)
+            return row
+
+        info_group.add(make_fw_row("Wheelbase Mainboard Firmware"))
+        info_group.add(make_fw_row("DirectDrive Motor Controller Firmware"))
+        info_group.add(make_fw_row("Steering Wheel Rim Firmware"))
         self.add(info_group)
 
         # 2. Live Axes & Telemetry
@@ -262,6 +319,49 @@ class OverviewView(Adw.PreferencesPage):
 
             if self.on_rim_changed:
                 self.on_rim_changed(rim_info)
+
+    def _refresh_update_row(self):
+        state = load_update_state()
+        local = get_local_version()
+        tag = state.get("tag")
+        if tag and is_newer(local, tag):
+            self._update_url = state.get("url")
+            self.update_status.set_label(f"{tag} available")
+            self.update_btn.set_label(f"Update to {tag}")
+            self.update_btn.set_visible(True)
+        else:
+            self._update_url = None
+            self.update_status.set_label("Up to date")
+            self.update_btn.set_visible(False)
+        return False
+
+    def _check_updates_bg(self):
+        tag, url = check_latest()
+        if tag:
+            save_update_state(tag, url)
+            GLib.idle_add(self._refresh_update_row)
+        else:
+            GLib.idle_add(self._update_check_failed)
+
+    def _update_check_failed(self):
+        if not self.update_btn.get_visible():
+            self.update_status.set_label("Check failed")
+        return False
+
+    def _on_update_clicked(self, _btn):
+        if self._update_url:
+            Gio.AppInfo.launch_default_for_uri(self._update_url, None)
+
+    def _on_about_details(self, _btn):
+        Adw.AboutWindow(
+            application_name="FanaLinux",
+            application_icon="io.github.davidedonadio.fanalinux",
+            version=get_local_version(),
+            developer_name="Davide Donadio",
+            license_type=Gtk.License.GPL_3_0,
+            website="https://github.com/DavideDonadio/fanalinux",
+            issue_url="https://github.com/DavideDonadio/fanalinux/issues",
+        ).present()
 
     def set_connection_status(self, is_online: bool):
         """Update hardware status badge and cards based on connection state."""
