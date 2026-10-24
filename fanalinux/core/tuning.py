@@ -33,6 +33,7 @@ class TuningProfile:
     sho: int = 100          # Wheel vibration / shock (0 = Off, 10 - 100%)
     bli: int = 85           # Brake Level Indicator (0 = Off, 1 - 100%)
     brf: int = 50           # Brake Force for load-cell pedals (0 - 100%)
+    ful: int = 0            # FullForce detail effects (0 = Off, 1 - 100%)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -231,5 +232,17 @@ TUNING_METADATA = [
         "unit": "%",
         "default": 50,
         "category": "Hardware Feedback"
+    },
+    {
+        "id": "ful",
+        "reg": "FUL",
+        "name": "FullForce (FUL)",
+        "desc": "Scales high-frequency road and engine detail effects (0 = Off).",
+        "min": 0,
+        "max": 100,
+        "step": 1,
+        "unit": "%",
+        "default": 0,
+        "category": "Filters and Effects"
     },
 ]

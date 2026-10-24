@@ -50,11 +50,12 @@ class TestTuningTransfer(unittest.TestCase):
         self.assertEqual(self.sen_byte(0), 129)
 
     def test_passthrough_registers(self):
-        buf = capture_full_buffer(self.dev, TuningProfile(slot=1, ff=50, ndp=70, bli=50, fei=50))
+        buf = capture_full_buffer(self.dev, TuningProfile(slot=1, ff=50, ndp=70, bli=50, fei=50, ful=50))
         self.assertEqual(reg(buf, "FF"), 50)
         self.assertEqual(reg(buf, "NDP"), 70)
         self.assertEqual(reg(buf, "BLI"), 50)
         self.assertEqual(reg(buf, "FEI"), 50)
+        self.assertEqual(reg(buf, "FUL"), 50)
 
     def test_scaled_registers(self):
         buf = capture_full_buffer(self.dev, TuningProfile(slot=1, for_mult=60, spr_mult=70, dpr_mult=80, sho=100))

@@ -159,7 +159,7 @@ class TuningView(Adw.PreferencesPage):
             if param_id in meta_by_id:
                 self._create_control_row(effects_left_list, meta_by_id[param_id], compact=True)
 
-        for param_id in ["spr_mult", "dpr_mult"]:
+        for param_id in ["spr_mult", "dpr_mult", "ful"]:
             if param_id in meta_by_id:
                 self._create_control_row(effects_right_list, meta_by_id[param_id], compact=True)
 

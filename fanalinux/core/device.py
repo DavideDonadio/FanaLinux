@@ -305,8 +305,11 @@ class FanatecDevice:
             "SHO": max(0, min(10, safe_int("sho", 100) // 10)),
             "BLI": max(0, min(100, safe_int("bli", 85))),
             "BRF": max(0, min(100, safe_int("brf", 50))),
+            "FUL": max(0, min(100, safe_int("ful", 0))),
         }
 
+        # NOTE: DRI/ACP stay zeroed (no app model: DRI absent from CSL DD
+        # menu so its encoding is unverifiable, ACP has no observable surface).
         out_buf = [REPORT_ID_DIRECT_DRIVE, 0x03, 0x00] + [0x00] * 61
         for reg_name, raw_val in reg_values.items():
             if reg_name in TUNING_REGISTERS:
@@ -361,6 +364,7 @@ class FanatecDevice:
                     prof.sho = data[TUNING_REGISTERS["SHO"] + 1] * 10
                     prof.bli = data[TUNING_REGISTERS["BLI"] + 1]
                     prof.brf = data[TUNING_REGISTERS["BRF"] + 1]
+                    prof.ful = data[TUNING_REGISTERS["FUL"] + 1]
                     prof.ffs = data[TUNING_REGISTERS["FFS"] + 1]
                     return prof
         except Exception as e:
