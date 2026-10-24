@@ -346,7 +346,16 @@ class OverviewView(Adw.PreferencesPage):
 
     def _on_update_clicked(self, _btn):
         if self._update_url:
+            self.update_btn.set_label("Opening…")
             Gio.AppInfo.launch_default_for_uri(self._update_url, None)
+            GLib.timeout_add_seconds(3, self._restore_update_label)
+
+    def _restore_update_label(self):
+        if self.update_btn.get_visible():
+            tag = load_update_state().get("tag")
+            if tag:
+                self.update_btn.set_label(f"Update to {tag}")
+        return False
 
     def _update_gh_icon(self):
         try:
