@@ -99,6 +99,13 @@ window {
     font-weight: bold;
     border-radius: 9999px;
     padding: 6px 18px;
+    transition: background-color 150ms ease-in-out;
+}
+.update-btn:hover {
+    background-color: mix(@success_color, black, 0.35);
+}
+.update-btn:active {
+    background-color: mix(@success_color, black, 0.5);
 }
 
 .about-title {
