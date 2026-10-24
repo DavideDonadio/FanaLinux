@@ -193,20 +193,19 @@ class CalibrationView(Adw.PreferencesPage):
         # 4. Hardware Firmware Versions
         fw_group = Adw.PreferencesGroup()
         fw_group.set_title("Hardware Firmware Versions")
-        fw_group.set_description("Reported microcontroller and motor firmware revisions")
+        fw_group.set_description("Hardware revision reporting is not implemented yet")
 
-        def make_fw_row(title, version_str):
+        def make_fw_row(title):
             row = Adw.ActionRow()
             row.set_title(title)
-            lbl = Gtk.Label(label=version_str)
-            lbl.add_css_class("val-badge")
-            lbl.add_css_class("accent")
+            lbl = Gtk.Label(label="Not queried yet")
+            lbl.add_css_class("dim-label")
             row.add_suffix(lbl)
             return row
 
-        fw_group.add(make_fw_row("Wheelbase Mainboard Firmware", self.device.firmware_base if self.device else "1.1.8.4"))
-        fw_group.add(make_fw_row("DirectDrive Motor Controller Firmware", self.device.firmware_motor if self.device else "1.0.3.2"))
-        fw_group.add(make_fw_row("Formula V2.5 Steering Rim Firmware", f"v{self.device.firmware_rim}" if self.device else "v45"))
+        fw_group.add(make_fw_row("Wheelbase Mainboard Firmware"))
+        fw_group.add(make_fw_row("DirectDrive Motor Controller Firmware"))
+        fw_group.add(make_fw_row("Steering Wheel Rim Firmware"))
 
         # Build Single Column Calibration Layout (Full Horizontal Space)
         self.add(ffb_group)

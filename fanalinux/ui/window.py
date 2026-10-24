@@ -5,11 +5,12 @@ Integrates Hardware Device, Evdev Listener, Telemetry Manager, and Auto-Profile 
 
 import os
 import logging
+import threading
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 gi.require_version('Gdk', '4.0')
-from gi.repository import Gtk, Adw, Gdk, GLib
+from gi.repository import Gtk, Adw, Gdk, GLib, Gio
 
 from fanalinux.core.device import FanatecDevice
 from fanalinux.core.evdev_listener import EvdevListener
@@ -24,6 +25,7 @@ from fanalinux.ui.views.leds import LedsView
 from fanalinux.ui.views.profiles import ProfilesView
 from fanalinux.ui.views.calibration import CalibrationView
 from fanalinux.ui.helpers import widen_page_clamp
+from fanalinux.core.updates import check_latest, get_local_version, is_newer
 
 logger = logging.getLogger("fanalinux.window")
 
@@ -70,6 +72,22 @@ class MainWindow(Adw.ApplicationWindow):
         view_switcher.set_stack(self.view_stack)
         view_switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
         header.set_title_widget(view_switcher)
+
+        # App menu: About + update check
+        app_menu = Gio.Menu()
+        app_menu.append("Check for Updates", "win.check-updates")
+        app_menu.append("About FanaLinux", "win.about")
+        menu_btn = Gtk.MenuButton()
+        menu_btn.set_icon_name("open-menu-symbolic")
+        menu_btn.set_menu_model(app_menu)
+        header.pack_end(menu_btn)
+
+        about_action = Gio.SimpleAction.new("about", None)
+        about_action.connect("activate", self._on_about)
+        self.add_action(about_action)
+        update_action = Gio.SimpleAction.new("check-updates", None)
+        update_action.connect("activate", self._on_check_updates)
+        self.add_action(update_action)
 
         main_box.append(header)
 
@@ -188,6 +206,33 @@ class MainWindow(Adw.ApplicationWindow):
                     )
         except Exception as e:
             print(f"Notice: CSS provider error: {e}")
+
+    def _on_about(self, *args):
+        Adw.AboutWindow(
+            transient_for=self,
+            application_name="FanaLinux",
+            application_icon="io.github.davidedonadio.fanalinux",
+            version=get_local_version(),
+            developer_name="Davide Donadio",
+            license_type=Gtk.License.GPL_3_0,
+            website="https://github.com/DavideDonadio/fanalinux",
+            issue_url="https://github.com/DavideDonadio/fanalinux/issues",
+        ).present()
+
+    def _on_check_updates(self, *args):
+        self.show_toast("Checking GitHub releases…")
+
+        def _worker():
+            local = get_local_version()
+            tag, _url = check_latest()
+            if tag is None:
+                GLib.idle_add(self.show_toast, "Could not reach GitHub releases")
+            elif is_newer(local, tag):
+                GLib.idle_add(self.show_toast, f"{tag} available (you have {local}) — fetch it from GitHub releases")
+            else:
+                GLib.idle_add(self.show_toast, f"FanaLinux {local} is up to date")
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def show_toast(self, message: str):
         # Escape any raw ampersands for Pango markup safety
