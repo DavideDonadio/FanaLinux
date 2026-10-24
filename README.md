@@ -2,7 +2,7 @@
 
 [![Linux Compatible](https://img.shields.io/badge/Platform-Linux%20(Fedora%20%2F%20Arch%20%2F%20Ubuntu)-blue.svg)]()
 [![License](https://img.shields.io/badge/License-GPLv3-green.svg)]()
-[![Hardware](https://img.shields.io/badge/Hardware-Fanatec%20CSL%20DD%20%2F%20Formula%20V2.5-orange.svg)]()
+[![Hardware](https://img.shields.io/badge/Hardware-Fanatec%20CSL%20DD%20%2F%20Formula%20V2-orange.svg)]()
 
 **FanaLinux** is a native, modern Linux GUI control suite providing comprehensive hardware tuning, profile switching, and dynamic telemetry feedback for Fanatec wheelbases and steering wheels.
 
@@ -56,7 +56,7 @@ Flow: **Tuning** → adjust → **Apply to Wheelbase**. \
 - SHO displays On/Off only; granularity unverified beyond that. FFS Linear confirmed by symmetry (Peak verified).
 - BRF can't be validated without load-cell pedals.
 
-## Firmware updates & Windows companion
+## Firmware updates
 
 Flashing firmware needs official software. \
 FanaLinux itself never flashes — by design.
