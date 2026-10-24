@@ -68,12 +68,21 @@ class OverviewView(Adw.PreferencesPage):
         return container, img
 
     def _build_ui(self):
-        # 0. About footer: single centered line, no card chrome
+        # 0. About footer: name + version, mark right, pill only on update
         about_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         about_box.set_halign(Gtk.Align.CENTER)
         about_box.set_valign(Gtk.Align.CENTER)
         about_box.set_margin_top(12)
         about_box.set_margin_bottom(4)
+        self.about_title = Gtk.Label(label=f"FanaLinux {get_local_version()}")
+        self.about_title.add_css_class("heading")
+        about_box.append(self.about_title)
+        self.update_btn = Gtk.Button(label="Update")
+        self.update_btn.add_css_class("update-btn")
+        self.update_btn.set_valign(Gtk.Align.CENTER)
+        self.update_btn.set_visible(False)
+        self.update_btn.connect("clicked", self._on_update_clicked)
+        about_box.append(self.update_btn)
         gh_img = Gtk.Image()
         gh_img.set_pixel_size(18)
         gh_btn = Gtk.Button()
@@ -83,25 +92,9 @@ class OverviewView(Adw.PreferencesPage):
         gh_btn.set_child(gh_img)
         gh_btn.connect("clicked", self._on_github_clicked)
         about_box.append(gh_btn)
-        self.about_title = Gtk.Label(label=f"FanaLinux {get_local_version()}")
-        self.about_title.add_css_class("heading")
-        about_box.append(self.about_title)
         self._gh_img = gh_img
         self._update_gh_icon()
         Adw.StyleManager.get_default().connect("notify::dark", lambda *a: self._update_gh_icon())
-
-        sep = Gtk.Label(label="·")
-        sep.add_css_class("dim-label")
-        about_box.append(sep)
-        self.update_status = Gtk.Label(label="Checking…")
-        self.update_status.add_css_class("dim-label")
-        about_box.append(self.update_status)
-        self.update_btn = Gtk.Button(label="Update")
-        self.update_btn.add_css_class("update-btn")
-        self.update_btn.set_valign(Gtk.Align.CENTER)
-        self.update_btn.set_visible(False)
-        self.update_btn.connect("clicked", self._on_update_clicked)
-        about_box.append(self.update_btn)
         about_group = Adw.PreferencesGroup()
         about_group.add(about_box)
         self._about_group = about_group
@@ -337,12 +330,10 @@ class OverviewView(Adw.PreferencesPage):
         tag = state.get("tag")
         if tag and is_newer(local, tag):
             self._update_url = state.get("url")
-            self.update_status.set_label(f"{tag} available")
             self.update_btn.set_label(f"Update to {tag}")
             self.update_btn.set_visible(True)
         else:
             self._update_url = None
-            self.update_status.set_label("Up to date")
             self.update_btn.set_visible(False)
         return False
 
@@ -351,13 +342,6 @@ class OverviewView(Adw.PreferencesPage):
         if tag:
             save_update_state(tag, url)
             GLib.idle_add(self._refresh_update_row)
-        else:
-            GLib.idle_add(self._update_check_failed)
-
-    def _update_check_failed(self):
-        if not self.update_btn.get_visible():
-            self.update_status.set_label("Check failed")
-        return False
 
     def _on_update_clicked(self, _btn):
         if self._update_url:
