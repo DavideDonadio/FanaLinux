@@ -27,7 +27,7 @@ Fanatec and related product names are used solely to identify compatible hardwar
 ## Hardware support
 
 | Base | Status |
-|---|---|
+|---|:---:|
 | CSL DD / GT DD Pro | ![Validated](https://img.shields.io/badge/Validated-brightgreen) |
 | Podium DD1/DD2, ClubSport DD/DD+ | ![Expected](https://img.shields.io/badge/Expected-yellow) |
 | CSL Elite / ClubSport V2.5 (belt) | ![Unsupported](https://img.shields.io/badge/Unsupported-red) |
