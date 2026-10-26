@@ -5,6 +5,7 @@ Reads low-latency steering, pedal axes, and button matrix states
 from /dev/input/ event nodes.
 """
 
+import fcntl
 import glob
 import logging
 import os
@@ -33,6 +34,41 @@ ABS_Y = 0x01       # Additional Axis
 ABS_Z = 0x02       # Throttle / Accelerator
 ABS_RZ = 0x05      # Brake
 ABS_THROTTLE = 0x06 # Clutch / Aux
+
+EV_FF = 0x15
+
+FF_EFFECT_NAMES = {
+    0x50: "Rumble", 0x51: "Periodic", 0x52: "Constant", 0x53: "Spring",
+    0x54: "Friction", 0x55: "Damper", 0x56: "Inertia", 0x57: "Ramp",
+}
+
+
+def decode_ff_effects(bits: int) -> list[str]:
+    """Effect names supported by an EV_FF capability bitmask (pure)."""
+    return [name for bit, name in sorted(FF_EFFECT_NAMES.items()) if bits & (1 << bit)]
+
+
+def query_ff_effects(node: str | None) -> list[str]:
+    """FF effect names the kernel exposes on an evdev node ([] if unavailable).
+    Empty means no kernel FFB driver (e.g. hid-fanatecff) is handling the wheel."""
+    if not node:
+        return []
+    try:
+        fd = os.open(node, os.O_RDONLY | os.O_NONBLOCK)
+    except OSError:
+        return []
+    try:
+        req = (2 << 30) | (64 << 16) | (0x45 << 8) | (0x20 + EV_FF)
+        buf = bytearray(64)
+        fcntl.ioctl(fd, req, buf)
+        return decode_ff_effects(int.from_bytes(buf, "little"))
+    except OSError:
+        return []
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
 ABS_HAT0X = 0x10   # D-Pad / FunkySwitch Hat X
 ABS_HAT0Y = 0x11   # D-Pad / FunkySwitch Hat Y
 

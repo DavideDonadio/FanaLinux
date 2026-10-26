@@ -176,6 +176,15 @@ class OverviewView(Adw.PreferencesPage):
         info_group.add(make_fw_row("Wheelbase Mainboard Firmware"))
         info_group.add(make_fw_row("DirectDrive Motor Controller Firmware"))
         info_group.add(make_fw_row("Steering Wheel Rim Firmware"))
+
+        # Kernel FFB driver: force feedback needs hid-fanatecff on the system
+        self.ff_row = Adw.ActionRow()
+        self.ff_row.set_title("Kernel FFB Driver")
+        self.ff_row.set_subtitle("hid-fanatecff: out-of-tree module exposing force feedback")
+        self.ff_lbl = Gtk.Label(label="Checking…")
+        self.ff_lbl.add_css_class("val-badge")
+        self.ff_row.add_suffix(self.ff_lbl)
+        info_group.add(self.ff_row)
         self.add(info_group)
 
         # 2. Live Axes & Telemetry
@@ -368,6 +377,17 @@ class OverviewView(Adw.PreferencesPage):
 
     def _on_github_clicked(self, _btn):
         self._launch_url("https://github.com/DavideDonadio/fanalinux")
+
+    def set_ff_driver(self, effects: list):
+        """Show kernel FFB driver state from probed evdev effects."""
+        for cls in ("success", "error"):
+            self.ff_lbl.remove_css_class(cls)
+        if effects:
+            self.ff_lbl.set_text(f"Installed ({len(effects)} effects)")
+            self.ff_lbl.add_css_class("success")
+        else:
+            self.ff_lbl.set_text("Missing — no force feedback")
+            self.ff_lbl.add_css_class("error")
 
     def set_connection_status(self, is_online: bool):
         """Update hardware status badge and cards based on connection state."""

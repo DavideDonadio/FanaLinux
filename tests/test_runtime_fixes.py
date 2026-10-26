@@ -202,6 +202,7 @@ class TestEvdevWatchdog(unittest.TestCase):
                 def __init__(self):
                     self.calls = 0
                     self.running = False
+                    self.device_node = None
 
                 def is_running(self):
                     return self.running
@@ -226,6 +227,19 @@ class TestEvdevWatchdog(unittest.TestCase):
             self.assertTrue(win.evdev_listener.is_running())
         finally:
             win.detector.stop()
+
+
+class TestFfDriverProbe(unittest.TestCase):
+    def test_decode_effects(self):
+        from fanalinux.core.evdev_listener import decode_ff_effects
+        self.assertEqual(decode_ff_effects(0), [])
+        got = decode_ff_effects((1 << 0x52) | (1 << 0x55))
+        self.assertEqual(got, ["Constant", "Damper"])
+
+    def test_query_no_node(self):
+        from fanalinux.core.evdev_listener import query_ff_effects
+        self.assertEqual(query_ff_effects(None), [])
+        self.assertEqual(query_ff_effects("/dev/input/nonexistent999"), [])
 
 
 class TestUdevRule(unittest.TestCase):

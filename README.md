@@ -34,6 +34,19 @@ fanalinux
 Flow: **Tuning** → adjust → **Apply to Wheelbase**. \
 **Remember to long-press the Tuning button for the full Advanced menu** (all 14 parameters).
 
+### Force feedback prerequisite
+
+Game force feedback needs the out-of-tree kernel driver (the app only tunes and telemeters):
+
+```bash
+sudo dnf install kernel-devel gcc make joystick git dkms  # Fedora
+# sudo apt install linux-headers-generic joystick dkms    # Ubuntu
+git clone https://github.com/gotzl/hid-fanatecff && cd hid-fanatecff
+sudo ./install.sh && sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+Then unplug/replug the wheel. Overview → Hardware Status shows **Kernel FFB Driver: Installed** when it's live.
+
 ## Features
 
 | Tab | What it does |
