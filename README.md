@@ -42,9 +42,9 @@ Flow: **Tuning** → adjust → **Apply to Wheelbase**. \
 | Overview | Hardware status + firmware, live 16-bit steering/pedals/buttons, about and version |
 | Tuning | Full parameter set (SEN/FF/FFS/NDP/NFR/NIN/INT/FEI/FOR/SPR/DPR/SHO/BLI/BRF/FUL), slots 1–5, disk presets with exact numeric entry + SEN quick-chips |
 | Profiles | Per-game auto-switching via `/proc` scan (Steam/Proton/Wine), auto telemetry start, fallback preset |
-| Dynamic FFB | Speed-sensitive + reverse-safety damping overlays |
+| Dyn FFB | Speed-sensitive + reverse-safety damping overlays |
 | Vibration | ABS/engine/rev/suspension/TC/lock/spin/under-oversteer haptics with preview |
-| LED & Display | RevLEDs, flag LEDs, OLED gear/speed |
+| Display | RevLEDs, flag LEDs, OLED gear/speed |
 | Calibration | Center calibration, motor diagnostics, pedal deadzones |
 
 **Telemetry in:** AC, BeamNG OutGauge, DiRT/WRC, F1, Forza (FM7 + FH/FM23), AMS2, SCS shm. \
