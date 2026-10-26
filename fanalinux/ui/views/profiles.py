@@ -157,14 +157,12 @@ class ProfilesView(Adw.PreferencesPage):
         enable_row.add_suffix(enable_sw)
         expander.add_row(enable_row)
 
-        # Assigned Tuning Preset Dropdown
-        preset_row = Adw.ActionRow()
-        preset_row.set_title("Assigned Hardware Preset")
-        preset_row.set_subtitle("Tuning profile flashed to CSL DD when game starts")
-
-        # Unsupported games get no dropdown: locked to the default preset.
-        preset_dd = None
         if supported:
+            # Assigned Tuning Preset Dropdown
+            preset_row = Adw.ActionRow()
+            preset_row.set_title("Assigned Hardware Preset")
+            preset_row.set_subtitle("Tuning profile flashed to CSL DD when game starts")
+
             preset_dd = Gtk.DropDown.new_from_strings(presets)
             preset_dd.set_valign(Gtk.Align.CENTER)
             preset_dd.set_size_request(200, -1)
@@ -182,31 +180,28 @@ class ProfilesView(Adw.PreferencesPage):
             preset_row.add_suffix(preset_dd)
             self._preset_dropdowns.append(preset_dd)
 
-        # Apply Immediately Button
-        apply_btn = Gtk.Button(label="Apply Preset Now")
-        apply_btn.set_valign(Gtk.Align.CENTER)
+            # Apply Immediately Button
+            apply_btn = Gtk.Button(label="Apply Preset Now")
+            apply_btn.set_valign(Gtk.Align.CENTER)
 
-        def _on_apply_preset(btn, g_id=gid, dd=preset_dd, fixed=current_preset):
-            if dd is not None:
+            def _on_apply_preset(btn, g_id=gid, dd=preset_dd):
                 idx = dd.get_selected()
-                chosen = dd.get_model().get_string(idx) if idx >= 0 else fixed
-            else:
-                chosen = fixed
-            if chosen:
-                profile = load_preset(chosen)
-                if profile and self.device and self.device.connected:
-                    self.device.apply_tuning_profile(profile)
-                    if self.on_toast_requested:
-                        self.on_toast_requested(f"Applied preset '{chosen}' to wheelbase!")
-                    if self.on_preset_applied:
-                        self.on_preset_applied(chosen)
-                elif not self.device or not self.device.connected:
-                    if self.on_toast_requested:
-                        self.on_toast_requested("Device not connected!")
+                if idx >= 0:
+                    chosen = dd.get_model().get_string(idx)
+                    profile = load_preset(chosen)
+                    if profile and self.device and self.device.connected:
+                        self.device.apply_tuning_profile(profile)
+                        if self.on_toast_requested:
+                            self.on_toast_requested(f"Applied preset '{chosen}' to wheelbase!")
+                        if self.on_preset_applied:
+                            self.on_preset_applied(chosen)
+                    elif not self.device or not self.device.connected:
+                        if self.on_toast_requested:
+                            self.on_toast_requested("Device not connected!")
 
-        apply_btn.connect("clicked", _on_apply_preset)
-        preset_row.add_suffix(apply_btn)
-        expander.add_row(preset_row)
+            apply_btn.connect("clicked", _on_apply_preset)
+            preset_row.add_suffix(apply_btn)
+            expander.add_row(preset_row)
 
         # Telemetry row (if game supports telemetry)
         if game.get("has_telemetry", False):
