@@ -126,7 +126,6 @@ class ProfilesView(Adw.PreferencesPage):
             # Flat row: no expander arrow, nothing to open.
             row = Adw.ActionRow()
             row.set_title(game["name"])
-            row.set_subtitle(f"Not supported — uses '{current_preset}' when detected")
             flat_icon = self.detector.get_game_icon_path(gid)
             if flat_icon and os.path.exists(flat_icon):
                 flat_img = Gtk.Image.new_from_file(flat_icon)
