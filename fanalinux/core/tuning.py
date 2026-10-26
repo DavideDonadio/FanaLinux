@@ -59,10 +59,6 @@ class TuningProfile:
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2)
 
-    @classmethod
-    def from_json(cls, text: str) -> "TuningProfile":
-        return cls.from_dict(json.loads(text))
-
 
 # Attribute metadata for GUI generators
 TUNING_METADATA = [

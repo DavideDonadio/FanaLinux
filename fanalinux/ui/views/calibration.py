@@ -140,35 +140,12 @@ class CalibrationView(Adw.PreferencesPage):
         hw_tip_row.set_icon_name("help-about-symbolic")
         center_group.add(hw_tip_row)
 
-        # 3. Pedal Min / Max Deadzones
-        pedal_group = Adw.PreferencesGroup()
-        pedal_group.set_title("Pedal Deadzones &amp; Calibration")
-        pedal_group.set_description("Configure software deadzone thresholds for throttle, brake, and clutch")
-
-        def make_deadzone_row(title, subtitle, default_val=2):
-            row = Adw.ActionRow()
-            row.set_title(title)
-            row.set_subtitle(subtitle)
-
-            def _on_deadzone_changed(v):
-                dead_lbl.set_text(f"{int(v)}%")
-
-            # shortcut: deadzone sliders are display-only until evdev gains
-            # deadband support; preserved as-is while unifying the widget.
-            box, _adj, dead_lbl = slider_cluster(
-                0, 25, 1, default_val, unit="%", width=220, badge_width=5,
-                on_change=_on_deadzone_changed,
-            )
-            row.add_suffix(box)
-            return row
-
-        pedal_group.add(make_deadzone_row("Throttle Lower Deadzone", "Prevents micro-inputs while resting your foot on the accelerator", 2))
-        pedal_group.add(make_deadzone_row("Brake Lower Deadzone", "Initial pedal travel deadband before hydraulic/load-cell engagement", 3))
-        pedal_group.add(make_deadzone_row("Clutch Engagement Threshold", "Disengagement buffer zone for launch control", 5))
+        # Pedal deadzone controls were removed: without Fanatec pedals on hand
+        # there is no way to validate them, and display-only sliders lie.
+        # Live pedal gauges in Overview stay (they show kernel truth).
 
         # Build Single Column Calibration Layout (Full Horizontal Space)
         self.add(ffb_group)
-        self.add(pedal_group)
         self.add(center_group)
 
     def _on_spring_toggled(self, switch, state):

@@ -359,6 +359,13 @@ class OverviewView(Adw.PreferencesPage):
         if tag:
             save_update_state(tag, url)
             GLib.idle_add(self._refresh_update_row)
+        else:
+            # Offline or error: retry every 15 min until one succeeds.
+            GLib.timeout_add_seconds(900, self._retry_update_check)
+
+    def _retry_update_check(self):
+        threading.Thread(target=self._check_updates_bg, daemon=True).start()
+        return False
 
     def _launch_url(self, url):
         root = self.get_root()

@@ -87,6 +87,26 @@ class TestGameSwitchTelemetry(unittest.TestCase):
         finally:
             win.detector.stop()
 
+    def test_update_check_retries_when_offline(self):
+        """Failed startup check must schedule a retry instead of giving up."""
+        from unittest import mock
+        from gi.repository import Adw
+        Adw.init()
+        from fanalinux.ui.window import MainWindow
+        win = MainWindow()
+        try:
+            scheduled = []
+            with mock.patch("fanalinux.ui.views.overview.check_latest", return_value=(None, None)):
+                with mock.patch("fanalinux.ui.views.overview.GLib.timeout_add_seconds",
+                                 side_effect=lambda s, cb: scheduled.append((s, cb)) or 1):
+                    win.overview_view._check_updates_bg()
+                    self.assertEqual(len(scheduled), 1)
+                    self.assertEqual(scheduled[0][0], 900)
+                    with mock.patch("threading.Thread"):
+                        self.assertFalse(scheduled[0][1]())  # one-shot timer
+        finally:
+            win.detector.stop()
+
     def test_manual_telemetry_survives_new_game(self):
         """Telemetry with no game behind it must not be killed by a game detection."""
         win, calls = self._window_with_fake_mgr()

@@ -85,6 +85,11 @@ class TuningView(Adw.PreferencesPage):
         load_btn.connect("clicked", self._on_load_preset_clicked)
         load_box.append(load_btn)
 
+        del_btn = Gtk.Button(label="Delete")
+        del_btn.set_valign(Gtk.Align.CENTER)
+        del_btn.connect("clicked", self._on_delete_preset_clicked)
+        load_box.append(del_btn)
+
         load_row.add_suffix(load_box)
         slot_group.add(load_row)
 
@@ -321,6 +326,20 @@ class TuningView(Adw.PreferencesPage):
                 if self.on_toast_requested:
                     self.on_toast_requested(f"Could not load preset '{name}': invalid or corrupt JSON")
 
+    def _on_delete_preset_clicked(self, btn):
+        from fanalinux.core.presets import delete_preset
+        idx = self.preset_dropdown.get_selected()
+        model = self.preset_dropdown.get_model()
+        if not model or not 0 <= idx < model.get_n_items():
+            return
+        name = model.get_string(idx)
+        if delete_preset(name):
+            self.refresh_presets()
+            if self.on_toast_requested:
+                self.on_toast_requested(f"Deleted preset '{name}'")
+        elif self.on_toast_requested:
+            self.on_toast_requested(f"Cannot delete '{name}'")
+
     def set_active_profile(self, profile: TuningProfile):
         """Update tuning UI to reflect profile values."""
         self.profile = profile
@@ -353,6 +372,8 @@ class TuningView(Adw.PreferencesPage):
             self.refresh_presets()
             if self.on_toast_requested:
                 self.on_toast_requested(f"Saved preset '{preset_name}' to disk")
+        elif self.on_toast_requested:
+            self.on_toast_requested(f"Save failed for '{preset_name}' — see log")
             if self.on_presets_changed:
                 self.on_presets_changed()
         else:

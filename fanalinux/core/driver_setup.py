@@ -78,8 +78,14 @@ def run_install() -> tuple:
 
         if os.path.isdir(os.path.join(CACHE_DIR, ".git")):
             emit(f"Updating {CACHE_DIR}")
-            r = subprocess.run(["git", "-C", CACHE_DIR, "pull", "--ff-only"],
+            # Shallow clones cannot pull; fetch + reset works on any depth.
+            r = subprocess.run(["git", "-C", CACHE_DIR, "fetch", "--depth", "1",
+                                "origin", "master"],
                                capture_output=True, text=True, timeout=300)
+            if r.returncode == 0:
+                r = subprocess.run(["git", "-C", CACHE_DIR, "reset", "--hard",
+                                    "FETCH_HEAD"],
+                                   capture_output=True, text=True, timeout=120)
         else:
             emit(f"Cloning {REPO_URL}")
             r = subprocess.run(["git", "clone", "--depth", "1", REPO_URL, CACHE_DIR],
