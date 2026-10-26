@@ -127,8 +127,12 @@ class ProfilesView(Adw.PreferencesPage):
         if supported:
             expander.set_subtitle(f"Assigned Profile: {current_preset}")
         else:
-            expander.set_subtitle("Not yet supported")
-        
+            expander.set_subtitle(f"Assigned Profile: {current_preset}")
+            badge = Gtk.Label(label="Not supported")
+            badge.set_valign(Gtk.Align.CENTER)
+            badge.add_css_class("status-pill-unsupported")
+            expander.add_suffix(badge)
+
         icon_path = self.detector.get_game_icon_path(gid)
         if icon_path and os.path.exists(icon_path):
             img = Gtk.Image.new_from_file(icon_path)
@@ -158,33 +162,37 @@ class ProfilesView(Adw.PreferencesPage):
         preset_row.set_title("Assigned Hardware Preset")
         preset_row.set_subtitle("Tuning profile flashed to CSL DD when game starts")
 
-        preset_dd = Gtk.DropDown.new_from_strings(presets)
-        preset_dd.set_valign(Gtk.Align.CENTER)
-        preset_dd.set_size_request(200, -1)
-        self._select_dropdown_text(preset_dd, current_preset)
+        # Unsupported games get no dropdown: locked to the default preset.
+        preset_dd = None
+        if supported:
+            preset_dd = Gtk.DropDown.new_from_strings(presets)
+            preset_dd.set_valign(Gtk.Align.CENTER)
+            preset_dd.set_size_request(200, -1)
+            self._select_dropdown_text(preset_dd, current_preset)
 
-        def _on_preset_picked(dd, param, g_id=gid, exp=expander):
-            idx = dd.get_selected()
-            if idx >= 0:
-                chosen = dd.get_model().get_string(idx)
-                self.detector.game_mappings.setdefault(g_id, {})["preset"] = chosen
-                self.detector.save_config()
-                exp.set_subtitle(f"Assigned Profile: {chosen}")
+            def _on_preset_picked(dd, param, g_id=gid, exp=expander):
+                idx = dd.get_selected()
+                if idx >= 0:
+                    chosen = dd.get_model().get_string(idx)
+                    self.detector.game_mappings.setdefault(g_id, {})["preset"] = chosen
+                    self.detector.save_config()
+                    exp.set_subtitle(f"Assigned Profile: {chosen}")
 
-        preset_dd.connect("notify::selected", _on_preset_picked)
-        if not supported:
-            preset_dd.set_sensitive(False)
-        preset_row.add_suffix(preset_dd)
-        self._preset_dropdowns.append(preset_dd)
+            preset_dd.connect("notify::selected", _on_preset_picked)
+            preset_row.add_suffix(preset_dd)
+            self._preset_dropdowns.append(preset_dd)
 
         # Apply Immediately Button
         apply_btn = Gtk.Button(label="Apply Preset Now")
         apply_btn.set_valign(Gtk.Align.CENTER)
 
-        def _on_apply_preset(btn, g_id=gid, dd=preset_dd):
-            idx = dd.get_selected()
-            if idx >= 0:
-                chosen = dd.get_model().get_string(idx)
+        def _on_apply_preset(btn, g_id=gid, dd=preset_dd, fixed=current_preset):
+            if dd is not None:
+                idx = dd.get_selected()
+                chosen = dd.get_model().get_string(idx) if idx >= 0 else fixed
+            else:
+                chosen = fixed
+            if chosen:
                 profile = load_preset(chosen)
                 if profile and self.device and self.device.connected:
                     self.device.apply_tuning_profile(profile)
