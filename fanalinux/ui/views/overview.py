@@ -386,20 +386,25 @@ class OverviewView(Adw.PreferencesPage):
     def _on_github_clicked(self, _btn):
         self._launch_url("https://github.com/DavideDonadio/fanalinux")
 
-    def set_ff_driver(self, effects: list, has_wheel: bool = True):
-        """Show kernel FFB driver state from probed evdev effects."""
+    def set_ff_driver(self, effects: list, has_wheel: bool = True, module_present: bool = False):
+        """Show kernel FFB driver state: live effects if wheel present,
+        otherwise module presence (functional check needs hardware)."""
         for cls in ("success", "error"):
             self.ff_lbl.remove_css_class(cls)
-        if not has_wheel:
-            self.ff_lbl.set_text("No wheel connected")
-            self.ff_btn.set_visible(False)
-        elif effects:
+        if effects:
             self.ff_lbl.set_text(f"Installed ({len(effects)} effects)")
             self.ff_lbl.add_css_class("success")
             self.ff_btn.set_visible(False)
-        else:
+        elif has_wheel:
             self.ff_lbl.set_text("Missing — no force feedback")
             self.ff_lbl.add_css_class("error")
+            self.ff_btn.set_visible(True)
+        elif module_present:
+            self.ff_lbl.set_text("Installed — connect wheel to verify")
+            self.ff_lbl.add_css_class("success")
+            self.ff_btn.set_visible(False)
+        else:
+            self.ff_lbl.set_text("Not detected")
             self.ff_btn.set_visible(True)
 
     def _on_install_driver_clicked(self, btn):

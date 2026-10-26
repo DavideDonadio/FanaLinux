@@ -16,6 +16,7 @@ from gi.repository import Adw, Gdk, GLib, Gtk
 
 from fanalinux.core.detector import GameDetector
 from fanalinux.core.device import FanatecDevice
+from fanalinux.core import driver_setup
 from fanalinux.core.evdev_listener import EvdevListener, query_ff_effects
 from fanalinux.core.presets import load_preset
 from fanalinux.core.telemetry.manager import TelemetryManager
@@ -264,9 +265,11 @@ class MainWindow(Adw.ApplicationWindow):
         is_online = self.device.check_connection() if self.device else False
         self._hardware_online = is_online
 
-        # Kernel FFB driver state from probed evdev effects (empty = missing)
+        # Kernel FFB driver: live effects if wheel present, else module presence
         node = self.evdev_listener.device_node if self.evdev_listener else None
-        self.overview_view.set_ff_driver(query_ff_effects(node) if is_online else [], is_online)
+        self.overview_view.set_ff_driver(
+            query_ff_effects(node) if is_online else [],
+            is_online, driver_setup.driver_module_present())
 
         if was_online != is_online:
             self.overview_view.set_connection_status(is_online)

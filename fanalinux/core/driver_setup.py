@@ -39,6 +39,17 @@ def dep_install_hint() -> str:
     return "install: git, make, gcc, dkms and your kernel headers"
 
 
+def driver_module_present() -> bool:
+    """True when hid-fanatec is installed (works without the wheel connected)."""
+    if os.path.isdir("/sys/module/hid_fanatec"):
+        return True
+    try:
+        r = subprocess.run(["modinfo", "hid-fanatec"], capture_output=True, timeout=10)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
 def secure_boot_on() -> bool:
     try:
         out = subprocess.run(["mokutil", "--sb-state"], capture_output=True,

@@ -246,6 +246,7 @@ class TestFfDriverProbe(unittest.TestCase):
         self.assertTrue(driver_setup.REPO_URL.endswith("hid-fanatecff"))
         self.assertIsInstance(driver_setup.missing_deps(), list)
         self.assertIn("install", driver_setup.dep_install_hint().lower())
+        self.assertIsInstance(driver_setup.driver_module_present(), bool)
 
 
 class TestUdevRule(unittest.TestCase):
