@@ -414,7 +414,8 @@ class OverviewView(Adw.PreferencesPage):
                        "but not load until you sign it or disable Secure Boot.")
         else:
             sb_note = ""
-        dlg = Adw.MessageDialog.new(self, "Install Kernel FFB Driver?",
+        # Parent must be the toplevel window, not this page.
+        dlg = Adw.MessageDialog.new(self.get_root(), "Install Kernel FFB Driver?",
             "Clones gotzl/hid-fanatecff, builds it and installs the kernel module "
             f"via DKMS (needs administrator rights), then reloads udev rules.{sb_note}"
             "\n\nUnplug/replug the wheel afterwards.")
