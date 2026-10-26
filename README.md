@@ -45,7 +45,8 @@ git clone https://github.com/gotzl/hid-fanatecff && cd hid-fanatecff
 sudo ./install.sh && sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
-Then unplug/replug the wheel. Overview → Hardware Status shows **Kernel FFB Driver: Installed** when it's live.
+Then unplug/replug the wheel. Overview → Hardware Status shows **Kernel FFB Driver: Installed** when it's live.\
+If it reports Missing, the **Install Driver** button right there runs the same steps inside the app (one admin prompt).
 
 ## Features
 

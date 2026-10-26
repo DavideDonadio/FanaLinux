@@ -181,9 +181,17 @@ class OverviewView(Adw.PreferencesPage):
         self.ff_row = Adw.ActionRow()
         self.ff_row.set_title("Kernel FFB Driver")
         self.ff_row.set_subtitle("hid-fanatecff: out-of-tree module exposing force feedback")
+        ff_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        ff_box.set_valign(Gtk.Align.CENTER)
         self.ff_lbl = Gtk.Label(label="Checking…")
         self.ff_lbl.add_css_class("val-badge")
-        self.ff_row.add_suffix(self.ff_lbl)
+        ff_box.append(self.ff_lbl)
+        self.ff_btn = Gtk.Button(label="Install Driver")
+        self.ff_btn.set_valign(Gtk.Align.CENTER)
+        self.ff_btn.set_visible(False)
+        self.ff_btn.connect("clicked", self._on_install_driver_clicked)
+        ff_box.append(self.ff_btn)
+        self.ff_row.add_suffix(ff_box)
         info_group.add(self.ff_row)
         self.add(info_group)
 
@@ -378,16 +386,66 @@ class OverviewView(Adw.PreferencesPage):
     def _on_github_clicked(self, _btn):
         self._launch_url("https://github.com/DavideDonadio/fanalinux")
 
-    def set_ff_driver(self, effects: list):
+    def set_ff_driver(self, effects: list, has_wheel: bool = True):
         """Show kernel FFB driver state from probed evdev effects."""
         for cls in ("success", "error"):
             self.ff_lbl.remove_css_class(cls)
-        if effects:
+        if not has_wheel:
+            self.ff_lbl.set_text("No wheel connected")
+            self.ff_btn.set_visible(False)
+        elif effects:
             self.ff_lbl.set_text(f"Installed ({len(effects)} effects)")
             self.ff_lbl.add_css_class("success")
+            self.ff_btn.set_visible(False)
         else:
             self.ff_lbl.set_text("Missing — no force feedback")
             self.ff_lbl.add_css_class("error")
+            self.ff_btn.set_visible(True)
+
+    def _on_install_driver_clicked(self, btn):
+        from fanalinux.core import driver_setup
+        if driver_setup.secure_boot_on():
+            sb_note = ("\n\nSecure Boot is enabled: the module will install "
+                       "but not load until you sign it or disable Secure Boot.")
+        else:
+            sb_note = ""
+        dlg = Adw.MessageDialog.new(self, "Install Kernel FFB Driver?",
+            "Clones gotzl/hid-fanatecff, builds it and installs the kernel module "
+            f"via DKMS (needs administrator rights), then reloads udev rules.{sb_note}"
+            "\n\nUnplug/replug the wheel afterwards.")
+        dlg.add_response("cancel", "Cancel")
+        dlg.add_response("install", "Install")
+        dlg.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("cancel")
+        dlg.set_close_response("cancel")
+        dlg.connect("response", self._on_install_driver_response)
+        dlg.present()
+
+    def _on_install_driver_response(self, dlg, response):
+        if response != "install":
+            return
+        self.ff_btn.set_sensitive(False)
+        self.ff_lbl.set_text("Installing…")
+        threading.Thread(target=self._install_driver_worker, daemon=True).start()
+
+    def _install_driver_worker(self):
+        from fanalinux.core import driver_setup
+        missing = driver_setup.missing_deps()
+        if missing:
+            GLib.idle_add(self._finish_driver_install, False,
+                          "Missing build tools. Run:\n" + driver_setup.dep_install_hint())
+            return
+        ok, tail = driver_setup.run_install()
+        GLib.idle_add(self._finish_driver_install, ok, tail)
+
+    def _finish_driver_install(self, ok, tail):
+        self.ff_btn.set_sensitive(True)
+        if ok:
+            if self.on_toast_requested:
+                self.on_toast_requested("FFB driver installed — unplug/replug the wheel")
+        elif self.on_toast_requested:
+            last = tail.splitlines()[-1] if tail else "unknown error"
+            self.on_toast_requested(f"Driver install failed: {last}")
 
     def set_connection_status(self, is_online: bool):
         """Update hardware status badge and cards based on connection state."""

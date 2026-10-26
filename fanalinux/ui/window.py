@@ -266,7 +266,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Kernel FFB driver state from probed evdev effects (empty = missing)
         node = self.evdev_listener.device_node if self.evdev_listener else None
-        self.overview_view.set_ff_driver(query_ff_effects(node) if is_online else [])
+        self.overview_view.set_ff_driver(query_ff_effects(node) if is_online else [], is_online)
 
         if was_online != is_online:
             self.overview_view.set_connection_status(is_online)

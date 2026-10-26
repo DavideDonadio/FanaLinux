@@ -241,6 +241,12 @@ class TestFfDriverProbe(unittest.TestCase):
         self.assertEqual(query_ff_effects(None), [])
         self.assertEqual(query_ff_effects("/dev/input/nonexistent999"), [])
 
+    def test_driver_setup_helpers(self):
+        from fanalinux.core import driver_setup
+        self.assertTrue(driver_setup.REPO_URL.endswith("hid-fanatecff"))
+        self.assertIsInstance(driver_setup.missing_deps(), list)
+        self.assertIn("install", driver_setup.dep_install_hint().lower())
+
 
 class TestUdevRule(unittest.TestCase):
     def test_no_world_writable_mode(self):
