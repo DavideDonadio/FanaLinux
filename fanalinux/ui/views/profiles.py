@@ -122,16 +122,41 @@ class ProfilesView(Adw.PreferencesPage):
         is_enabled = mapping.get("enabled", True)
         auto_telem = mapping.get("auto_telemetry", game.get("has_telemetry", False))
 
-        expander = Adw.ExpanderRow()
-        expander.set_title(game["name"])
-        if supported:
-            expander.set_subtitle(f"Assigned Profile: {current_preset}")
-        else:
-            expander.set_subtitle(f"Assigned Profile: {current_preset}")
+        if not supported:
+            # Flat row: no expander arrow, nothing to open.
+            row = Adw.ActionRow()
+            row.set_title(game["name"])
+            row.set_subtitle(f"Not supported — uses '{current_preset}' when detected")
+            flat_icon = self.detector.get_game_icon_path(gid)
+            if flat_icon and os.path.exists(flat_icon):
+                flat_img = Gtk.Image.new_from_file(flat_icon)
+                flat_img.set_pixel_size(32)
+                row.add_prefix(flat_img)
+            else:
+                row.set_icon_name("input-gaming-symbolic")
+            suffix_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            suffix_box.set_valign(Gtk.Align.CENTER)
             badge = Gtk.Label(label="Not supported")
             badge.set_valign(Gtk.Align.CENTER)
             badge.add_css_class("status-pill-unsupported")
-            expander.add_suffix(badge)
+            suffix_box.append(badge)
+            enable_sw = Gtk.Switch()
+            enable_sw.set_active(is_enabled)
+            enable_sw.set_valign(Gtk.Align.CENTER)
+            enable_sw.set_tooltip_text("Detect process launch and load assigned preset")
+
+            def _on_flat_enable(sw, state, g_id=gid):
+                self.detector.game_mappings.setdefault(g_id, {})["enabled"] = sw.get_active()
+                self.detector.save_config()
+
+            enable_sw.connect("state-set", _on_flat_enable)
+            suffix_box.append(enable_sw)
+            row.add_suffix(suffix_box)
+            return row
+
+        expander = Adw.ExpanderRow()
+        expander.set_title(game["name"])
+        expander.set_subtitle(f"Assigned Profile: {current_preset}")
 
         icon_path = self.detector.get_game_icon_path(gid)
         if icon_path and os.path.exists(icon_path):
