@@ -134,24 +134,10 @@ class ProfilesView(Adw.PreferencesPage):
                 row.add_prefix(flat_img)
             else:
                 row.set_icon_name("input-gaming-symbolic")
-            suffix_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            suffix_box.set_valign(Gtk.Align.CENTER)
             badge = Gtk.Label(label="Not supported")
             badge.set_valign(Gtk.Align.CENTER)
             badge.add_css_class("status-pill-unsupported")
-            suffix_box.append(badge)
-            enable_sw = Gtk.Switch()
-            enable_sw.set_active(is_enabled)
-            enable_sw.set_valign(Gtk.Align.CENTER)
-            enable_sw.set_tooltip_text("Detect process launch and load assigned preset")
-
-            def _on_flat_enable(sw, state, g_id=gid):
-                self.detector.game_mappings.setdefault(g_id, {})["enabled"] = sw.get_active()
-                self.detector.save_config()
-
-            enable_sw.connect("state-set", _on_flat_enable)
-            suffix_box.append(enable_sw)
-            row.add_suffix(suffix_box)
+            row.add_suffix(badge)
             return row
 
         expander = Adw.ExpanderRow()
