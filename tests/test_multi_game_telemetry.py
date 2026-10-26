@@ -13,7 +13,6 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from fanalinux.core.detector import GameDetector
-from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
 from fanalinux.core.telemetry.ams2 import AMS2Telemetry
 from fanalinux.core.telemetry.beamng import BeamNGTelemetry
 from fanalinux.core.telemetry.dirt import DirtRallyTelemetry
@@ -227,10 +226,26 @@ class TestMultiGameTelemetry(unittest.TestCase):
         for c in mgr._clients.values():
             self.assertFalse(c._running)
 
-    def test_assetto_corsa_inherits_base(self):
-        client = AssettoCorsaTelemetry()
-        self.assertTrue(hasattr(client, "is_running"))
-        self.assertTrue(hasattr(client, "_dispatch_telemetry"))
+    def test_assetto_corsa_dispatch(self):
+        from fanalinux.core.telemetry.ac import parse_ac_packet
+        pkt = bytearray(328)
+        pkt[0] = ord('a')
+        struct.pack_into("<f", pkt, 8, 55.5556)   # speed
+        pkt[21] = 1                                # ABS on
+        pkt[22] = 0                                # TC off
+        struct.pack_into("<f", pkt, 68, 7200.0)   # rpm
+        struct.pack_into("<i", pkt, 76, 4)        # raw gear 4 -> 3rd
+        struct.pack_into("<f", pkt, 24, 0.12)     # steer angle
+        parsed = parse_ac_packet(bytes(pkt))
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["rpm"], 7200)
+        self.assertEqual(parsed["gear"], 3)
+        self.assertAlmostEqual(parsed["speed_kmh"], 55.5556, places=3)
+        self.assertTrue(parsed["abs_active"])
+        self.assertFalse(parsed["tc_active"])
+        self.assertAlmostEqual(parsed["steer_angle"], 0.12, places=4)
+        self.assertIsNone(parse_ac_packet(b"junk"))
+        self.assertIsNone(parse_ac_packet(bytes(100)))
 
     def test_forza_telemetry_dispatch(self):
         received = []

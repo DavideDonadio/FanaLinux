@@ -16,6 +16,28 @@ from fanalinux.core.telemetry.base import BaseTelemetryClient
 logger = logging.getLogger("fanalinux.telemetry.ac")
 
 
+def parse_ac_packet(data: bytes) -> dict | None:
+    """Parse an Assetto Corsa RTCarUpdate packet (328-388 bytes, starts with 'a').
+    Returns the telemetry fields or None for anything else. Pure: no I/O."""
+    if not data or not (320 <= len(data) <= 400 and data[0] == ord('a')):
+        return None
+    try:
+        return {
+            "speed_kmh": float(struct.unpack("<f", data[8:12])[0]),
+            "abs_active": bool(data[21]),
+            "tc_active": bool(data[22]),
+            "rpm": int(struct.unpack("<f", data[68:72])[0]),
+            # Gear: 0 = R, 1 = N, 2 = 1st, 3 = 2nd...
+            "gear": int.from_bytes(data[76:80], byteorder="little") - 1,
+            "steer_angle": float(struct.unpack_from("<f", data, 24)[0]),
+            "wheel_slip": tuple(struct.unpack_from("<4f", data, 56)),
+            "wheel_speed": tuple(struct.unpack_from("<4f", data, 104)),
+            "suspension": tuple(struct.unpack_from("<4f", data, 184)),
+        }
+    except Exception:
+        return None
+
+
 class AssettoCorsaTelemetry(BaseTelemetryClient):
     UDP_IP = "127.0.0.1"
     UDP_PORT = 9996
@@ -96,35 +118,15 @@ class AssettoCorsaTelemetry(BaseTelemetryClient):
 
                     timeout_count = 0
                     data = self._sock.recv(2048)
-                    # Assetto Corsa RTCarUpdate packets are strictly 328 to 388 bytes and start with identifier 'a' (97)
-                    if 320 <= len(data) <= 400 and data[0] == ord('a'):
-                        speed_kmh = float(struct.unpack("<f", data[8:12])[0])
-                        abs_active = bool(data[21])
-                        tc_active = bool(data[22])
-                        rpm = int(struct.unpack("<f", data[68:72])[0])
-                        raw_gear = int.from_bytes(data[76:80], byteorder="little")
-                        # Gear: 0 = R, 1 = N, 2 = 1st, 3 = 2nd...
-                        gear = raw_gear - 1
-
-                        wheel_slip = (0.0, 0.0, 0.0, 0.0)
-                        wheel_speed = (0.0, 0.0, 0.0, 0.0)
-                        suspension = (0.0, 0.0, 0.0, 0.0)
-                        steer_angle = 0.0
-
-                        try:
-                            steer_angle = float(struct.unpack_from("<f", data, 24)[0])
-                            wheel_slip = struct.unpack_from("<4f", data, 56)
-                            wheel_speed = struct.unpack_from("<4f", data, 104)
-                            suspension = struct.unpack_from("<4f", data, 184)
-                        except Exception:
-                            pass
-
+                    parsed = parse_ac_packet(data)
+                    if parsed is not None:
                         self._dispatch_telemetry(
-                            rpm, gear, speed_kmh, abs_active, tc_active,
-                            wheel_slip=wheel_slip,
-                            wheel_speed=wheel_speed,
-                            suspension=suspension,
-                            steer_angle=steer_angle
+                            parsed["rpm"], parsed["gear"], parsed["speed_kmh"],
+                            parsed["abs_active"], parsed["tc_active"],
+                            wheel_slip=parsed["wheel_slip"],
+                            wheel_speed=parsed["wheel_speed"],
+                            suspension=parsed["suspension"],
+                            steer_angle=parsed["steer_angle"]
                         )
 
             except Exception as e:
