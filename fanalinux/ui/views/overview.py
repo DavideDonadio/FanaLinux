@@ -468,11 +468,11 @@ class OverviewView(Adw.PreferencesPage):
         else:
             self.status_dot.remove_css_class("status-dot-online")
             self.status_dot.add_css_class("status-dot-offline")
-            self.conn_badge.set_text("Offline")
+            self.conn_badge.set_text("Disconnected")
             self.conn_badge.remove_css_class("success")
             self.conn_badge.add_css_class("error")
             base_info = get_base_info(self.device.product_id if self.device else 0x0020)
-            self.status_row.set_title(f"{base_info['name']} (Disconnected)")
+            self.status_row.set_title(base_info["name"])
             self.status_row.set_subtitle("Hardware disconnected — connect USB or power on wheelbase")
             self.rim_row.set_subtitle("No steering wheel rim detected")
             # Reset live input gauges
