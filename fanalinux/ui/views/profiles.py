@@ -95,7 +95,7 @@ class ProfilesView(Adw.PreferencesPage):
 
         # 2. Simulator Profiles Catalog
         self.games_group = Adw.PreferencesGroup()
-        self.games_group.set_title("Supported Simulators &amp; Game Profiles")
+        self.games_group.set_title("Simulators &amp; Game Profiles")
         self.games_group.set_description(
             "Associate each racing game with a specific tuning preset and choose whether in-game telemetry launches automatically."
         )
@@ -110,21 +110,10 @@ class ProfilesView(Adw.PreferencesPage):
         def _is_supported(game):
             return bool(game.get("has_telemetry") and game.get("telemetry_type"))
 
-        for game in all_games:
-            if not _is_supported(game):
-                continue
-            self.games_group.add(self._make_game_row(game, presets, supported=True))
-
-        unsupported = [g for g in all_games if not _is_supported(g)]
-        if unsupported:
-            unsupported_group = Adw.PreferencesGroup()
-            unsupported_group.set_title("Not Yet Supported")
-            unsupported_group.set_description(
-                "Detection only — telemetry integration is pending, preset assignment is locked."
-            )
-            for game in unsupported:
-                unsupported_group.add(self._make_game_row(game, presets, supported=False))
-            self.add(unsupported_group)
+        # Supported games first, unwired ones last in the same list.
+        ordered = sorted(all_games, key=lambda g: not _is_supported(g))
+        for game in ordered:
+            self.games_group.add(self._make_game_row(game, presets, supported=_is_supported(game)))
 
     def _make_game_row(self, game, presets, supported: bool = True):
         gid = game["id"]
@@ -138,11 +127,7 @@ class ProfilesView(Adw.PreferencesPage):
         if supported:
             expander.set_subtitle(f"Assigned Profile: {current_preset}")
         else:
-            expander.set_subtitle("Currently not supported — detection only")
-            badge = Gtk.Label(label="Not supported")
-            badge.set_valign(Gtk.Align.CENTER)
-            badge.add_css_class("status-pill-unsupported")
-            expander.add_suffix(badge)
+            expander.set_subtitle("Not yet supported")
         
         icon_path = self.detector.get_game_icon_path(gid)
         if icon_path and os.path.exists(icon_path):
