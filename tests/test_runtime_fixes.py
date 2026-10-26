@@ -261,6 +261,26 @@ class TestFfDriverProbe(unittest.TestCase):
         self.assertEqual(query_ff_effects(None), [])
         self.assertEqual(query_ff_effects("/dev/input/nonexistent999"), [])
 
+    def test_match_game_process_ignores_wrappers(self):
+        from fanalinux.core.detector import match_game_process
+        # Real game: Windows-path argv[0] or comm
+        self.assertTrue(match_game_process("", ["Z:\\mnt\\games\\assettocorsa\\acs.exe"], "acs.exe"))
+        self.assertTrue(match_game_process("acs.exe", [], "acs.exe"))
+        # Wrappers carry the game path in later args: must not match
+        self.assertFalse(match_game_process("", ["/home/dd/.steam/root/ubuntu12_32/reaper",
+            "SteamLaunch", "AppId=244210", "--", "/mnt/games/assettocorsa/AssettoCorsa.exe"],
+            "assettocorsa.exe"))
+        self.assertFalse(match_game_process("", ["/usr/bin/bwrap", "--args", "26", "/path/acs.exe"], "acs.exe"))
+        self.assertFalse(match_game_process("", [], "acs.exe"))
+
+    def test_detection_keys_on_race_not_launcher(self):
+        # Launchers (CM, BeamNG UI) outlive the race: detecting them makes a
+        # dead race look still active (frozen OLED, no stopped event).
+        from fanalinux.core.detector import BUILTIN_GAMES
+        by_id = {g["id"]: g for g in BUILTIN_GAMES}
+        self.assertNotIn("assettocorsa.exe", by_id["assetto_corsa"]["executables"])
+        self.assertNotIn("beamng.drive.ui.x64.exe", by_id["beamng"]["executables"])
+
 
 class TestUdevRule(unittest.TestCase):
     def test_no_world_writable_mode(self):

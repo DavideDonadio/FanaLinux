@@ -14,6 +14,22 @@ from typing import Any
 
 logger = logging.getLogger("fanalinux.detector")
 
+
+def match_game_process(comm: str, argv: list[str], target_exe: str) -> bool:
+    """True when a process looks like the game itself, not a launcher wrapper.
+    Wrappers (steam reaper, pressure-vessel, proton) carry the game path in
+    their arguments, so only argv[0] — the executed binary — may match.
+    The comm check covers native binaries (15-char kernel limit)."""
+    target_short = target_exe[:15]  # comm is limited to 15 chars in Linux
+    if comm and (comm == target_exe or comm == target_short):
+        return True
+    if argv:
+        # Clean both Windows & POSIX slashes to get exact filename
+        first = argv[0].replace("\\", "/").split("/")[-1].lower()
+        if first == target_exe or first == target_short:
+            return True
+    return False
+
 CONFIG_PATH = Path.home() / ".config" / "fanalinux" / "game_profiles.json"
 OLD_CONFIG_PATH = Path.home() / ".config" / "open-fanactrl" / "game_profiles.json"
 
@@ -21,7 +37,9 @@ BUILTIN_GAMES: list[dict[str, Any]] = [
     {
         "id": "assetto_corsa",
         "name": "Assetto Corsa",
-        "executables": ["acs.exe", "assettocorsa.exe"],
+        # NOTE: AssettoCorsa.exe is the Content Manager launcher, which outlives
+        # the race. Detect only the race sim or a dead race looks still active.
+        "executables": ["acs.exe"],
         "default_preset": "Assetto Corsa - GT3",
         "has_telemetry": True,
         "telemetry_type": "ac_udp",
@@ -105,7 +123,8 @@ BUILTIN_GAMES: list[dict[str, Any]] = [
     {
         "id": "beamng",
         "name": "BeamNG.drive",
-        "executables": ["beamng.drive.x64.exe", "beamng.drive.ui.x64.exe"],
+        # NOTE: the .ui process is the launcher overlay, detect only the game.
+        "executables": ["beamng.drive.x64.exe"],
         "default_preset": "Default",
         "has_telemetry": True,
         "telemetry_type": "beamng_outgauge",
@@ -393,23 +412,7 @@ class GameDetector:
             parts = [p for p in cmd_str.split("\x00") if p]
 
             for target_exe, games in exe_map.items():
-                target_short = target_exe[:15]  # comm is limited to 15 chars in Linux
-                matched = False
-
-                # 1. Match comm
-                if comm_str and (comm_str == target_exe or comm_str == target_short):
-                    matched = True
-
-                # 2. Match cmdline args by token basename
-                if not matched and parts:
-                    for part in parts:
-                        # Clean both Windows & POSIX slashes to get exact filename
-                        fname = part.replace("\\", "/").split("/")[-1].lower()
-                        if fname == target_exe or fname == target_short:
-                            matched = True
-                            break
-
-                if matched:
+                if match_game_process(comm_str, parts, target_exe):
                     # Return first matching enabled game
                     return {
                         "game": games[0],
