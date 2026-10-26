@@ -1,6 +1,6 @@
 """
 Circular Steering Wheel Center Calibration Dial Widget.
-Features high-resolution Formula V2.5 rim rendering with real-time rotation
+Features high-resolution Formula-style rim rendering with real-time rotation
 and an interactive calibration animation.
 """
 

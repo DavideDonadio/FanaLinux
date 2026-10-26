@@ -437,7 +437,7 @@ class CalibrationView(Adw.PreferencesPage):
         # 2. Immediately snap visual dial to 0.0
         GLib.idle_add(self.wheel_dial.set_angle, 0.0)
 
-        # 3. Physical visual confirmation on Formula V2.5 rim
+        # 3. Physical visual confirmation on the wheel rim LEDs
         if self.device and self.device.connected:
             def _feedback():
                 try:

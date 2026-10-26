@@ -62,7 +62,7 @@ class LedsView(Adw.PreferencesPage):
 
         redline_row = Adw.ActionRow()
         redline_row.set_title("Shift Point / Redline RPM")
-        redline_row.set_subtitle("Type exact RPM limit or click +/- (Formula 4: ~6,300 RPM)")
+        redline_row.set_subtitle("Auto-learns from telemetry; typing a value overrides auto")
 
         redline_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         redline_box.set_valign(Gtk.Align.CENTER)
@@ -78,10 +78,17 @@ class LedsView(Adw.PreferencesPage):
             val = int(spin.get_value())
             self.telemetry_mgr.max_rpm = val
             self.telemetry_mgr.auto_detect_rpm = False
+            self.redline_auto_btn.set_active(False)
 
         self.redline_spin.connect("value-changed", _on_redline_changed)
 
+        self.redline_auto_btn = Gtk.ToggleButton(label="Auto")
+        self.redline_auto_btn.set_valign(Gtk.Align.CENTER)
+        self.redline_auto_btn.set_active(True)
+        self.redline_auto_btn.set_tooltip_text("Re-enable automatic redline learning")
+        self.redline_auto_btn.connect("toggled", self._on_redline_auto_toggled)
         redline_box.append(self.redline_spin)
+        redline_box.append(self.redline_auto_btn)
         redline_row.add_suffix(redline_box)
         telem_group.add(redline_row)
 
@@ -103,7 +110,7 @@ class LedsView(Adw.PreferencesPage):
         # 2. 1-inch OLED Display Manual Controls
         oled_group = Adw.PreferencesGroup()
         oled_group.set_title("OLED Rim Display (Manual Override)")
-        oled_group.set_description("Write custom strings directly to the Formula V2.5 center display")
+        oled_group.set_description("Write custom strings directly to the wheel's center OLED display")
 
         disp_row = Adw.ActionRow()
         disp_row.set_title("Display String")
@@ -209,6 +216,11 @@ class LedsView(Adw.PreferencesPage):
     def set_telemetry_active(self, active: bool):
         """Telemetry engine state is managed autonomously by Auto-Profile."""
 
+    def _on_redline_auto_toggled(self, btn):
+        if btn.get_active():
+            self.telemetry_mgr.auto_detect_rpm = True
+            self.telemetry_mgr.peak_rpm_seen = 0
+
     def _on_mode_changed(self, dropdown, param):
         idx = dropdown.get_selected()
         self.telemetry_mgr.display_mode = "gear" if idx == 0 else "speed"
@@ -289,7 +301,7 @@ class LedsView(Adw.PreferencesPage):
         if self.device and self.device.connected:
             self.device.set_display_text(text)
             if self.on_toast_requested:
-                self.on_toast_requested(f"Sent '{text}' to Formula V2.5 OLED display")
+                self.on_toast_requested(f"Sent '{text}' to wheel OLED display")
 
     def _on_clear_display(self, btn):
         if self.device and self.device.connected:
