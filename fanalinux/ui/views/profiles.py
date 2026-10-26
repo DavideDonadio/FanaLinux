@@ -107,107 +107,135 @@ class ProfilesView(Adw.PreferencesPage):
         presets = list_presets()
         all_games = self.detector.get_all_games()
 
+        def _is_supported(game):
+            return bool(game.get("has_telemetry") and game.get("telemetry_type"))
+
         for game in all_games:
-            gid = game["id"]
-            mapping = self.detector.game_mappings.get(gid, {})
-            current_preset = mapping.get("preset") or game.get("default_preset", "Default")
-            is_enabled = mapping.get("enabled", True)
-            auto_telem = mapping.get("auto_telemetry", game.get("has_telemetry", False))
+            if not _is_supported(game):
+                continue
+            self.games_group.add(self._make_game_row(game, presets, supported=True))
 
-            expander = Adw.ExpanderRow()
-            expander.set_title(game["name"])
+        unsupported = [g for g in all_games if not _is_supported(g)]
+        if unsupported:
+            unsupported_group = Adw.PreferencesGroup()
+            unsupported_group.set_title("Not Yet Supported")
+            unsupported_group.set_description(
+                "Detection only — telemetry integration is pending, preset assignment is locked."
+            )
+            for game in unsupported:
+                unsupported_group.add(self._make_game_row(game, presets, supported=False))
+            self.add(unsupported_group)
+
+    def _make_game_row(self, game, presets, supported: bool = True):
+        gid = game["id"]
+        mapping = self.detector.game_mappings.get(gid, {})
+        current_preset = mapping.get("preset") or game.get("default_preset", "Default")
+        is_enabled = mapping.get("enabled", True)
+        auto_telem = mapping.get("auto_telemetry", game.get("has_telemetry", False))
+
+        expander = Adw.ExpanderRow()
+        expander.set_title(game["name"])
+        if supported:
             expander.set_subtitle(f"Assigned Profile: {current_preset}")
-            
-            icon_path = self.detector.get_game_icon_path(gid)
-            if icon_path and os.path.exists(icon_path):
-                img = Gtk.Image.new_from_file(icon_path)
-                img.set_pixel_size(32)
-                expander.add_prefix(img)
-            else:
-                expander.set_icon_name("input-gaming-symbolic")
+        else:
+            expander.set_subtitle("Currently not supported — detection only")
+            badge = Gtk.Label(label="Not supported")
+            badge.set_valign(Gtk.Align.CENTER)
+            badge.add_css_class("status-pill-unsupported")
+            expander.add_suffix(badge)
+        
+        icon_path = self.detector.get_game_icon_path(gid)
+        if icon_path and os.path.exists(icon_path):
+            img = Gtk.Image.new_from_file(icon_path)
+            img.set_pixel_size(32)
+            expander.add_prefix(img)
+        else:
+            expander.set_icon_name("input-gaming-symbolic")
 
-            # Enable Toggle for this game
-            enable_row = Adw.ActionRow()
-            enable_row.set_title("Auto-Switch for this Game")
-            enable_row.set_subtitle("Detect process launch and automatically load assigned preset")
-            enable_sw = Gtk.Switch()
-            enable_sw.set_active(is_enabled)
-            enable_sw.set_valign(Gtk.Align.CENTER)
+        # Enable Toggle for this game
+        enable_row = Adw.ActionRow()
+        enable_row.set_title("Auto-Switch for this Game")
+        enable_row.set_subtitle("Detect process launch and automatically load assigned preset")
+        enable_sw = Gtk.Switch()
+        enable_sw.set_active(is_enabled)
+        enable_sw.set_valign(Gtk.Align.CENTER)
 
-            def _on_game_enable(sw, state, g_id=gid):
-                self.detector.game_mappings.setdefault(g_id, {})["enabled"] = sw.get_active()
+        def _on_game_enable(sw, state, g_id=gid):
+            self.detector.game_mappings.setdefault(g_id, {})["enabled"] = sw.get_active()
+            self.detector.save_config()
+
+        enable_sw.connect("state-set", _on_game_enable)
+        enable_row.add_suffix(enable_sw)
+        expander.add_row(enable_row)
+
+        # Assigned Tuning Preset Dropdown
+        preset_row = Adw.ActionRow()
+        preset_row.set_title("Assigned Hardware Preset")
+        preset_row.set_subtitle("Tuning profile flashed to CSL DD when game starts")
+
+        preset_dd = Gtk.DropDown.new_from_strings(presets)
+        preset_dd.set_valign(Gtk.Align.CENTER)
+        preset_dd.set_size_request(200, -1)
+        self._select_dropdown_text(preset_dd, current_preset)
+
+        def _on_preset_picked(dd, param, g_id=gid, exp=expander):
+            idx = dd.get_selected()
+            if idx >= 0:
+                chosen = dd.get_model().get_string(idx)
+                self.detector.game_mappings.setdefault(g_id, {})["preset"] = chosen
+                self.detector.save_config()
+                exp.set_subtitle(f"Assigned Profile: {chosen}")
+
+        preset_dd.connect("notify::selected", _on_preset_picked)
+        if not supported:
+            preset_dd.set_sensitive(False)
+        preset_row.add_suffix(preset_dd)
+        self._preset_dropdowns.append(preset_dd)
+
+        # Apply Immediately Button
+        apply_btn = Gtk.Button(label="Apply Preset Now")
+        apply_btn.set_valign(Gtk.Align.CENTER)
+
+        def _on_apply_preset(btn, g_id=gid, dd=preset_dd):
+            idx = dd.get_selected()
+            if idx >= 0:
+                chosen = dd.get_model().get_string(idx)
+                profile = load_preset(chosen)
+                if profile and self.device and self.device.connected:
+                    self.device.apply_tuning_profile(profile)
+                    if self.on_toast_requested:
+                        self.on_toast_requested(f"Applied preset '{chosen}' to wheelbase!")
+                    if self.on_preset_applied:
+                        self.on_preset_applied(chosen)
+                elif not self.device or not self.device.connected:
+                    if self.on_toast_requested:
+                        self.on_toast_requested("Device not connected!")
+
+        apply_btn.connect("clicked", _on_apply_preset)
+        preset_row.add_suffix(apply_btn)
+        expander.add_row(preset_row)
+
+        # Telemetry row (if game supports telemetry)
+        if game.get("has_telemetry", False):
+            telem_row = Adw.ActionRow()
+            telem_row.set_title("Auto-Start In-Game Telemetry")
+            telem_row.set_subtitle("Automatically start RevLED and display telemetry listener")
+
+            telem_sw = Gtk.Switch()
+            telem_sw.set_active(auto_telem)
+            telem_sw.set_valign(Gtk.Align.CENTER)
+
+            def _on_telem_toggle(sw, state, g_id=gid):
+                entry = self.detector.game_mappings.setdefault(g_id, {})
+                entry["auto_telemetry"] = sw.get_active()
+                entry["auto_telemetry_explicit"] = True
                 self.detector.save_config()
 
-            enable_sw.connect("state-set", _on_game_enable)
-            enable_row.add_suffix(enable_sw)
-            expander.add_row(enable_row)
+            telem_sw.connect("state-set", _on_telem_toggle)
+            telem_row.add_suffix(telem_sw)
+            expander.add_row(telem_row)
 
-            # Assigned Tuning Preset Dropdown
-            preset_row = Adw.ActionRow()
-            preset_row.set_title("Assigned Hardware Preset")
-            preset_row.set_subtitle("Tuning profile flashed to CSL DD when game starts")
-
-            preset_dd = Gtk.DropDown.new_from_strings(presets)
-            preset_dd.set_valign(Gtk.Align.CENTER)
-            preset_dd.set_size_request(200, -1)
-            self._select_dropdown_text(preset_dd, current_preset)
-
-            def _on_preset_picked(dd, param, g_id=gid, exp=expander):
-                idx = dd.get_selected()
-                if idx >= 0:
-                    chosen = dd.get_model().get_string(idx)
-                    self.detector.game_mappings.setdefault(g_id, {})["preset"] = chosen
-                    self.detector.save_config()
-                    exp.set_subtitle(f"Assigned Profile: {chosen}")
-
-            preset_dd.connect("notify::selected", _on_preset_picked)
-            preset_row.add_suffix(preset_dd)
-            self._preset_dropdowns.append(preset_dd)
-
-            # Apply Immediately Button
-            apply_btn = Gtk.Button(label="Apply Preset Now")
-            apply_btn.set_valign(Gtk.Align.CENTER)
-
-            def _on_apply_preset(btn, g_id=gid, dd=preset_dd):
-                idx = dd.get_selected()
-                if idx >= 0:
-                    chosen = dd.get_model().get_string(idx)
-                    profile = load_preset(chosen)
-                    if profile and self.device and self.device.connected:
-                        self.device.apply_tuning_profile(profile)
-                        if self.on_toast_requested:
-                            self.on_toast_requested(f"Applied preset '{chosen}' to wheelbase!")
-                        if self.on_preset_applied:
-                            self.on_preset_applied(chosen)
-                    elif not self.device or not self.device.connected:
-                        if self.on_toast_requested:
-                            self.on_toast_requested("Device not connected!")
-
-            apply_btn.connect("clicked", _on_apply_preset)
-            preset_row.add_suffix(apply_btn)
-            expander.add_row(preset_row)
-
-            # Telemetry row (if game supports telemetry)
-            if game.get("has_telemetry", False):
-                telem_row = Adw.ActionRow()
-                telem_row.set_title("Auto-Start In-Game Telemetry")
-                telem_row.set_subtitle("Automatically start RevLED and display telemetry listener")
-
-                telem_sw = Gtk.Switch()
-                telem_sw.set_active(auto_telem)
-                telem_sw.set_valign(Gtk.Align.CENTER)
-
-                def _on_telem_toggle(sw, state, g_id=gid):
-                    entry = self.detector.game_mappings.setdefault(g_id, {})
-                    entry["auto_telemetry"] = sw.get_active()
-                    entry["auto_telemetry_explicit"] = True
-                    self.detector.save_config()
-
-                telem_sw.connect("state-set", _on_telem_toggle)
-                telem_row.add_suffix(telem_sw)
-                expander.add_row(telem_row)
-
-            self.games_group.add(expander)
+        return expander
 
     def _select_dropdown_text(self, dropdown: Gtk.DropDown, text: str):
         model = dropdown.get_model()
