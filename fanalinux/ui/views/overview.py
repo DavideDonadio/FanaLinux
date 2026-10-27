@@ -104,6 +104,12 @@ class OverviewView(Adw.PreferencesPage):
         # (offline demos), stored state still drives the button.
         if not os.environ.get("FANALINUX_NO_UPDATE_CHECK"):
             threading.Thread(target=self._check_updates_bg, daemon=True).start()
+        # Driver update check runs once at startup, only if a driver is present.
+        self._ff_update_available = False
+        self._ff_button_mode = "install"
+        self._ff_installing = False
+        if not os.environ.get("FANALINUX_NO_UPDATE_CHECK"):
+            threading.Thread(target=self._check_driver_update_bg, daemon=True).start()
 
         # 1. Device Info Card
         info_group = Adw.PreferencesGroup()
@@ -181,8 +187,10 @@ class OverviewView(Adw.PreferencesPage):
         self.ff_row = Adw.ActionRow()
         self.ff_row.set_title("Kernel FFB Driver")
         # Pango markup passes through to the subtitle label: project name links out.
+        # Explicit color: the dim subtitle styling washes out the theme link color.
         self.ff_row.set_subtitle(
-            '<a href="https://github.com/gotzl/hid-fanatecff">hid-fanatecff</a>'
+            '<a href="https://github.com/gotzl/hid-fanatecff">'
+            '<span foreground="#3584e4">hid-fanatecff</span></a>'
             ": out-of-tree module exposing force feedback")
         ff_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         ff_box.set_valign(Gtk.Align.CENTER)
@@ -366,6 +374,14 @@ class OverviewView(Adw.PreferencesPage):
             # Offline or error: retry every 15 min until one succeeds.
             GLib.timeout_add_seconds(900, self._retry_update_check)
 
+    def _check_driver_update_bg(self):
+        from fanalinux.core import driver_setup
+        if not driver_setup.driver_module_present():
+            return
+        latest = driver_setup.latest_upstream_version()
+        if driver_setup.is_upstream_newer(driver_setup.installed_version(), latest):
+            self._ff_update_available = True
+
     def _retry_update_check(self):
         threading.Thread(target=self._check_updates_bg, daemon=True).start()
         return False
@@ -399,48 +415,72 @@ class OverviewView(Adw.PreferencesPage):
     def set_ff_driver(self, effects: list, has_wheel: bool = True, module_present: bool = False):
         """Show kernel FFB driver state: live effects if wheel present,
         otherwise module presence (functional check needs hardware)."""
+        if getattr(self, "_ff_installing", False):
+            self.ff_lbl.set_text("Installing…")
+            return
         for cls in ("success", "error"):
             self.ff_lbl.remove_css_class(cls)
+        update_ready = bool(module_present and getattr(self, "_ff_update_available", False))
         if effects:
             self.ff_lbl.set_text("Active")
             self.ff_lbl.add_css_class("success")
-            self.ff_btn.set_visible(False)
         elif has_wheel:
             self.ff_lbl.set_text("Missing — no force feedback")
             self.ff_lbl.add_css_class("error")
-            self.ff_btn.set_visible(True)
         elif module_present:
-            self.ff_lbl.set_text("Installed — connect wheel to verify")
+            from fanalinux.core import driver_setup
+            ver = driver_setup.installed_version()
+            base = ver.split("-")[0] if ver else ""
+            self.ff_lbl.set_text(f"Installed (v{base})" if base else "Installed (unknown)")
             self.ff_lbl.add_css_class("success")
-            self.ff_btn.set_visible(False)
         else:
-            self.ff_lbl.set_text("Not detected")
+            self.ff_lbl.set_text("Not detected - FFB not available")
+        if update_ready:
+            self.ff_btn.set_label("Update Driver")
+            self._ff_button_mode = "update"
             self.ff_btn.set_visible(True)
+        elif not module_present:
+            self.ff_btn.set_label("Install Driver")
+            self._ff_button_mode = "install"
+            self.ff_btn.set_visible(True)
+        else:
+            self.ff_btn.set_visible(False)
 
     def _on_install_driver_clicked(self, btn):
         from fanalinux.core import driver_setup
+        update_mode = getattr(self, "_ff_button_mode", "install") == "update"
         if driver_setup.secure_boot_on():
             sb_note = ("\n\nSecure Boot is enabled: the module will install "
                        "but not load until you sign it or disable Secure Boot.")
         else:
             sb_note = ""
+        if update_mode:
+            title = "Update Kernel FFB Driver?"
+            body = ("Removes the installed module, then clones, builds and installs "
+                    f"the latest gotzl/hid-fanatecff via DKMS (needs administrator rights).{sb_note}"
+                    "\n\nUnplug/replug the wheel afterwards.")
+            action = "Update"
+        else:
+            title = "Install Kernel FFB Driver?"
+            body = ("Clones gotzl/hid-fanatecff, builds it and installs the kernel module "
+                    f"via DKMS (needs administrator rights), then reloads udev rules.{sb_note}"
+                    "\n\nUnplug/replug the wheel afterwards.")
+            action = "Install"
         # Parent must be the toplevel window, not this page.
-        dlg = Adw.MessageDialog.new(self.get_root(), "Install Kernel FFB Driver?",
-            "Clones gotzl/hid-fanatecff, builds it and installs the kernel module "
-            f"via DKMS (needs administrator rights), then reloads udev rules.{sb_note}"
-            "\n\nUnplug/replug the wheel afterwards.")
+        dlg = Adw.MessageDialog.new(self.get_root(), title, body)
         dlg.add_response("cancel", "Cancel")
-        dlg.add_response("install", "Install")
-        dlg.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
+        dlg.add_response("go", action)
+        dlg.set_response_appearance("go", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("cancel")
         dlg.set_close_response("cancel")
         dlg.connect("response", self._on_install_driver_response)
         dlg.present()
 
     def _on_install_driver_response(self, dlg, response):
-        if response != "install":
+        if response != "go":
             return
-        self.ff_btn.set_sensitive(False)
+        self._ff_installing = True
+        self.ff_btn.set_visible(False)
         self.ff_lbl.set_text("Installing…")
         threading.Thread(target=self._install_driver_worker, daemon=True).start()
 
@@ -451,10 +491,12 @@ class OverviewView(Adw.PreferencesPage):
             GLib.idle_add(self._finish_driver_install, False,
                           "Missing build tools. Run:\n" + driver_setup.dep_install_hint())
             return
-        ok, tail = driver_setup.run_install()
+        update_mode = getattr(self, "_ff_button_mode", "install") == "update"
+        ok, tail = driver_setup.run_install(update=update_mode)
         GLib.idle_add(self._finish_driver_install, ok, tail)
 
     def _finish_driver_install(self, ok, tail):
+        self._ff_installing = False
         self.ff_btn.set_sensitive(True)
         if ok:
             if self.on_toast_requested:

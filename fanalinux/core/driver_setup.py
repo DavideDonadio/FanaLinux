@@ -50,6 +50,48 @@ def driver_module_present() -> bool:
         return False
 
 
+def installed_version() -> str | None:
+    """Installed driver version from /usr/src (None if absent)."""
+    import glob
+    dirs = sorted(glob.glob("/usr/src/hid-fanatec-*"))
+    if not dirs:
+        return None
+    ver = os.path.basename(dirs[-1]).removeprefix("hid-fanatec-")
+    return ver or None
+
+
+def _version_key(version: str) -> tuple:
+    key = []
+    for part in version.split("-")[0].lstrip("v").split("."):
+        digits = "".join(c for c in part if c.isdigit())
+        key.append(int(digits) if digits else 0)
+    return tuple(key)
+
+
+def is_upstream_newer(installed: str | None, upstream: str | None) -> bool:
+    """True when the upstream tag is newer (unparseable installed counts as older)."""
+    if not upstream:
+        return False
+    if not installed:
+        return True
+    return _version_key(upstream) > _version_key(installed)
+
+
+def latest_upstream_version(timeout: int = 8) -> str | None:
+    """Latest upstream tag via GitHub API (None on any failure)."""
+    try:
+        import json
+        import urllib.request
+        req = urllib.request.Request(
+            "https://api.github.com/repos/gotzl/hid-fanatecff/releases/latest",
+            headers={"User-Agent": "fanalinux"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            tag = json.load(resp).get("tag_name")
+        return tag.strip() if tag else None
+    except Exception:
+        return None
+
+
 def secure_boot_on() -> bool:
     try:
         out = subprocess.run(["mokutil", "--sb-state"], capture_output=True,
@@ -59,12 +101,16 @@ def secure_boot_on() -> bool:
         return False
 
 
-def run_install() -> tuple:
+def run_install(update: bool = False) -> tuple:
     """Clone/update the driver repo and run its install.sh as root.
+    Any already-installed DKMS module is removed first (upstream refuses
+    reinstalls); update=True additionally starts from a fresh full clone.
 
     Returns (ok, tail): ok True when DKMS reports success, tail the last
     log lines for display. Full output goes to LOG_PATH.
     """
+    if update:
+        shutil.rmtree(CACHE_DIR, ignore_errors=True)
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     with open(LOG_PATH, "w") as log:
         def emit(msg):
@@ -88,19 +134,62 @@ def run_install() -> tuple:
                                    capture_output=True, text=True, timeout=120)
         else:
             emit(f"Cloning {REPO_URL}")
-            r = subprocess.run(["git", "clone", "--depth", "1", REPO_URL, CACHE_DIR],
+            # Full clone: upstream version detection needs the tags.
+            r = subprocess.run(["git", "clone", REPO_URL, CACHE_DIR],
                                capture_output=True, text=True, timeout=300)
         emit(r.stdout + r.stderr)
         if r.returncode != 0:
             return False, f"git failed (see {LOG_PATH})"
+        # Never install an unversioned tree: without tags, upstream fingerprints
+        # the build as "unknown" and version checks become meaningless.
+        # Stale clones (e.g. from the first shallow-clone releases) carry no
+        # tags even after fetch: start over with a full clone instead of aborting.
+        r = subprocess.run(["git", "-C", CACHE_DIR, "describe", "--tags"],
+                           capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            emit("No tags in cache, re-cloning full tree")
+            shutil.rmtree(CACHE_DIR, ignore_errors=True)
+            r = subprocess.run(["git", "clone", REPO_URL, CACHE_DIR],
+                               capture_output=True, text=True, timeout=300)
+            emit(r.stdout + r.stderr)
+            if r.returncode != 0:
+                return False, f"git failed (see {LOG_PATH})"
+            r = subprocess.run(["git", "-C", CACHE_DIR, "describe", "--tags"],
+                               capture_output=True, text=True, timeout=60)
+            if r.returncode != 0:
+                return False, "Cannot determine driver version from the clone; aborting"
+        emit(f"Driver tree version: {r.stdout.strip()}")
 
         # Upstream install.sh must run as root; udev reload needs root too,
         # so both go through the single pkexec authentication.
-        root_cmd = (f"cd {shlex.quote(CACHE_DIR)} && bash install.sh"
+        # SUDO_USER lets their script fingerprint the real version instead of
+        # "unknown"; the tree already carries tags from the full clone.
+        import getpass
+        try:
+            invoking_user = os.environ.get("SUDO_USER") or os.environ.get("USER") or getpass.getuser()
+        except Exception:
+            invoking_user = ""
+        # Upstream install.sh refuses when DKMS already lists the module, so any
+        # existing entries are removed first (no-op on a clean system).
+        pre = ""
+        dkms_dir = "/var/lib/dkms/hid-fanatec"
+        try:
+            old_versions = sorted(os.listdir(dkms_dir)) if os.path.isdir(dkms_dir) else []
+        except OSError:
+            old_versions = []
+        removals = " && ".join(
+            f"dkms remove -m hid-fanatec -v {shlex.quote(v)} --all" for v in old_versions)
+        if removals:
+            pre = removals + " && "
+        root_cmd = (f"{pre}cd {shlex.quote(CACHE_DIR)} && bash install.sh"
                     " && udevadm control --reload-rules"
                     " && udevadm trigger --subsystem-match=hidraw")
+        pkexec_cmd = ["pkexec"]
+        if invoking_user:
+            pkexec_cmd += ["env", f"SUDO_USER={invoking_user}"]
+        pkexec_cmd += ["bash", "-c", root_cmd]
         emit("Running upstream install.sh as root")
-        r = subprocess.run(["pkexec", "bash", "-c", root_cmd],
+        r = subprocess.run(pkexec_cmd,
                            capture_output=True, text=True, timeout=900)
         emit(r.stdout + r.stderr)
         tail = "\n".join((r.stdout + r.stderr).strip().splitlines()[-12:])

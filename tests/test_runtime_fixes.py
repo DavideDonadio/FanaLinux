@@ -261,6 +261,15 @@ class TestFfDriverProbe(unittest.TestCase):
         self.assertEqual(query_ff_effects(None), [])
         self.assertEqual(query_ff_effects("/dev/input/nonexistent999"), [])
 
+    def test_driver_version_compare(self):
+        from fanalinux.core import driver_setup
+        self.assertTrue(driver_setup.is_upstream_newer("0.2.2", "0.2.3"))
+        self.assertFalse(driver_setup.is_upstream_newer("0.2.3", "0.2.3"))
+        self.assertFalse(driver_setup.is_upstream_newer("0.2.3-18-g6e58466", "0.2.3"))
+        self.assertTrue(driver_setup.is_upstream_newer("unknown", "0.2.3"))
+        self.assertFalse(driver_setup.is_upstream_newer("0.2.3", None))
+        self.assertIsInstance(driver_setup.installed_version(), (str, type(None)))
+
     def test_match_game_process_ignores_wrappers(self):
         from fanalinux.core.detector import match_game_process
         # Real game: Windows-path argv[0] or comm
