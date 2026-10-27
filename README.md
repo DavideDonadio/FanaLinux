@@ -69,6 +69,6 @@ FanaLinux itself never flashes — by design.
 It is not affiliated with, endorsed by, or sponsored by Endor AG, Fanatec, Corsair, or their affiliates.
 
 Protocol behavior is established through device testing and USB analysis for interoperability. \
-No proprietary code, binaries, firmware, or assets are included, and nothing here flashes firmware or decompiles vendor software. \
+No proprietary code, binaries, firmware, or assets are included. \
 Fanatec product names identify compatible hardware only; all trademarks belong to their owners.
 
