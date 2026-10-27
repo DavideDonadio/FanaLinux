@@ -13,7 +13,6 @@ import time
 from gi.repository import Adw, GLib, Gtk
 
 from fanalinux.core.telemetry.manager import TelemetryManager
-from fanalinux.ui.helpers import widen_page_clamp
 
 
 def led_zone_class(index: int) -> str:
@@ -37,8 +36,7 @@ class LedsView(Adw.PreferencesPage):
         # Initialize In-Game Telemetry Manager
         self.telemetry_mgr = telemetry_mgr if telemetry_mgr is not None else TelemetryManager(self.device)
 
-        # Ensure wide clamp so RevLEDs and descriptions have ample horizontal room
-        GLib.idle_add(widen_page_clamp, self)
+
         self._build_ui()
 
     def _build_ui(self):

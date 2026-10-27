@@ -11,14 +11,14 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from collections.abc import Callable
 
-from gi.repository import Adw, GLib, Gtk
+from gi.repository import Adw, Gtk
 
 from fanalinux.core.dynamic_ffb import (
     DynamicFFBSettings,
     load_dynamic_ffb_settings,
     save_dynamic_ffb_settings,
 )
-from fanalinux.ui.helpers import slider_cluster, widen_page_clamp
+from fanalinux.ui.helpers import slider_cluster
 
 
 class DynamicFFBView(Adw.PreferencesPage):
@@ -29,8 +29,7 @@ class DynamicFFBView(Adw.PreferencesPage):
         self.on_toast_requested = on_toast_requested
         self.settings: DynamicFFBSettings = load_dynamic_ffb_settings()
 
-        # Ensure full width layout
-        GLib.idle_add(widen_page_clamp, self)
+
         self._build_ui()
 
     def _build_ui(self):

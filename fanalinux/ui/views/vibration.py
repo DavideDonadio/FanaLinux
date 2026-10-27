@@ -12,14 +12,14 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from collections.abc import Callable
 
-from gi.repository import Adw, GLib, Gtk
+from gi.repository import Adw, Gtk
 
 from fanalinux.core.vibration import (
     VibrationSettings,
     load_vibration_settings,
     save_vibration_settings,
 )
-from fanalinux.ui.helpers import slider_cluster, widen_page_clamp
+from fanalinux.ui.helpers import slider_cluster
 
 logger = logging.getLogger("fanalinux.vibration")
 
@@ -33,8 +33,7 @@ class VibrationView(Adw.PreferencesPage):
         self.settings: VibrationSettings = self.haptic_engine.settings if self.haptic_engine else load_vibration_settings()
 
         self._controls = {}
-        # Ensure page clamp utilizes available window space
-        GLib.idle_add(widen_page_clamp, self)
+
         self._build_ui()
 
     def _build_ui(self):

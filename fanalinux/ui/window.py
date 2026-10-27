@@ -137,16 +137,20 @@ class MainWindow(Adw.ApplicationWindow):
         self.toast_overlay.set_child(main_box)
         self.set_content(self.toast_overlay)
 
-        # Start Evdev Listener
+        # Start Evdev Listener. Analog axes run hot (hundreds of events/sec):
+        # stash the latest values and flush them to GTK at ~30Hz. Button
+        # presses are discrete and stay immediate.
+        self._pending_inputs = {}
+        GLib.timeout_add(33, self._flush_pending_inputs)
+
         def _on_steering_event(norm_val: float, raw_val: int):
-            self.overview_view.update_steering(norm_val, raw_val)
-            self.calibration_view.update_steering(norm_val, raw_val)
+            self._pending_inputs["steer"] = (norm_val, raw_val)
 
         self.evdev_listener = EvdevListener(
             on_steering=_on_steering_event,
-            on_throttle=self.overview_view.update_throttle,
-            on_brake=self.overview_view.update_brake,
-            on_clutch=self.overview_view.update_clutch,
+            on_throttle=lambda val: self._pending_inputs.update(throttle=val),
+            on_brake=lambda val: self._pending_inputs.update(brake=val),
+            on_clutch=lambda val: self._pending_inputs.update(clutch=val),
             on_button=self.overview_view.update_button,
         )
         self.evdev_listener.start()
@@ -174,6 +178,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.leds_view,
             self.profiles_view,
             self.calibration_view,
+            self.dynamic_ffb_view,
         ]
         for page in views:
             widen_page_clamp(page)
@@ -202,6 +207,20 @@ class MainWindow(Adw.ApplicationWindow):
         toast = Adw.Toast(title=message)
         toast.set_timeout(3)
         self.toast_overlay.add_toast(toast)
+
+    def _flush_pending_inputs(self):
+        pending = self._pending_inputs
+        self._pending_inputs = {}
+        if "steer" in pending:
+            self.overview_view.update_steering(*pending["steer"])
+            self.calibration_view.update_steering(*pending["steer"])
+        if "throttle" in pending:
+            self.overview_view.update_throttle(pending["throttle"])
+        if "brake" in pending:
+            self.overview_view.update_brake(pending["brake"])
+        if "clutch" in pending:
+            self.overview_view.update_clutch(pending["clutch"])
+        return True
 
     def _on_game_started(self, game_info, preset_name, auto_telem):
         GLib.idle_add(self._apply_game_started, game_info, preset_name, auto_telem)

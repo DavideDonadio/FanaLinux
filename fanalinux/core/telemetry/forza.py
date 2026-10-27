@@ -5,23 +5,24 @@ Supports Forza Motorsport (2023 / FM7) and Forza Horizon 4 / 5.
 """
 
 import logging
-import select
-import socket
 import struct
 from collections.abc import Callable
 
-from fanalinux.core.telemetry.base import BaseTelemetryClient
+from fanalinux.core.telemetry.base import UdpTelemetryClient
 
 logger = logging.getLogger("fanalinux.telemetry.forza")
 
 
-class ForzaTelemetry(BaseTelemetryClient):
+class ForzaTelemetry(UdpTelemetryClient):
     """
     Forza 'Data Out' UDP receiver.
     Listens for Dash (Car Dash) 324-byte packets.
     """
     UDP_IP = "127.0.0.1"
     UDP_PORT = 5300
+    UDP_PORT = 5300
+    STREAM_LABEL = "Forza UDP"
+    RECV_SIZE = 1024
 
     # Minimum packet lengths for Forza 'Car Dash' packet format:
     # - 311 bytes: Forza Motorsport 7 Dash format
@@ -40,66 +41,15 @@ class ForzaTelemetry(BaseTelemetryClient):
                          on_car_detected=on_car_detected,
                          default_max_rpm=default_max_rpm)
         self.UDP_PORT = port
-        self._sock: socket.socket | None = None
         self._sled_warned = False
 
-    def stop(self):
-        super().stop()
-        if self._sock:
-            try:
-                self._sock.close()
-            except Exception:
-                pass
-            self._sock = None
-
-    def _worker(self):
-        while self._running:
-            try:
-                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self._sock.bind((self.UDP_IP, self.UDP_PORT))
-                self._sock.setblocking(False)
-                logger.info(f"Listening for Forza UDP telemetry on {self.UDP_IP}:{self.UDP_PORT}")
-
-                timeout_count = 0
-                while self._running:
-                    r, _, _ = select.select([self._sock], [], [], 0.5)
-                    if not r:
-                        if self.is_connected:
-                            timeout_count += 1
-                            if timeout_count > 6:
-                                logger.info("Forza telemetry stream timed out")
-                                self.is_connected = False
-                        continue
-
-                    timeout_count = 0
-                    data, _ = self._sock.recvfrom(1024)
-                    if len(data) >= self.MIN_PACKET_SIZE:
-                        if not self.is_connected:
-                            self.is_connected = True
-                            logger.info(f"Connected to Forza telemetry stream ({len(data)} bytes)")
-
-                        self.process_packet(data)
-                    elif len(data) == self.SLED_PACKET_SIZE:
-                        if not self._sled_warned:
-                            logger.warning(
-                                "Received 232-byte Forza 'Sled' packet. "
-                                "Please change Data Out Packet Format to 'Dash' or 'Car Dash' in game settings."
-                            )
-                            self._sled_warned = True
-
-            except Exception as e:
-                if self._running:
-                    logger.debug(f"Forza telemetry socket error: {e}")
-                self.is_connected = False
-                self._stop_event.wait(2.0)
-            finally:
-                if self._sock:
-                    try:
-                        self._sock.close()
-                    except Exception:
-                        pass
-                    self._sock = None
+    def _handle_short_packet(self, data: bytes):
+        if len(data) == self.SLED_PACKET_SIZE and not self._sled_warned:
+            logger.warning(
+                "Received 232-byte Forza 'Sled' packet. "
+                "Please change Data Out Packet Format to 'Dash' or 'Car Dash' in game settings."
+            )
+            self._sled_warned = True
 
     def process_packet(self, data: bytes):
         """

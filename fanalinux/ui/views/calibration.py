@@ -12,7 +12,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Adw, GLib, Gtk
 
-from fanalinux.ui.helpers import slider_cluster, widen_page_clamp
+from fanalinux.ui.helpers import slider_cluster
 from fanalinux.ui.widgets.wheel_dial import WheelDialWidget
 
 
@@ -29,8 +29,7 @@ class CalibrationView(Adw.PreferencesPage):
         # goes inert instead of fighting the new run.
         self._self_test_gen = 0
 
-        # Ensure wide clamp for 2-column layout
-        GLib.idle_add(widen_page_clamp, self)
+
         self._build_ui()
 
     def set_evdev_listener(self, listener):

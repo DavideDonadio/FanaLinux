@@ -4,19 +4,20 @@ Connects via native OutGauge UDP protocol (default port 4444).
 """
 
 import logging
-import select
-import socket
 import struct
 from collections.abc import Callable
 
-from fanalinux.core.telemetry.base import BaseTelemetryClient
+from fanalinux.core.telemetry.base import UdpTelemetryClient
 
 logger = logging.getLogger("fanalinux.telemetry.beamng")
 
 
-class BeamNGTelemetry(BaseTelemetryClient):
+class BeamNGTelemetry(UdpTelemetryClient):
     UDP_IP = "127.0.0.1"
     UDP_PORT = 4444
+    UDP_PORT = 4444
+    STREAM_LABEL = "BeamNG OutGauge"
+    RECV_SIZE = 512
 
     # OutGauge packet: 92 bytes base (without trailing optional id)
     # I: time (4)
@@ -45,58 +46,6 @@ class BeamNGTelemetry(BaseTelemetryClient):
                          on_car_detected=on_car_detected,
                          default_max_rpm=default_max_rpm)
         self.UDP_PORT = port
-        self._sock: socket.socket | None = None
-
-    def stop(self):
-        super().stop()
-        if self._sock:
-            try:
-                self._sock.close()
-            except Exception:
-                pass
-            self._sock = None
-
-    def _worker(self):
-        while self._running:
-            try:
-                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self._sock.bind((self.UDP_IP, self.UDP_PORT))
-                self._sock.setblocking(False)
-                logger.info(f"Listening for BeamNG OutGauge telemetry on {self.UDP_IP}:{self.UDP_PORT}")
-
-                timeout_count = 0
-                while self._running:
-                    r, _, _ = select.select([self._sock], [], [], 0.5)
-                    if not r:
-                        if self.is_connected:
-                            timeout_count += 1
-                            if timeout_count > 6:
-                                logger.info("BeamNG OutGauge telemetry stream timed out")
-                                self.is_connected = False
-                        continue
-
-                    timeout_count = 0
-                    data, _ = self._sock.recvfrom(512)
-                    if len(data) >= self.MIN_PACKET_SIZE:
-                        if not self.is_connected:
-                            self.is_connected = True
-                            logger.info("Connected to BeamNG OutGauge telemetry stream")
-
-                        self.process_packet(data)
-
-            except Exception as e:
-                if self._running:
-                    logger.debug(f"BeamNG telemetry socket error: {e}")
-                self.is_connected = False
-                self._stop_event.wait(2.0)
-            finally:
-                if self._sock:
-                    try:
-                        self._sock.close()
-                    except Exception:
-                        pass
-                    self._sock = None
 
     def process_packet(self, data: bytes):
         """Parse raw OutGauge binary packet and dispatch to listener."""

@@ -144,6 +144,21 @@ class TestGameSwitchTelemetry(unittest.TestCase):
         finally:
             win.detector.stop()
 
+    def test_pending_inputs_coalesce_at_flush(self):
+        """Rapid evdev events collapse into one view update per flush."""
+        win, _ = self._window_with_fake_mgr()
+        try:
+            seen = []
+            win.overview_view.update_steering = lambda n, r: seen.append((n, r))
+            win.calibration_view.update_steering = lambda n, r: seen.append((n, r))
+            win._pending_inputs["steer"] = (0.1, 100)
+            win._pending_inputs["steer"] = (0.2, 200)  # newer overwrites
+            self.assertTrue(win._flush_pending_inputs())  # timer stays armed
+            self.assertEqual(seen, [(0.2, 200), (0.2, 200)])
+            self.assertEqual(win._pending_inputs, {})
+        finally:
+            win.detector.stop()
+
     def test_owner_exit_stops_owned_session(self):
         """Exiting the owning game stops telemetry and clears ownership."""
         win, calls = self._window_with_fake_mgr()

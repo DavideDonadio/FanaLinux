@@ -5,19 +5,20 @@ Compatible with F1 2020 through F1 25.
 """
 
 import logging
-import select
-import socket
 import struct
 from collections.abc import Callable
 
-from fanalinux.core.telemetry.base import BaseTelemetryClient
+from fanalinux.core.telemetry.base import UdpTelemetryClient
 
 logger = logging.getLogger("fanalinux.telemetry.f1")
 
 
-class F1Telemetry(BaseTelemetryClient):
+class F1Telemetry(UdpTelemetryClient):
     UDP_IP = "127.0.0.1"
     UDP_PORT = 20777
+    UDP_PORT = 20777
+    STREAM_LABEL = "F1"
+    MIN_PACKET_SIZE = 24
 
     # Packet IDs
     PACKET_ID_CAR_TELEMETRY = 6
@@ -32,60 +33,8 @@ class F1Telemetry(BaseTelemetryClient):
                          on_car_detected=on_car_detected,
                          default_max_rpm=default_max_rpm)
         self.UDP_PORT = port
-        self._sock: socket.socket | None = None
         self._last_abs = False
         self._last_tc = False
-
-    def stop(self):
-        super().stop()
-        if self._sock:
-            try:
-                self._sock.close()
-            except Exception:
-                pass
-            self._sock = None
-
-    def _worker(self):
-        while self._running:
-            try:
-                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self._sock.bind((self.UDP_IP, self.UDP_PORT))
-                self._sock.setblocking(False)
-                logger.info(f"Listening for F1 UDP telemetry on {self.UDP_IP}:{self.UDP_PORT}")
-
-                timeout_count = 0
-                while self._running:
-                    r, _, _ = select.select([self._sock], [], [], 0.5)
-                    if not r:
-                        if self.is_connected:
-                            timeout_count += 1
-                            if timeout_count > 6:
-                                logger.info("F1 telemetry stream timed out")
-                                self.is_connected = False
-                        continue
-
-                    timeout_count = 0
-                    data, _ = self._sock.recvfrom(2048)
-                    if len(data) >= 24:
-                        if not self.is_connected:
-                            self.is_connected = True
-                            logger.info("Connected to F1 UDP telemetry stream")
-
-                        self.process_packet(data)
-
-            except Exception as e:
-                if self._running:
-                    logger.debug(f"F1 telemetry socket error: {e}")
-                self.is_connected = False
-                self._stop_event.wait(2.0)
-            finally:
-                if self._sock:
-                    try:
-                        self._sock.close()
-                    except Exception:
-                        pass
-                    self._sock = None
 
     def process_packet(self, data: bytes):
         """Parse F1 UDP packet header and route payload."""

@@ -5,6 +5,8 @@ Provides thread management, callback signature inspection, and safe dispatching.
 
 import inspect
 import logging
+import select
+import socket
 import threading
 from collections.abc import Callable
 
@@ -109,3 +111,75 @@ class BaseTelemetryClient:
 
     def _worker(self):
         raise NotImplementedError
+
+
+class UdpTelemetryClient(BaseTelemetryClient):
+    """Bind-style UDP telemetry: open, select-loop, dispatch, reconnect.
+    Subclasses provide endpoint constants and process_packet(); packets below
+    MIN_PACKET_SIZE go to _handle_short_packet() (default: ignored)."""
+
+    UDP_IP = "127.0.0.1"
+    UDP_PORT = 0
+    RECV_SIZE = 2048
+    MIN_PACKET_SIZE = 1
+    STREAM_LABEL = "UDP"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._sock: socket.socket | None = None
+
+    def stop(self):
+        super().stop()
+        if getattr(self, "_sock", None):
+            try:
+                self._sock.close()
+            except Exception:
+                pass
+            self._sock = None
+
+    def _handle_short_packet(self, data: bytes):
+        pass
+
+    def _worker(self):
+        while self._running:
+            try:
+                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self._sock.bind((self.UDP_IP, self.UDP_PORT))
+                self._sock.setblocking(False)
+                logger.info(f"Listening for {self.STREAM_LABEL} telemetry"
+                            f" on {self.UDP_IP}:{self.UDP_PORT}")
+
+                timeout_count = 0
+                while self._running:
+                    r, _, _ = select.select([self._sock], [], [], 0.5)
+                    if not r:
+                        if self.is_connected:
+                            timeout_count += 1
+                            if timeout_count > 6:
+                                logger.info(f"{self.STREAM_LABEL} telemetry stream timed out")
+                                self.is_connected = False
+                        continue
+
+                    timeout_count = 0
+                    data, _ = self._sock.recvfrom(self.RECV_SIZE)
+                    if len(data) >= self.MIN_PACKET_SIZE:
+                        if not self.is_connected:
+                            self.is_connected = True
+                            logger.info(f"Connected to {self.STREAM_LABEL} telemetry stream")
+                        self.process_packet(data)
+                    else:
+                        self._handle_short_packet(data)
+
+            except Exception as e:
+                if self._running:
+                    logger.debug(f"{self.STREAM_LABEL} telemetry socket error: {e}")
+                self.is_connected = False
+                self._stop_event.wait(2.0)
+            finally:
+                if self._sock:
+                    try:
+                        self._sock.close()
+                    except Exception:
+                        pass
+                    self._sock = None

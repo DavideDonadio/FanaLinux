@@ -4,17 +4,15 @@ Connects via native Project CARS 2 UDP protocol (default port 5606).
 """
 
 import logging
-import select
-import socket
 import struct
 from collections.abc import Callable
 
-from fanalinux.core.telemetry.base import BaseTelemetryClient
+from fanalinux.core.telemetry.base import UdpTelemetryClient
 
 logger = logging.getLogger("fanalinux.telemetry.ams2")
 
 
-class AMS2Telemetry(BaseTelemetryClient):
+class AMS2Telemetry(UdpTelemetryClient):
     """
     Automobilista 2 / Project CARS 2 UDP receiver.
     Listens for eCarPhysics packets (mPacketType == 0).
@@ -22,11 +20,14 @@ class AMS2Telemetry(BaseTelemetryClient):
     # Bind 0.0.0.0 to permit LAN / console forwarding from external rigs
     UDP_IP = "0.0.0.0"
     UDP_PORT = 5606
+    STREAM_LABEL = "AMS2 UDP"
 
     HEADER_SIZE = 12
     HEADER_FORMAT = "<IIBBBB"
+    # Worker dispatch gate; full eCarPhysics packets are CAR_PHYSICS_SIZE.
+    MIN_PACKET_SIZE = HEADER_SIZE
     # sTelemetryData (eCarPhysics) packet size in Project CARS 2 / AMS2 spec
-    MIN_PACKET_SIZE = 556
+    CAR_PHYSICS_SIZE = 556
 
     # CarFlags bitmask constants
     CAR_HEADLIGHT = 1 << 0
@@ -47,58 +48,6 @@ class AMS2Telemetry(BaseTelemetryClient):
                          on_car_detected=on_car_detected,
                          default_max_rpm=default_max_rpm)
         self.UDP_PORT = port
-        self._sock: socket.socket | None = None
-
-    def stop(self):
-        super().stop()
-        if self._sock:
-            try:
-                self._sock.close()
-            except Exception:
-                pass
-            self._sock = None
-
-    def _worker(self):
-        while self._running:
-            try:
-                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self._sock.bind((self.UDP_IP, self.UDP_PORT))
-                self._sock.setblocking(False)
-                logger.info(f"Listening for AMS2 UDP telemetry on {self.UDP_IP}:{self.UDP_PORT}")
-
-                timeout_count = 0
-                while self._running:
-                    r, _, _ = select.select([self._sock], [], [], 0.5)
-                    if not r:
-                        if self.is_connected:
-                            timeout_count += 1
-                            if timeout_count > 6:
-                                logger.info("AMS2 telemetry stream timed out")
-                                self.is_connected = False
-                        continue
-
-                    timeout_count = 0
-                    data, _ = self._sock.recvfrom(2048)
-                    if len(data) >= self.HEADER_SIZE:
-                        if not self.is_connected:
-                            self.is_connected = True
-                            logger.info(f"Connected to AMS2 telemetry stream ({len(data)} bytes)")
-
-                        self.process_packet(data)
-
-            except Exception as e:
-                if self._running:
-                    logger.debug(f"AMS2 telemetry socket error: {e}")
-                self.is_connected = False
-                self._stop_event.wait(2.0)
-            finally:
-                if self._sock:
-                    try:
-                        self._sock.close()
-                    except Exception:
-                        pass
-                    self._sock = None
 
     def process_packet(self, data: bytes):
         """
@@ -118,7 +67,7 @@ class AMS2Telemetry(BaseTelemetryClient):
             p_num, cat_num, p_idx, p_total, packet_type, p_ver = struct.unpack_from(self.HEADER_FORMAT, data, 0)
 
             # Only eCarPhysics (packet_type == 0) contains live vehicle telemetry
-            if packet_type != 0 or len(data) < self.MIN_PACKET_SIZE:
+            if packet_type != 0 or len(data) < self.CAR_PHYSICS_SIZE:
                 return
 
             # Car state & Flags

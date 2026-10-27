@@ -9,7 +9,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from collections.abc import Callable
 
-from gi.repository import Adw, GLib, Gtk
+from gi.repository import Adw, Gtk
 
 from fanalinux.core.presets import (
     init_default_presets,
@@ -18,7 +18,7 @@ from fanalinux.core.presets import (
     save_preset,
 )
 from fanalinux.core.tuning import TUNING_METADATA, TuningProfile
-from fanalinux.ui.helpers import slider_cluster, widen_page_clamp
+from fanalinux.ui.helpers import slider_cluster
 
 
 class TuningView(Adw.PreferencesPage):
@@ -39,8 +39,7 @@ class TuningView(Adw.PreferencesPage):
         # Ensure default presets exist
         init_default_presets()
 
-        # Ensure page clamp utilizes available window space
-        GLib.idle_add(widen_page_clamp, self)
+
 
         self._build_ui()
 

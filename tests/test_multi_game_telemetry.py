@@ -128,6 +128,34 @@ class TestMultiGameTelemetry(unittest.TestCase):
         struct.pack_into("<H", player_status, 17, 13500) # maxRPM at offset 17: 13500
         cls.f1_status_pkt = bytes(f1_status_hdr) + bytes(player_status) * 22
 
+    def test_shared_udp_loop_delivers_packets(self):
+        """Loopback through the shared bind/select/dispatch worker."""
+        import socket
+        import time
+        received = []
+        client = BeamNGTelemetry(on_telemetry=lambda *a, **k: received.append((a, k)))
+        free = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        free.bind(("127.0.0.1", 0))
+        port = free.getsockname()[1]
+        free.close()
+        client.UDP_PORT = port
+        client.start()
+        try:
+            with open(self.beamng_fixture_path, "rb") as f:
+                data = f.read()
+            sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            deadline = time.time() + 5
+            while not received and time.time() < deadline:
+                sender.sendto(data, ("127.0.0.1", port))
+                time.sleep(0.1)
+            sender.close()
+            self.assertTrue(received)
+            self.assertEqual(received[0][0][0], 6250)  # rpm from fixture
+            self.assertTrue(client.is_connected)
+        finally:
+            client.stop()
+        self.assertFalse(client.is_running)
+
     def test_beamng_telemetry_dispatch(self):
         received = []
         def _cb(*args, **kwargs):
