@@ -338,6 +338,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.evdev_listener.stop()
         if self.device and self.device.connected:
             try:
+                self.device.stop_all_forces()
                 self.device.clear_display()
                 self.device.set_revleds([(0, 0, 0)] * 9)
                 self.device.set_flagleds([(0, 0, 0)] * 6)

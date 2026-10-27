@@ -63,15 +63,9 @@ Game force feedback needs the hid-fanatecff kernel module — **Overview** insta
 Flashing firmware needs official software. \
 FanaLinux itself never flashes — by design.
 
-## Legal & Intellectual Property Notice
+## Legal
 
-FanaLinux is an independent, open-source project developed to enable interoperability between Linux systems and compatible Fanatec hardware. It is not affiliated with, endorsed by, or sponsored by Endor AG, Fanatec, Corsair, or their respective affiliates.
+**FanaLinux is an independent community project and is not an official Fanatec product.** It is not affiliated with, endorsed by, or sponsored by Endor AG, Fanatec, Corsair, or their affiliates.
 
-The project's implementation is independently authored. No Fanatec proprietary source code, Windows application binaries, firmware images, or proprietary graphical assets are intentionally incorporated into or distributed with this project.
-
-Hardware protocol behaviour is investigated through direct device testing and USB communication analysis for compatibility purposes. The Fanatec Windows application has not been decompiled or disassembled as part of this project's development.
-
-The project is intended to enable interoperability with lawfully possessed hardware while respecting applicable intellectual-property laws. This notice describes the project's development approach and intended scope; it does not constitute a legal determination or guarantee of compliance in every jurisdiction.
-
-Fanatec and related product names are used solely to identify compatible hardware. All trademarks remain the property of their respective owners. **FanaLinux is an independent community project and is not an official Fanatec product.**
+Protocol behavior is established through device testing and USB analysis for interoperability. No proprietary code, binaries, firmware, or assets are included, and nothing here flashes firmware or decompiles vendor software. Fanatec product names identify compatible hardware only; all trademarks belong to their owners.
 
