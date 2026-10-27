@@ -180,14 +180,12 @@ class OverviewView(Adw.PreferencesPage):
         # Kernel FFB driver: force feedback needs hid-fanatecff on the system
         self.ff_row = Adw.ActionRow()
         self.ff_row.set_title("Kernel FFB Driver")
-        self.ff_row.set_subtitle("Out-of-tree module exposing force feedback")
+        self.ff_row.set_subtitle("hid-fanatecff: out-of-tree module exposing force feedback")
+        self.ff_row.set_tooltip_text("Open the driver author's repository")
+        self.ff_row.set_activatable(True)
+        self.ff_row.connect("activated", self._on_ff_row_activated)
         ff_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         ff_box.set_valign(Gtk.Align.CENTER)
-        ff_link = Gtk.LinkButton.new_with_label(
-            "https://github.com/gotzl/hid-fanatecff", "hid-fanatecff")
-        ff_link.set_valign(Gtk.Align.CENTER)
-        ff_link.set_tooltip_text("Open the driver author's repository")
-        ff_box.append(ff_link)
         self.ff_lbl = Gtk.Label(label="Checking…")
         self.ff_lbl.add_css_class("val-badge")
         ff_box.append(self.ff_lbl)
@@ -418,6 +416,11 @@ class OverviewView(Adw.PreferencesPage):
         else:
             self.ff_lbl.set_text("Not detected")
             self.ff_btn.set_visible(True)
+
+    def _on_ff_row_activated(self, row):
+        root = self.get_root()
+        parent = root if isinstance(root, Gtk.Window) else None
+        Gtk.show_uri_full(parent, "https://github.com/gotzl/hid-fanatecff", Gdk.CURRENT_TIME)
 
     def _on_install_driver_clicked(self, btn):
         from fanalinux.core import driver_setup
