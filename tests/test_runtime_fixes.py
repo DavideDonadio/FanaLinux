@@ -225,6 +225,56 @@ class TestGameSwitchTelemetry(unittest.TestCase):
         from fanalinux.core.telemetry.manager import CAR_DATABASE
         self.assertTrue(len(CAR_DATABASE) > 0)
 
+    def test_emergency_gate_is_atomic(self):
+        """A send blocked on the device lock must observe a gate set meanwhile.
+        Fails if the inhibit check ever moves outside the lock."""
+        import threading
+        import time
+        from unittest import mock
+        from fanalinux.core.device import FanatecDevice
+        dev = FanatecDevice()
+        dev._fd = 1
+        dev.connected = True
+        with mock.patch.object(FanatecDevice, "write_report") as wr:
+            dev._lock.acquire()
+            try:
+                t = threading.Thread(target=lambda: dev.send_damper_friction(50))
+                t.start()
+                time.sleep(0.2)  # sender is now parked on the device lock
+                dev.output_inhibited = True  # emergency gate, lock already held
+            finally:
+                dev._lock.release()
+            t.join(timeout=5)
+            self.assertFalse(t.is_alive())
+            wr.assert_not_called()
+
+    def test_force_storm_survives_emergency(self):
+        """Hammering force outputs around repeated cutoffs must not deadlock."""
+        import threading
+        from unittest import mock
+        from fanalinux.core.device import FanatecDevice
+        dev = FanatecDevice()
+        dev._fd = 1
+        dev.connected = True
+        stop = threading.Event()
+        def storm():
+            while not stop.is_set():
+                dev.send_constant_force(1000)
+                dev.send_damper_friction(50)
+                dev.send_centering_spring(50)
+                dev.send_handle_vibration(100, 100)
+        with mock.patch.object(FanatecDevice, "write_report"):
+            workers = [threading.Thread(target=storm) for _ in range(4)]
+            for w in workers:
+                w.start()
+            for _ in range(5):
+                dev.emergency_stop()
+                dev.output_inhibited = False
+            stop.set()
+            for w in workers:
+                w.join(timeout=10)
+                self.assertFalse(w.is_alive())
+
 
 class TestTelemetryLifecycle(unittest.TestCase):
     def test_stop_wakes_blocked_worker(self):

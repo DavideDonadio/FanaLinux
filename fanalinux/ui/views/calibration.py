@@ -229,6 +229,19 @@ class CalibrationView(Adw.PreferencesPage):
         def _worker():
             def live() -> bool:
                 return gen == self._self_test_gen and not self._abort_self_test
+            class _LiveDevice:
+                """Device proxy: calls from a superseded run go inert."""
+                def __init__(self, inner):
+                    self._inner = inner
+                def __getattr__(self, name):
+                    fn = getattr(self._inner, name)
+                    if not callable(fn):
+                        return fn
+                    def gated(*a, **k):
+                        if live():
+                            return fn(*a, **k)
+                    return gated
+            dev = _LiveDevice(self.device)
             def sleep_check(seconds: float) -> bool:
                 end_t = time.time() + seconds
                 while time.time() < end_t:
@@ -244,7 +257,7 @@ class CalibrationView(Adw.PreferencesPage):
                 if self.on_toast_requested:
                     GLib.idle_add(self.on_toast_requested, "Self-Test (1/3): Testing RevLEDs, Flag clusters & OLED...")
 
-                self.device.set_display_text("TST")
+                dev.set_display_text("TST")
                 if not sleep_check(0.4):
                     return
 
@@ -260,30 +273,30 @@ class CalibrationView(Adw.PreferencesPage):
                     if self._abort_self_test:
                         return
                     current_leds[i] = color_palette[i]
-                    self.device.set_revleds(current_leds)
+                    dev.set_revleds(current_leds)
                     if not sleep_check(0.12):
                         return
 
                 # Flag LEDs cycle (3 left, 3 right)
-                self.device.set_display_text("LED")
+                dev.set_display_text("LED")
                 for c in [(255, 0, 0), (255, 200, 0), (0, 120, 255)]:
                     if self._abort_self_test:
                         return
-                    self.device.set_flagleds([c] * 6)
+                    dev.set_flagleds([c] * 6)
                     if not sleep_check(0.35):
                         return
 
                 # All LEDs full bright white flash
                 if self._abort_self_test:
                     return
-                self.device.set_revleds([(255, 255, 255)] * 9)
-                self.device.set_flagleds([(255, 255, 255)] * 6)
+                dev.set_revleds([(255, 255, 255)] * 9)
+                dev.set_flagleds([(255, 255, 255)] * 6)
                 if not sleep_check(0.4):
                     return
 
                 # Clear LEDs
-                self.device.set_revleds([(0, 0, 0)] * 9)
-                self.device.set_flagleds([(0, 0, 0)] * 6)
+                dev.set_revleds([(0, 0, 0)] * 9)
+                dev.set_flagleds([(0, 0, 0)] * 6)
 
                 # -------------------------------------------------------------
                 # PHASE 2: Direct Drive Motor Torque & Centering (3.2s - 6.8s)
@@ -294,14 +307,14 @@ class CalibrationView(Adw.PreferencesPage):
                 if self.on_toast_requested:
                     GLib.idle_add(self.on_toast_requested, "Self-Test (2/3): Direct Drive motor test: Left sweep, Right sweep & Centering...")
 
-                self.device.set_display_text("DD")
+                dev.set_display_text("DD")
 
                 # Smooth ramp Left (up to ~20% torque)
                 for step in range(1, 11):
                     if self._abort_self_test:
                         return
                     force = int(-7000 * (step / 10.0))
-                    self.device.send_constant_force(force)
+                    dev.send_constant_force(force)
                     if not sleep_check(0.07):
                         return
 
@@ -313,7 +326,7 @@ class CalibrationView(Adw.PreferencesPage):
                     if self._abort_self_test:
                         return
                     force = int(-7000 * (step / 10.0))
-                    self.device.send_constant_force(force)
+                    dev.send_constant_force(force)
                     if not sleep_check(0.035):
                         return
 
@@ -322,7 +335,7 @@ class CalibrationView(Adw.PreferencesPage):
                     if self._abort_self_test:
                         return
                     force = int(7000 * (step / 10.0))
-                    self.device.send_constant_force(force)
+                    dev.send_constant_force(force)
                     if not sleep_check(0.07):
                         return
 
@@ -334,17 +347,17 @@ class CalibrationView(Adw.PreferencesPage):
                     if self._abort_self_test:
                         return
                     force = int(7000 * (step / 10.0))
-                    self.device.send_constant_force(force)
+                    dev.send_constant_force(force)
                     if not sleep_check(0.035):
                         return
 
                 # Centering spring check
                 if self._abort_self_test:
                     return
-                self.device.send_centering_spring(50)
+                dev.send_centering_spring(50)
                 if not sleep_check(0.8):
                     return
-                self.device.send_centering_spring(0)
+                dev.send_centering_spring(0)
 
                 # -------------------------------------------------------------
                 # PHASE 3: Tactile Rim Grip & Pedal Rumble (6.8s - 9.4s)
@@ -355,10 +368,10 @@ class CalibrationView(Adw.PreferencesPage):
                 if self.on_toast_requested:
                     GLib.idle_add(self.on_toast_requested, "Self-Test (3/3): Testing rim grip rumble & pedal haptic motors...")
 
-                self.device.set_display_text("VIB")
+                dev.set_display_text("VIB")
 
                 # Left grip rumble (1.0s)
-                self.device.send_handle_vibration(180, 0)
+                dev.send_handle_vibration(180, 0)
                 if not sleep_check(1.0):
                     return
 
@@ -366,7 +379,7 @@ class CalibrationView(Adw.PreferencesPage):
                     return
 
                 # Right grip rumble (1.0s)
-                self.device.send_handle_vibration(0, 180)
+                dev.send_handle_vibration(0, 180)
                 if not sleep_check(1.0):
                     return
 
@@ -374,44 +387,44 @@ class CalibrationView(Adw.PreferencesPage):
                     return
 
                 # Both handles + base 18 Hz tactile pulse (0.6s)
-                self.device.send_handle_vibration(220, 220)
+                dev.send_handle_vibration(220, 220)
                 end_vib = time.time() + 0.6
                 half = (1.0 / 18.0) / 2.0
                 while time.time() < end_vib and not self._abort_self_test:
-                    self.device.send_constant_force(4500)
+                    dev.send_constant_force(4500)
                     if not sleep_check(half):
                         return
-                    self.device.send_constant_force(-4500)
+                    dev.send_constant_force(-4500)
                     if not sleep_check(half):
                         return
 
                 # -------------------------------------------------------------
                 # PHASE 4: Pass & Restoration (9.4s - 10.0s)
                 # -------------------------------------------------------------
-                self.device.send_constant_force(0)
-                self.device.send_handle_vibration(0, 0)
-                self.device.send_centering_spring(0)
-                self.device.set_display_text("OK")
+                dev.send_constant_force(0)
+                dev.send_handle_vibration(0, 0)
+                dev.send_centering_spring(0)
+                dev.set_display_text("OK")
                 if not sleep_check(0.6):
                     return
-                self.device.clear_display()
+                dev.clear_display()
 
                 if self.on_toast_requested:
                     GLib.idle_add(self.on_toast_requested, "Hardware Self-Test Complete: All displays, LEDs, DD motor, and haptic actuators passed!")
 
             finally:
-                if gen != self._self_test_gen:
-                    return  # superseded: the new run owns the hardware now
-                self._self_test_running = False
-                try:
-                    self.device.stop_all_forces()
-                    self.device.set_revleds([(0, 0, 0)] * 9)
-                    self.device.set_flagleds([(0, 0, 0)] * 6)
-                    self.device.clear_display()
-                except Exception:
-                    pass
-                GLib.idle_add(self.self_test_btn.set_sensitive, True)
-                GLib.idle_add(self.self_test_btn.set_label, "Run Self-Test")
+                # Superseded runs own nothing: skip cleanup, the new run does it.
+                if gen == self._self_test_gen:
+                    self._self_test_running = False
+                    try:
+                        dev.stop_all_forces()
+                        dev.set_revleds([(0, 0, 0)] * 9)
+                        dev.set_flagleds([(0, 0, 0)] * 6)
+                        dev.clear_display()
+                    except Exception:
+                        pass
+                    GLib.idle_add(self.self_test_btn.set_sensitive, True)
+                    GLib.idle_add(self.self_test_btn.set_label, "Run Self-Test")
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -430,11 +443,10 @@ class CalibrationView(Adw.PreferencesPage):
             self.self_test_btn.set_sensitive(True)
             self.self_test_btn.set_label("Run Self-Test")
         if self.device:
-            self.device._abort_vibration = True
-            self.device.stop_all_forces()
-            # Inhibit AFTER zeroing: background engines (haptics, dynamic FFB)
-            # go silent until a switch or self-test explicitly re-arms.
-            self.device.output_inhibited = True
+            # Zeroes go out first, then the gate closes, atomically: background
+            # engines (haptics, dynamic FFB) go silent until a switch or
+            # self-test explicitly re-arms.
+            self.device.emergency_stop()
             try:
                 self.device.set_revleds([(0, 0, 0)] * 9)
                 self.device.set_flagleds([(0, 0, 0)] * 6)

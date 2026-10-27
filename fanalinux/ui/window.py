@@ -67,8 +67,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Header Bar
         header = Adw.HeaderBar()
-        title_widget = Adw.WindowTitle(title="FanaLinux", subtitle="Fanatec Control Suite &amp; Telemetry")
-        header.set_title_widget(title_widget)
 
         # View Switcher in Header
         self.view_stack = Adw.ViewStack()

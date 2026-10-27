@@ -229,7 +229,9 @@ def run_install(update: bool = False) -> tuple:
         if head.returncode != 0 or not expected_head:
             return False, "Cannot fingerprint the driver tree; aborting"
         stage_check = (f"[ \"$(git -C \"$STAGE\" rev-parse HEAD)\" = {shlex.quote(expected_head)} ]"
-                       f" && [ -z \"$(git -C \"$STAGE\" status --porcelain)\" ]")
+                       f" && [ -z \"$(git -C \"$STAGE\" status --porcelain)\" ]"
+                       f" && [ \"$(git -C \"$STAGE\" remote get-url origin)\" = {shlex.quote(REPO_URL)}"
+                       f" -o \"$(git -C \"$STAGE\" remote get-url origin)\" = {shlex.quote(REPO_URL + '.git')} ]")
         install_cmd = ("STAGE=$(mktemp -d /root/.fanalinux-driver-XXXXXX)"
                        " && trap 'rm -rf \"$STAGE\"' EXIT"
                        f" && cp -a {shlex.quote(CACHE_DIR)}/. \"$STAGE\"/"
