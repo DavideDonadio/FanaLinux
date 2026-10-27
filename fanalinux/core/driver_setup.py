@@ -50,13 +50,37 @@ def driver_module_present() -> bool:
         return False
 
 
+def _dkms_versions() -> list:
+    """Versions DKMS reports as installed (authoritative over /usr/src)."""
+    try:
+        r = subprocess.run(["dkms", "status", "hid-fanatec"],
+                           capture_output=True, text=True, timeout=15)
+    except Exception:
+        return []
+    versions = []
+    for line in (r.stdout or "").splitlines():
+        head, _, state = line.partition(":")
+        if state.strip() != "installed":
+            continue
+        name, _, ver = head.partition("/")
+        ver = ver.split(",")[0].strip()
+        if name.strip() == "hid-fanatec" and ver and ver not in versions:
+            versions.append(ver)
+    return versions
+
+
 def installed_version() -> str | None:
-    """Installed driver version from /usr/src (None if absent)."""
+    """Installed driver version: DKMS status first, /usr/src glob as fallback."""
     import glob
-    dirs = sorted(glob.glob("/usr/src/hid-fanatec-*"))
+    versions = _dkms_versions()
+    if versions:
+        return versions[0]
+    dirs = glob.glob("/usr/src/hid-fanatec-*")
     if not dirs:
         return None
-    ver = os.path.basename(dirs[-1]).removeprefix("hid-fanatec-")
+    # Numeric version order, not lexicographic (0.2.10 beats 0.2.9).
+    best = max(dirs, key=lambda d: _version_key(os.path.basename(d).removeprefix("hid-fanatec-")))
+    ver = os.path.basename(best).removeprefix("hid-fanatec-")
     return ver or None
 
 
@@ -133,6 +157,8 @@ def run_install(update: bool = False) -> tuple:
                                     "FETCH_HEAD"],
                                    capture_output=True, text=True, timeout=120)
         else:
+            # A non-repo cache dir is junk from an older release: replace it.
+            shutil.rmtree(CACHE_DIR, ignore_errors=True)
             emit(f"Cloning {REPO_URL}")
             # Full clone: upstream version detection needs the tags.
             r = subprocess.run(["git", "clone", REPO_URL, CACHE_DIR],
@@ -160,6 +186,16 @@ def run_install(update: bool = False) -> tuple:
                 return False, "Cannot determine driver version from the clone; aborting"
         emit(f"Driver tree version: {r.stdout.strip()}")
 
+        # The privileged step executes a script from a user-writable cache:
+        # refuse when the checkout points anywhere but upstream.
+        r = subprocess.run(["git", "-C", CACHE_DIR, "remote", "get-url", "origin"],
+                           capture_output=True, text=True, timeout=30)
+        origin = (r.stdout or "").strip().rstrip("/")
+        if origin.endswith(".git"):
+            origin = origin[:-4]
+        if r.returncode != 0 or origin != REPO_URL:
+            return False, f"Refusing: cache origin is {origin or 'unknown'}, not {REPO_URL}"
+
         # Upstream install.sh must run as root; udev reload needs root too,
         # so both go through the single pkexec authentication.
         # SUDO_USER lets their script fingerprint the real version instead of
@@ -171,7 +207,10 @@ def run_install(update: bool = False) -> tuple:
             invoking_user = ""
         # Upstream install.sh refuses when DKMS already lists the module, so any
         # existing entries are removed first (no-op on a clean system).
-        pre = ""
+        # Upstream install.sh refuses when DKMS already lists the module, so any
+        # existing entries are removed first (no-op on a clean system). If the
+        # new build then fails, the same privileged script reinstalls the old
+        # sources from /usr/src before reporting failure.
         dkms_dir = "/var/lib/dkms/hid-fanatec"
         try:
             old_versions = sorted(os.listdir(dkms_dir)) if os.path.isdir(dkms_dir) else []
@@ -179,11 +218,17 @@ def run_install(update: bool = False) -> tuple:
             old_versions = []
         removals = " && ".join(
             f"dkms remove -m hid-fanatec -v {shlex.quote(v)} --all" for v in old_versions)
-        if removals:
-            pre = removals + " && "
-        root_cmd = (f"{pre}cd {shlex.quote(CACHE_DIR)} && bash install.sh"
-                    " && udevadm control --reload-rules"
-                    " && udevadm trigger --subsystem-match=hidraw")
+        install_cmd = f"cd {shlex.quote(CACHE_DIR)} && bash install.sh"
+        post = "udevadm control --reload-rules && udevadm trigger --subsystem-match=hidraw"
+        if removals and old_versions:
+            rollback = " && ".join(
+                f"dkms install -m hid-fanatec -v {shlex.quote(v)} --all" for v in old_versions)
+            root_cmd = (f"{removals} && (({install_cmd} && {post}) || "
+                        f"{{ echo FANALINUX_ROLLBACK; {rollback}; exit 1; }})")
+        elif removals:
+            root_cmd = f"{removals} && {install_cmd} && {post}"
+        else:
+            root_cmd = f"{install_cmd} && {post}"
         pkexec_cmd = ["pkexec"]
         if invoking_user:
             pkexec_cmd += ["env", f"SUDO_USER={invoking_user}"]
@@ -196,5 +241,14 @@ def run_install(update: bool = False) -> tuple:
         if r.returncode != 0:
             if "dismissed" in (r.stderr or "").lower() or r.returncode in (126, 127):
                 return False, "Administrator authentication cancelled"
-            return False, tail or f"install failed (see {LOG_PATH})"
+            msg = tail or f"install failed (see {LOG_PATH})"
+            if old_versions and "FANALINUX_ROLLBACK" in (r.stdout or ""):
+                # Same-script rollback ran: verify the old module is back.
+                restored = sorted(set(_dkms_versions()) & set(old_versions))
+                if restored:
+                    msg += f"\nPrevious driver {restored[0]} was restored."
+                else:
+                    msg += ("\nPrevious driver could NOT be restored: "
+                            "reinstall it manually before rebooting.")
+            return False, msg
         return True, tail

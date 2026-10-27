@@ -9,6 +9,7 @@ import errno
 import glob
 import logging
 import os
+import re
 import select
 import threading
 import time
@@ -39,6 +40,14 @@ from fanalinux.core.tuning import TuningProfile
 logger = logging.getLogger("fanalinux.device")
 
 
+def parse_hid_ids(uevent_text: str) -> tuple | None:
+    """Extract (vendor_id, product_id) from a hidraw uevent dump."""
+    match = re.search(r"HID_ID=\S+:([0-9A-Fa-f]+):([0-9A-Fa-f]+)", uevent_text)
+    if not match:
+        return None
+    return int(match.group(1), 16), int(match.group(2), 16)
+
+
 class FanatecDevice:
     def __init__(self, vendor_id: int = FANATEC_VENDOR_ID, product_id: int = PID_CSL_DD):
         self.vendor_id = vendor_id
@@ -48,6 +57,9 @@ class FanatecDevice:
         self.connected = False
         self._abort_vibration = False
         self._vibration_token = 0
+        # Set by the emergency cutoff: force outputs stay silent until an
+        # explicit user action (force switch, self-test) re-arms them.
+        self.output_inhibited = False
         self.active_sen = 900
         self._lock = threading.RLock()
 
@@ -113,6 +125,14 @@ class FanatecDevice:
             self._fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
             self.hidraw_path = path
             self.connected = True
+            # Propagate the real wheelbase identity (uevent HID_ID=bus:vend:prod).
+            try:
+                with open(f"/sys/class/hidraw/{os.path.basename(path)}/device/uevent") as f:
+                    ids = parse_hid_ids(f.read())
+                if ids and ids[0] == self.vendor_id:
+                    self.product_id = ids[1]
+            except Exception:
+                pass
             logger.info(f"Connected to Fanatec on {path}")
 
             # Send initialization handshake (may disconnect on fatal HID errors)
@@ -320,6 +340,8 @@ class FanatecDevice:
         Send constant torque command to direct drive motor.
         level: signed integer from -32768 (full left) to +32767 (full right). 0 = no force.
         """
+        if self.output_inhibited:
+            return
         if self._fd is None or not self.connected:
             return
         if level == 0:
@@ -336,6 +358,8 @@ class FanatecDevice:
         Engage hardware autocenter spring effect.
         strength: 0 to 100% (0 disables the spring).
         """
+        if self.output_inhibited:
+            return
         if self._fd is None or not self.connected:
             return
         if strength <= 0:
@@ -351,6 +375,8 @@ class FanatecDevice:
         Apply mechanical friction/damper resistance to wheel rotation.
         friction: 0 to 100% (0 disables friction).
         """
+        if self.output_inhibited:
+            return
         if self._fd is None or not self.connected:
             return
         if friction <= 0:
@@ -365,6 +391,8 @@ class FanatecDevice:
         Trigger rim grip vibration motors and peripheral pedal rumble motors.
         left, right: 0 to 255 intensity.
         """
+        if self.output_inhibited:
+            return
         if self._fd is None or not self.connected:
             return
         payload = [

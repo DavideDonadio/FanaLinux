@@ -55,6 +55,9 @@ class MainWindow(Adw.ApplicationWindow):
         )
         # Last game that owned telemetry (guards direct A->B switches)
         self._last_game_id = None
+        # Owner of the running telemetry session: a game id, or "manual".
+        # Game exit only stops sessions its own game started.
+        self._telemetry_owner = None
 
         # Toast Overlay
         self.toast_overlay = Adw.ToastOverlay()
@@ -197,9 +200,8 @@ class MainWindow(Adw.ApplicationWindow):
             print(f"Notice: CSS provider error: {e}")
 
     def show_toast(self, message: str):
-        # Escape any raw ampersands for Pango markup safety
-        escaped = message.replace("&", "&amp;") if "&amp;" not in message else message
-        toast = Adw.Toast(title=escaped)
+        # Toast titles are plain text, not markup: no escaping.
+        toast = Adw.Toast(title=message)
         toast.set_timeout(3)
         self.toast_overlay.add_toast(toast)
 
@@ -219,12 +221,14 @@ class MainWindow(Adw.ApplicationWindow):
         if (self.telemetry_mgr.enabled and self._last_game_id is not None
                 and self._last_game_id != new_game_id):
             self.telemetry_mgr.stop()
+            self._telemetry_owner = None
             self.leds_view.set_telemetry_active(False)
         self._last_game_id = new_game_id
 
         if auto_telem:
             telem_type = game_info.get("telemetry_type") or "ac_udp"
             self.telemetry_mgr.start(telemetry_type=telem_type)
+            self._telemetry_owner = new_game_id
             self.leds_view.set_telemetry_active(True)
 
         self.profiles_view.update_status(game_info)
@@ -238,9 +242,11 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._apply_game_stopped, game_info, fallback_preset)
 
     def _apply_game_stopped(self, game_info, fallback_preset):
+        exiting_id = game_info.get("id")
         self._last_game_id = None
-        if self.telemetry_mgr.enabled:
+        if self.telemetry_mgr.enabled and self._telemetry_owner in (None, exiting_id):
             self.telemetry_mgr.stop()
+            self._telemetry_owner = None
             self.leds_view.set_telemetry_active(False)
 
         profile = load_preset(fallback_preset)

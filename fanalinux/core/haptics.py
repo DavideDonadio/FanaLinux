@@ -34,6 +34,7 @@ class HapticEngine:
         self._last_lock_pulse = 0.0
         self._last_spin_pulse = 0.0
         self._last_slip_pulse = 0.0
+        self._last_oversteer_pulse = 0.0
         self._last_susp_pulse = 0.0
         self._last_suspension = [0.0, 0.0, 0.0, 0.0]
         self._suspension_primed = False
@@ -139,16 +140,17 @@ class HapticEngine:
         front_slip = max(abs(fl_slip), abs(fr_slip))
         rear_slip = max(abs(rl_slip), abs(rr_slip))
 
+        # Evaluated independently: either end can step out regardless of the other.
         if self.settings.understeer_enabled and speed_kmh > 20.0 and abs(steer_angle) > 0.1:
             # Front tires scrubbing significantly more than rear
             if (front_slip - rear_slip) > 0.15 and (now - self._last_slip_pulse) >= 0.09:
                 self._last_slip_pulse = now
                 intensity = max(10, min(100, self.settings.understeer_strength * 10))
                 self.trigger_pulse(intensity, 0.08)
-        elif self.settings.oversteer_enabled and speed_kmh > 20.0:
+        if self.settings.oversteer_enabled and speed_kmh > 20.0:
             # Rear tires stepping out
-            if (rear_slip - front_slip) > 0.20 and (now - self._last_slip_pulse) >= 0.09:
-                self._last_slip_pulse = now
+            if (rear_slip - front_slip) > 0.20 and (now - self._last_oversteer_pulse) >= 0.09:
+                self._last_oversteer_pulse = now
                 intensity = max(10, min(100, self.settings.oversteer_strength * 10))
                 self.trigger_pulse(intensity, 0.08)
 

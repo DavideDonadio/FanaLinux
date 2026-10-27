@@ -129,6 +129,102 @@ class TestGameSwitchTelemetry(unittest.TestCase):
         finally:
             win.detector.stop()
 
+    def test_stale_stop_does_not_kill_new_session(self):
+        """A late stop event for game A must not kill game B's session."""
+        win, calls = self._window_with_fake_mgr()
+        try:
+            game_a = {"id": "ac", "name": "Assetto Corsa", "telemetry_type": "ac_udp"}
+            game_b = {"id": "ams2", "name": "Automobilista 2", "telemetry_type": "ams2_udp"}
+            win._apply_game_started(game_a, "Default", True)
+            win._apply_game_started(game_b, "Default", True)
+            calls.clear()
+            win._apply_game_stopped(game_a, "Default")
+            self.assertNotIn(("stop",), calls)
+            self.assertEqual(win._telemetry_owner, "ams2")
+        finally:
+            win.detector.stop()
+
+    def test_owner_exit_stops_owned_session(self):
+        """Exiting the owning game stops telemetry and clears ownership."""
+        win, calls = self._window_with_fake_mgr()
+        try:
+            game_a = {"id": "ac", "name": "Assetto Corsa", "telemetry_type": "ac_udp"}
+            win._apply_game_started(game_a, "Default", True)
+            calls.clear()
+            win._apply_game_stopped(game_a, "Default")
+            self.assertIn(("stop",), calls)
+            self.assertIsNone(win._telemetry_owner)
+        finally:
+            win.detector.stop()
+
+    def test_haptic_engines_obey_emergency_inhibit(self):
+        """Inhibited device must swallow every force output (cutoff is global)."""
+        from unittest import mock
+        from fanalinux.core.device import FanatecDevice
+        dev = FanatecDevice()
+        dev._fd = 1
+        dev.connected = True
+        with mock.patch.object(FanatecDevice, "write_report") as wr:
+            dev.send_constant_force(5000)
+            dev.send_centering_spring(50)
+            dev.send_damper_friction(50)
+            dev.send_handle_vibration(100, 100)
+            self.assertEqual(wr.call_count, 4)
+            dev.output_inhibited = True
+            dev.send_constant_force(5000)
+            dev.send_centering_spring(50)
+            dev.send_damper_friction(50)
+            dev.send_handle_vibration(100, 100)
+            self.assertEqual(wr.call_count, 4)
+            dev.output_inhibited = False
+            dev.send_damper_friction(50)
+            self.assertEqual(wr.call_count, 5)
+
+    def test_product_id_parsed_from_uevent(self):
+        """Podium DD1 uevent must resolve to its product id, junk to None."""
+        from fanalinux.core.device import parse_hid_ids
+        from fanalinux.core.protocol import PID_CSL_DD
+        sample = "HID_ID=0003:00000EB7:00000020\nHID_NAME=Fanatec CSL DD\n"
+        self.assertEqual(parse_hid_ids(sample), (0x0EB7, PID_CSL_DD))
+        self.assertIsNone(parse_hid_ids("HID_NAME=nope\n"))
+
+    def test_oversteer_fires_without_understeer(self):
+        """Rear stepping out must pulse even when the understeer gate is open."""
+        from fanalinux.core.haptics import HapticEngine
+        from fanalinux.core.vibration import VibrationSettings
+        fired = []
+        engine = HapticEngine(device=type("D", (), {"connected": True})(),
+                              settings=VibrationSettings(understeer_enabled=True,
+                                                         oversteer_enabled=True,
+                                                         wheel_spin_enabled=False))
+        engine._running = True  # skip worker thread, exercise dispatch logic only
+        engine.trigger_pulse = lambda intensity, dur: fired.append((intensity, dur))
+        # Understeer outer gate open (steering + speed) but front not scrubbing;
+        # rear clearly stepping out.
+        engine.update_telemetry(rpm=1000, max_rpm=8000, abs_active=False, tc_active=False,
+                                speed_kmh=60.0, wheel_slip=(0.05, 0.05, 0.45, 0.45),
+                                wheel_speed=(0, 0, 0, 0), suspension=(0, 0, 0, 0),
+                                steer_angle=0.5)
+        self.assertTrue(fired)
+
+    def test_dkms_version_parsing(self):
+        """Only installed module lines count; unknown lines are skipped."""
+        from unittest import mock
+        from fanalinux.core import driver_setup
+        out = ("hid-fanatec/0.2.3-18-g6e58466, 7.2.11-200.fc44.x86_64, x86_64: installed\n"
+               "hid-fanatec/0.2.2, 7.2.11-200.fc44.x86_64, x86_64: built\n"
+               "v4l2loopback/0.1.0, 7.2.11-200.fc44.x86_64, x86_64: installed\n")
+        with mock.patch("subprocess.run") as sr:
+            sr.return_value.stdout = out
+            self.assertEqual(driver_setup._dkms_versions(), ["0.2.3-18-g6e58466"])
+            sr.return_value.stdout = ""
+            self.assertEqual(driver_setup._dkms_versions(), [])
+
+    def test_car_database_loads(self):
+        """The packaged car database must be present and non-empty."""
+        from fanalinux.core.telemetry.manager import CAR_DATABASE
+        self.assertTrue(len(CAR_DATABASE) > 0)
+
 
 class TestTelemetryLifecycle(unittest.TestCase):
     def test_stop_wakes_blocked_worker(self):

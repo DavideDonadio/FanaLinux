@@ -25,6 +25,9 @@ class CalibrationView(Adw.PreferencesPage):
         self._last_raw_steering = 32768
         self._abort_self_test = False
         self._self_test_running = False
+        # Run generation: a restarted test bumps this so the stale worker
+        # goes inert instead of fighting the new run.
+        self._self_test_gen = 0
 
         # Ensure wide clamp for 2-column layout
         GLib.idle_add(widen_page_clamp, self)
@@ -155,6 +158,7 @@ class CalibrationView(Adw.PreferencesPage):
             return
         if state:
             strength = int(self.spring_adj.get_value())
+            self.device.output_inhibited = False  # explicit re-arm after cutoff
             self.device.send_centering_spring(strength)
             if self.on_toast_requested:
                 self.on_toast_requested(f"Centering spring engaged ({strength}%)")
@@ -170,6 +174,7 @@ class CalibrationView(Adw.PreferencesPage):
             return
         if state:
             fric = int(self.friction_adj.get_value())
+            self.device.output_inhibited = False  # explicit re-arm after cutoff
             self.device.send_damper_friction(fric)
             if self.on_toast_requested:
                 self.on_toast_requested(f"Motor friction resistance applied ({fric}%)")
@@ -213,18 +218,24 @@ class CalibrationView(Adw.PreferencesPage):
 
     def _run_full_self_test(self):
         self._abort_self_test = False
+        self._self_test_gen += 1
+        gen = self._self_test_gen
+        if self.device:
+            self.device.output_inhibited = False  # deliberate force run re-arms
         self._self_test_running = True
         self.self_test_btn.set_sensitive(False)
         self.self_test_btn.set_label("Running (10s)...")
 
         def _worker():
+            def live() -> bool:
+                return gen == self._self_test_gen and not self._abort_self_test
             def sleep_check(seconds: float) -> bool:
                 end_t = time.time() + seconds
                 while time.time() < end_t:
-                    if self._abort_self_test:
+                    if not live():
                         return False
                     time.sleep(min(0.04, max(0.005, end_t - time.time())))
-                return not self._abort_self_test
+                return live()
 
             try:
                 # -------------------------------------------------------------
@@ -389,6 +400,8 @@ class CalibrationView(Adw.PreferencesPage):
                     GLib.idle_add(self.on_toast_requested, "Hardware Self-Test Complete: All displays, LEDs, DD motor, and haptic actuators passed!")
 
             finally:
+                if gen != self._self_test_gen:
+                    return  # superseded: the new run owns the hardware now
                 self._self_test_running = False
                 try:
                     self.device.stop_all_forces()
@@ -411,6 +424,7 @@ class CalibrationView(Adw.PreferencesPage):
 
     def _on_emergency_stop_clicked(self, btn):
         self._abort_self_test = True
+        self._self_test_gen += 1  # retire any running worker immediately
         self._self_test_running = False
         if hasattr(self, 'self_test_btn'):
             self.self_test_btn.set_sensitive(True)
@@ -418,6 +432,9 @@ class CalibrationView(Adw.PreferencesPage):
         if self.device:
             self.device._abort_vibration = True
             self.device.stop_all_forces()
+            # Inhibit AFTER zeroing: background engines (haptics, dynamic FFB)
+            # go silent until a switch or self-test explicitly re-arms.
+            self.device.output_inhibited = True
             try:
                 self.device.set_revleds([(0, 0, 0)] * 9)
                 self.device.set_flagleds([(0, 0, 0)] * 6)
