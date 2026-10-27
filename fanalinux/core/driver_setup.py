@@ -70,18 +70,32 @@ def _dkms_versions() -> list:
 
 
 def installed_version() -> str | None:
-    """Installed driver version: DKMS status first, /usr/src glob as fallback."""
+    """Installed driver version: DKMS status first, /usr/src glob as fallback.
+    Result is cached (dkms spawns a slow subprocess): refresh at most every
+    two minutes, or immediately after invalidate_installed_version()."""
     import glob
+    import time
+    now = time.monotonic()
+    cached_at = getattr(installed_version, "_at", 0)
+    if now - cached_at < 120 and hasattr(installed_version, "_val"):
+        return installed_version._val
     versions = _dkms_versions()
-    if versions:
-        return versions[0]
-    dirs = glob.glob("/usr/src/hid-fanatec-*")
-    if not dirs:
-        return None
-    # Numeric version order, not lexicographic (0.2.10 beats 0.2.9).
-    best = max(dirs, key=lambda d: _version_key(os.path.basename(d).removeprefix("hid-fanatec-")))
-    ver = os.path.basename(best).removeprefix("hid-fanatec-")
-    return ver or None
+    ver = versions[0] if versions else None
+    if ver is None:
+        dirs = glob.glob("/usr/src/hid-fanatec-*")
+        if dirs:
+            # Numeric version order, not lexicographic (0.2.10 beats 0.2.9).
+            best = max(dirs, key=lambda d: _version_key(os.path.basename(d).removeprefix("hid-fanatec-")))
+            ver = os.path.basename(best).removeprefix("hid-fanatec-") or None
+    installed_version._val = ver
+    installed_version._at = now
+    return ver
+
+
+def invalidate_installed_version():
+    """Drop the installed_version() cache (call after driver install/update)."""
+    if hasattr(installed_version, "_at"):
+        installed_version._at = 0
 
 
 def _version_key(version: str) -> tuple:

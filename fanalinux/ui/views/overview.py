@@ -39,6 +39,13 @@ class OverviewView(Adw.PreferencesPage):
         self._button_chips = {}
         self.hardware_config = load_hardware_config()
         self.current_rim_info = get_rim_info(self.hardware_config.rim_id)
+        self._rim_textures = {}
+        self._pending_rim_idx = -1
+        self._rim_apply_id = 0
+        # Decode every thumbnail once while the UI is idle, so scrolling the
+        # rim list never blocks on image loading.
+        self._preload_rims = list(KNOWN_RIMS)
+        GLib.idle_add(self._preload_next_rim_texture)
         self._build_ui()
 
     def _create_thumbnail(self, image_path: str, fallback_icon: str, size: int = 102, box_width: int = 128, box_height: int = 108) -> tuple[Gtk.Box, Gtk.Image]:
@@ -330,7 +337,36 @@ class OverviewView(Adw.PreferencesPage):
                 self._create_and_add_chip(hat_id, hat_label)
 
     def _on_rim_selected(self, dropdown, param):
+        # Scrolling the popup fires this per highlight step: wait until the
+        # selection settles before the expensive apply (disk + rebuild).
         idx = dropdown.get_selected()
+        if not (0 <= idx < len(KNOWN_RIMS)):
+            return
+        self._pending_rim_idx = idx
+        if getattr(self, "_rim_apply_id", 0):
+            GLib.source_remove(self._rim_apply_id)
+        self._rim_apply_id = GLib.timeout_add(250, self._apply_pending_rim)
+
+    def _rim_texture(self, rim_img_path):
+        cached = self._rim_textures.get(rim_img_path)
+        if cached is None and os.path.exists(rim_img_path):
+            try:
+                cached = Gdk.Texture.new_from_file(Gio.File.new_for_path(rim_img_path))
+            except Exception:
+                cached = False
+            self._rim_textures[rim_img_path] = cached
+        return cached or None
+
+    def _preload_next_rim_texture(self):
+        if not self._preload_rims:
+            return False
+        rim = self._preload_rims.pop(0)
+        self._rim_texture(os.path.join(RESOURCES_DIR, "rims", rim.get("image", "formula_v2.png")))
+        return True
+
+    def _apply_pending_rim(self):
+        self._rim_apply_id = 0
+        idx = getattr(self, "_pending_rim_idx", -1)
         if 0 <= idx < len(KNOWN_RIMS):
             rim_info = KNOWN_RIMS[idx]
             self.hardware_config.rim_id = rim_info["id"]
@@ -341,16 +377,16 @@ class OverviewView(Adw.PreferencesPage):
             # Dynamically rebuild button matrix to match newly selected rim
             self._rebuild_button_matrix(rim_info)
 
-            # Update prefix image
+            # Update prefix image (decoded once per rim, then cached)
             rim_img_path = os.path.join(RESOURCES_DIR, "rims", rim_info.get("image", "formula_v2.png"))
-            if os.path.exists(rim_img_path):
-                f = Gio.File.new_for_path(rim_img_path)
-                tex = Gdk.Texture.new_from_file(f)
+            tex = self._rim_texture(rim_img_path)
+            if tex is not None:
                 self.rim_thumbnail.set_from_paintable(tex)
                 self.rim_thumbnail.set_pixel_size(102)
 
             if self.on_rim_changed:
                 self.on_rim_changed(rim_info)
+        return False
 
     def _refresh_update_row(self):
         state = load_update_state()
@@ -496,6 +532,8 @@ class OverviewView(Adw.PreferencesPage):
         GLib.idle_add(self._finish_driver_install, ok, tail)
 
     def _finish_driver_install(self, ok, tail):
+        from fanalinux.core import driver_setup
+        driver_setup.invalidate_installed_version()
         self._ff_installing = False
         self.ff_btn.set_sensitive(True)
         if ok:
