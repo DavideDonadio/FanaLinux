@@ -103,15 +103,37 @@ class ProfilesView(Adw.PreferencesPage):
         self._populate_games()
         self.add(self.games_group)
 
+    # Games whose FFB/LEDs/display run natively through the kernel driver.
+    NATIVE_DRIVER_IDS = {"acc", "assetto_corsa_evo", "rfactor2", "lmu"}
+
     def _populate_games(self):
+        # Notice card first: same in-group spacing as the calibration shortcut
+        # row, visually separate from the game rows below it.
+        tip_row = Adw.ActionRow()
+        tip_row.set_title("Natively Supported Games")
+        tip_row.set_subtitle(
+            "ACC, EVO, rF2 and LMU drive force feedback, LEDs and display through the kernel driver — no app telemetry needed."
+        )
+        tip_row.set_subtitle_lines(2)
+        tip_row.set_icon_name("help-about-symbolic")
+        tip_row.set_activatable(False)
+        self.games_group.add(tip_row)
+
         presets = list_presets()
         all_games = self.detector.get_all_games()
 
         def _is_supported(game):
             return bool(game.get("has_telemetry") and game.get("telemetry_type"))
 
-        # Supported games first, unwired ones last in the same list.
-        ordered = sorted(all_games, key=lambda g: not _is_supported(g))
+        def _rank(game):
+            if _is_supported(game):
+                return 0
+            if game["id"] in self.NATIVE_DRIVER_IDS:
+                return 1
+            return 2
+
+        # Supported first, native-via-driver next, truly unsupported last.
+        ordered = sorted(all_games, key=_rank)
         for game in ordered:
             self.games_group.add(self._make_game_row(game, presets, supported=_is_supported(game)))
 
@@ -122,6 +144,8 @@ class ProfilesView(Adw.PreferencesPage):
         is_enabled = mapping.get("enabled", True)
         auto_telem = mapping.get("auto_telemetry", game.get("has_telemetry", False))
 
+        # Natively supported through the kernel driver: the game drives
+        # FFB, LEDs and display itself, profiles still auto-apply tuning.
         if not supported:
             # Flat row: no expander arrow, nothing to open.
             row = Adw.ActionRow()
@@ -133,9 +157,19 @@ class ProfilesView(Adw.PreferencesPage):
                 row.add_prefix(flat_img)
             else:
                 row.set_icon_name("input-gaming-symbolic")
-            badge = Gtk.Label(label="Not supported")
-            badge.set_valign(Gtk.Align.CENTER)
-            badge.add_css_class("status-pill-unsupported")
+            if gid in self.NATIVE_DRIVER_IDS:
+                if gid == "lmu":
+                    row.set_subtitle(
+                        "Requires the <a href=\"https://steamcommunity.com/sharedfiles/filedetails/?id=3536726840\"" 
+                        "title=\"Community Linux setup guide\">GE-Proton10-34-LMU-hid_fixes</a> "
+                        "Proton build with inverted FFB in the game settings.")
+                badge = Gtk.Label(label="Via driver")
+                badge.set_valign(Gtk.Align.CENTER)
+                badge.add_css_class("status-pill-native")
+            else:
+                badge = Gtk.Label(label="Not supported")
+                badge.set_valign(Gtk.Align.CENTER)
+                badge.add_css_class("status-pill-unsupported")
             row.add_suffix(badge)
             return row
 

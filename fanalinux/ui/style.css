@@ -90,6 +90,15 @@ window {
     font-size: 0.85rem;
 }
 
+.status-pill-native {
+    background-color: #2ec27e;
+    color: #ffffff;
+    font-weight: bold;
+    border-radius: 9999px;
+    padding: 3px 12px;
+    font-size: 0.85rem;
+}
+
 
 .status-indicator-box {
     padding: 6px 14px;
