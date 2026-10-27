@@ -218,7 +218,24 @@ def run_install(update: bool = False) -> tuple:
             old_versions = []
         removals = " && ".join(
             f"dkms remove -m hid-fanatec -v {shlex.quote(v)} --all" for v in old_versions)
-        install_cmd = f"cd {shlex.quote(CACHE_DIR)} && bash install.sh"
+        # Trust boundary: the cache is user-writable, so root never executes
+        # from it. Pin the verified HEAD before auth; the privileged script
+        # copies the tree to a root-owned stage and aborts unless origin, HEAD
+        # and clean status all match. Any post-check tampering changes the hash
+        # or dirties the tree, so it cannot slip through the auth delay.
+        head = subprocess.run(["git", "-C", CACHE_DIR, "rev-parse", "HEAD"],
+                              capture_output=True, text=True, timeout=30)
+        expected_head = (head.stdout or "").strip()
+        if head.returncode != 0 or not expected_head:
+            return False, "Cannot fingerprint the driver tree; aborting"
+        stage_check = (f"[ \"$(git -C \"$STAGE\" rev-parse HEAD)\" = {shlex.quote(expected_head)} ]"
+                       f" && [ -z \"$(git -C \"$STAGE\" status --porcelain)\" ]")
+        install_cmd = ("STAGE=$(mktemp -d /root/.fanalinux-driver-XXXXXX)"
+                       " && trap 'rm -rf \"$STAGE\"' EXIT"
+                       f" && cp -a {shlex.quote(CACHE_DIR)}/. \"$STAGE\"/"
+                       " && cd \"$STAGE\""
+                       f" && {stage_check}"
+                       " && bash install.sh")
         post = "udevadm control --reload-rules && udevadm trigger --subsystem-match=hidraw"
         if removals and old_versions:
             rollback = " && ".join(
