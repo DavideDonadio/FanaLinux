@@ -180,9 +180,14 @@ class OverviewView(Adw.PreferencesPage):
         # Kernel FFB driver: force feedback needs hid-fanatecff on the system
         self.ff_row = Adw.ActionRow()
         self.ff_row.set_title("Kernel FFB Driver")
-        self.ff_row.set_subtitle("hid-fanatecff: out-of-tree module exposing force feedback")
+        self.ff_row.set_subtitle("Out-of-tree module exposing force feedback")
         ff_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         ff_box.set_valign(Gtk.Align.CENTER)
+        ff_link = Gtk.LinkButton.new_with_label(
+            "https://github.com/gotzl/hid-fanatecff", "hid-fanatecff")
+        ff_link.set_valign(Gtk.Align.CENTER)
+        ff_link.set_tooltip_text("Open the driver author's repository")
+        ff_box.append(ff_link)
         self.ff_lbl = Gtk.Label(label="Checking…")
         self.ff_lbl.add_css_class("val-badge")
         ff_box.append(self.ff_lbl)
@@ -399,7 +404,7 @@ class OverviewView(Adw.PreferencesPage):
         for cls in ("success", "error"):
             self.ff_lbl.remove_css_class(cls)
         if effects:
-            self.ff_lbl.set_text(f"Installed ({len(effects)} effects)")
+            self.ff_lbl.set_text("Active")
             self.ff_lbl.add_css_class("success")
             self.ff_btn.set_visible(False)
         elif has_wheel:
