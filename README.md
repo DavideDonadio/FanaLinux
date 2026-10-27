@@ -33,7 +33,7 @@ fanalinux
 
 Flow: **Tuning** → adjust → **Apply to Wheelbase**. \
 **Remember to long-press the Tuning button for the full Advanced menu** (all 14 parameters). \
-Game force feedback needs the hid-fanatecff kernel module — **Overview** installs it in one click.
+Game force feedback needs the [hid-fanatecff](https://github.com/gotzl/hid-fanatecff) kernel module — You can install it from inside FanaLinux.
 
 
 ## Features
