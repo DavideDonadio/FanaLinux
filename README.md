@@ -8,6 +8,10 @@
 
 Built using **GTK4** and **Libadwaita** on top of a user-space **`hidraw` / `evdev`** driver engine, it eliminates the need for proprietary Windows software or Wine wrappers to configure and tune Fanatec sim racing hardware.
 
+<p align="center">
+  <img src="pictures/overview.png" alt="FanaLinux Overview — CSL DD online" width="860" />
+</p>
+
 ---
 
 ## Hardware support
