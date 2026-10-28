@@ -58,13 +58,13 @@ Game force feedback needs the [hid-fanatecff](https://github.com/gotzl/hid-fanat
 ## Known limitations
 
 - No read-back: The app can't display current on-wheel values — verification is eyes-on-OLED.
-- Every Apply writes all known registers; DRI/ACP (unmodeled) reset to 0/OFF. If you use Drift mode, re-set it on the wheel afterwards.
+- Every Apply writes all known registers; DRI/ACP reset to 0/OFF. If you use Drift mode, re-set it on the wheel afterwards.
 - SHO displays On/Off only; granularity unverified beyond that. FFS Linear confirmed by symmetry (Peak verified).
 - BRF can't be validated without load-cell pedals.
 
 ## Firmware updates
 
-Flashing firmware needs official software. \
+Flashing firmware needs [official software](https://www.fanatec.com/us/en/s/download-apps-driver). \
 FanaLinux itself never flashes — by design.
 
 ## Legal
