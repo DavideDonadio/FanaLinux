@@ -126,11 +126,13 @@ class TestAuditBatch2(unittest.TestCase):
     def test_trigger_happy_range_matches_kernel(self):
         """Button mapping must agree with the kernel header, not comments.
         BTN_TRIGGER_HAPPY1..40 = codes 704..743 -> buttons 17..56."""
-        from evdev import ecodes
+        import importlib.util
         from fanalinux.core.evdev_listener import EvdevListener, EV_KEY
+        if importlib.util.find_spec("evdev") is not None:
+            from evdev import ecodes
+            self.assertEqual(ecodes.BTN_TRIGGER_HAPPY40 - ecodes.BTN_TRIGGER_HAPPY1, 39)
         got = []
         listener = EvdevListener(on_button=lambda b, p: got.append((b, p)))
-        self.assertEqual(ecodes.BTN_TRIGGER_HAPPY40 - ecodes.BTN_TRIGGER_HAPPY1, 39)
         listener._process_event(EV_KEY, 704, 1)
         listener._process_event(EV_KEY, 743, 1)
         listener._process_event(EV_KEY, 744, 1)  # beyond the real range
