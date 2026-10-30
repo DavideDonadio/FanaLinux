@@ -15,7 +15,6 @@ logger = logging.getLogger("fanalinux.telemetry.dirt")
 class DirtRallyTelemetry(UdpTelemetryClient):
     UDP_IP = "127.0.0.1"
     UDP_PORT = 20777
-    UDP_PORT = 20777
     STREAM_LABEL = "DiRT / WRC UDP"
     RECV_SIZE = 512
 

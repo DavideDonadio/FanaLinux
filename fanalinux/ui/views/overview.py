@@ -457,16 +457,16 @@ class OverviewView(Adw.PreferencesPage):
         for cls in ("success", "error"):
             self.ff_lbl.remove_css_class(cls)
         update_ready = bool(module_present and getattr(self, "_ff_update_available", False))
+        from fanalinux.core import driver_setup
+        ver = driver_setup.installed_version() if module_present else None
+        base = ver.split("-")[0] if ver else ""
         if effects:
-            self.ff_lbl.set_text("Active")
+            self.ff_lbl.set_text(f"Active (v{base})" if base else "Active")
             self.ff_lbl.add_css_class("success")
         elif has_wheel:
             self.ff_lbl.set_text("Missing — no force feedback")
             self.ff_lbl.add_css_class("error")
         elif module_present:
-            from fanalinux.core import driver_setup
-            ver = driver_setup.installed_version()
-            base = ver.split("-")[0] if ver else ""
             self.ff_lbl.set_text(f"Installed (v{base})" if base else "Installed (unknown)")
             self.ff_lbl.add_css_class("success")
         else:

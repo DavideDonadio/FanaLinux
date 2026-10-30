@@ -137,4 +137,11 @@ window {
     font-weight: bold;
 }
 
+/* Inline links inside row subtitles: the hover underline changes line
+   metrics and shaves the glyph tops, so links stay underline-free. */
+row label.subtitle link,
+row label.subtitle link:hover {
+    text-decoration-line: none;
+}
+
 

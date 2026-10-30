@@ -14,7 +14,7 @@ gi.require_version('Adw', '1')
 gi.require_version('Gdk', '4.0')
 from gi.repository import Adw, Gdk, GLib, Gtk
 
-from fanalinux.core.detector import GameDetector
+from fanalinux.core.detector import NATIVE_DRIVER_IDS, GameDetector
 from fanalinux.core.device import FanatecDevice
 from fanalinux.core import driver_setup
 from fanalinux.core.evdev_listener import EvdevListener, query_ff_effects
@@ -109,7 +109,9 @@ class MainWindow(Adw.ApplicationWindow):
             on_toast_requested=self.show_toast,
             on_preset_applied=self._on_preset_applied
         )
-        self.calibration_view = CalibrationView(self.device, on_toast_requested=self.show_toast)
+        self.calibration_view = CalibrationView(
+            self.device, on_toast_requested=self.show_toast,
+            on_output_rearmed=self.telemetry_mgr.invalidate_output_caches)
 
         self.view_stack.add_titled_with_icon(
             self.overview_view, "overview", "Overview", "input-gaming-symbolic"
@@ -239,14 +241,13 @@ class MainWindow(Adw.ApplicationWindow):
                 and self._last_game_id != new_game_id):
             self.telemetry_mgr.stop()
             self._telemetry_owner = None
-            self.leds_view.set_telemetry_active(False)
         self._last_game_id = new_game_id
+        self.leds_view.set_native_game_active(new_game_id in NATIVE_DRIVER_IDS)
 
         if auto_telem:
             telem_type = game_info.get("telemetry_type") or "ac_udp"
             self.telemetry_mgr.start(telemetry_type=telem_type)
             self._telemetry_owner = new_game_id
-            self.leds_view.set_telemetry_active(True)
 
         self.profiles_view.update_status(game_info)
         toast_msg = f"Game Detected: {game_info['name']} → Loaded '{preset_name}'"
@@ -260,11 +261,16 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _apply_game_stopped(self, game_info, fallback_preset):
         exiting_id = game_info.get("id")
+        # Stale stop (e.g. delayed A-stop after an A->B switch): B owns the
+        # session, profile and identity — ignore, don't clobber them.
+        if exiting_id != self._last_game_id:
+            logger.debug(f"Ignoring stale stop event for '{exiting_id}' (active: '{self._last_game_id}')")
+            return False
         self._last_game_id = None
+        self.leds_view.set_native_game_active(False)
         if self.telemetry_mgr.enabled and self._telemetry_owner in (None, exiting_id):
             self.telemetry_mgr.stop()
             self._telemetry_owner = None
-            self.leds_view.set_telemetry_active(False)
 
         profile = load_preset(fallback_preset)
         if profile and self.device and self.device.connected:
@@ -279,7 +285,9 @@ class MainWindow(Adw.ApplicationWindow):
         if hasattr(self, "calibration_view") and self.calibration_view:
             self.calibration_view.update_rim(rim_info)
 
-    def _on_presets_changed(self):
+    def _on_presets_changed(self, action: str, name: str):
+        if action == "delete" and self.detector:
+            self.detector.reconcile_deleted_preset(name)
         self.profiles_view.refresh_preset_lists()
 
     def _check_hardware_connection(self) -> bool:
@@ -289,12 +297,24 @@ class MainWindow(Adw.ApplicationWindow):
         self._hardware_online = is_online
 
         # Kernel FFB driver: live effects if wheel present, else module presence
+        module_present = driver_setup.driver_module_present()
         node = self.evdev_listener.device_node if self.evdev_listener else None
+        effects = query_ff_effects(node) if is_online else []
+        if is_online and not effects and self.evdev_listener:
+            # Hotplug race or stale cached node: re-discover instead of
+            # trusting the old path, so the row heals without a restart.
+            fresh = self.evdev_listener.find_device_node()
+            if fresh and fresh != node:
+                logger.info(f"FF driver node changed ({node} -> {fresh}), reconnecting evdev")
+                self.evdev_listener.stop()
+                if self.evdev_listener.start():
+                    node = self.evdev_listener.device_node
+                    effects = query_ff_effects(node)
         self.overview_view.set_ff_driver(
-            query_ff_effects(node) if is_online else [],
-            is_online, driver_setup.driver_module_present())
+            effects, is_online, module_present)
 
         if was_online != is_online:
+            self.telemetry_mgr.invalidate_output_caches()
             self.overview_view.set_connection_status(is_online)
             if is_online:
                 if not self.evdev_listener.is_running():
@@ -315,6 +335,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Watchdog: evdev may have failed to open at startup or its worker
         # may have died while HID stayed healthy. Retry with backoff.
+        # Telemetry stream health: clear stuck motor outputs on silent loss.
+        if self.telemetry_mgr:
+            self.telemetry_mgr.check_stream_health()
+
         if is_online and not self.evdev_listener.is_running():
             now = time.monotonic()
             if now - self._last_evdev_retry >= 5.0:

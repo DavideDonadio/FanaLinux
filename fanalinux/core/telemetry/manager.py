@@ -3,9 +3,7 @@ Telemetry Manager: Bridges sim games to Fanatec LEDs and OLED Display.
 Includes Adaptive Peak RPM Auto-Calibration and Car Database.
 """
 
-import json
 import logging
-import os
 from typing import Any
 
 from fanalinux.core.dynamic_ffb_engine import DynamicFFBEngine
@@ -19,16 +17,6 @@ from fanalinux.core.telemetry.forza import ForzaTelemetry
 from fanalinux.core.telemetry.scs import SCSTelemetry
 
 logger = logging.getLogger("fanalinux.telemetry.manager")
-
-# Load car database if available
-CAR_DATA_PATH = os.path.join(os.path.dirname(__file__), "car_data.json")
-CAR_DATABASE = {}
-if os.path.exists(CAR_DATA_PATH):
-    try:
-        with open(CAR_DATA_PATH, "r") as f:
-            CAR_DATABASE = json.load(f)
-    except Exception:
-        pass
 
 TELEMETRY_FACTORIES = {
     "ac_udp": AssettoCorsaTelemetry,
@@ -61,6 +49,7 @@ class TelemetryManager:
         self._last_speed_txt = None
         self._last_flag_state = None
         self._limiter_strobe = False
+        self._stream_was_alive = False
 
     def _get_client(self, telem_type: str):
         if telem_type not in self._clients:
@@ -70,6 +59,35 @@ class TelemetryManager:
                 on_car_detected=self.set_car_name
             )
         return self._clients[telem_type]
+
+    def invalidate_output_caches(self):
+        """Forget cached hardware state after emergency stops and reconnects."""
+        try:
+            self.dynamic_ffb_engine.invalidate_cache()
+        except Exception:
+            pass
+
+    def check_stream_health(self):
+        """Zero stuck motor outputs if the stream died silently.
+        Polled from the UI heartbeat: on the connected->lost transition,
+        clear haptic levels and the damper overlay (timeout path never
+        calls stop(), so without this the last forces stick on the wheel).
+        Also covers a game exit while Auto-Profile is disabled."""
+        if not self.enabled:
+            self._stream_was_alive = False
+            return
+        alive = bool(self.active_client and getattr(self.active_client, "is_connected", False))
+        if self._stream_was_alive and not alive:
+            logger.warning("Telemetry stream lost: clearing haptic and damper outputs")
+            try:
+                self.haptic_engine.zero_outputs()
+            except Exception:
+                pass
+            try:
+                self.dynamic_ffb_engine.reset()
+            except Exception:
+                pass
+        self._stream_was_alive = alive
 
     @property
     def is_connected(self) -> bool:
@@ -118,17 +136,9 @@ class TelemetryManager:
             self.device.clear_display()
 
     def set_car_name(self, car_name: str):
-        """Lookup car in database or adapt."""
+        """Seed the redline from the car class; live learning refines it."""
         cleaned = car_name.lower().strip()
         self.peak_rpm_seen = 0
-        if cleaned in CAR_DATABASE:
-            try:
-                self.max_rpm = int(CAR_DATABASE[cleaned])
-                logger.info(f"Loaded car database redline for '{cleaned}': {self.max_rpm} RPM")
-                return
-            except Exception:
-                pass
-        
         # Heuristics for common car classes
         if "formula4" in cleaned or "f4" in cleaned or "tatuus" in cleaned:
             self.max_rpm = 6500
@@ -147,9 +157,12 @@ class TelemetryManager:
         if not self.enabled or not self.device or not self.device.connected:
             return
 
-        # Adaptive Peak Tracking: learn the car's actual rev ceiling live
+        # Adaptive Peak Tracking: learn the car's actual rev ceiling live.
+        # Over-rev guard: a real pull climbs gradually, a downshift money-shift
+        # arrives as a huge single-frame jump — ignore jumps over 500 rpm so a
+        # spike can't ratchet the redline up and silence the shift lights.
         if self.auto_detect_rpm:
-            if rpm > self.peak_rpm_seen:
+            if rpm > self.peak_rpm_seen and (self.peak_rpm_seen == 0 or rpm - self.peak_rpm_seen <= 500):
                 self.peak_rpm_seen = rpm
                 if self.peak_rpm_seen > 4000:
                     self.max_rpm = self.peak_rpm_seen

@@ -143,10 +143,11 @@ class SCSTelemetry(BaseTelemetryClient):
         speed_kmh = max(0.0, float(speed_ms * 3.6))
         rpm_int = max(0, int(rpm))
 
-        # Resilient freshness watchdog:
-        # Ticking clock, active engine revs, vehicle speed, or inputs all confirm live session
+        # Resilient freshness watchdog: only the ticking simulation clock proves
+        # the buffer is live. Static values (idling rpm, speed) must never count
+        # as a heartbeat, or a frozen buffer looks connected forever.
         now = time.time()
-        is_active = (sim_time != 0 and sim_time != self._last_sim_time) or (rpm_int > 0 or speed_kmh > 0.0 or throttle > 0.0)
+        is_active = (sim_time != 0 and sim_time != self._last_sim_time)
         if is_active:
             if sim_time != 0:
                 self._last_sim_time = sim_time

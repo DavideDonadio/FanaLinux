@@ -41,7 +41,7 @@ echo -e "${GREEN}[✓] Detected Python $PY_VER${NC}"
 # 3. Check System Dependencies (PyGObject, GTK4, Libadwaita)
 echo -e "${BLUE}[*] Checking GTK4 and Libadwaita bindings...${NC}"
 MISSING_DEPS=0
-python3 -c "import gi; gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1'); from gi.repository import Gtk, Adw" 2>/dev/null || MISSING_DEPS=1
+python3 -c "import gi; gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1'); from gi.repository import Gtk, Adw; import cairo" 2>/dev/null || MISSING_DEPS=1
 
 if [ "$MISSING_DEPS" -eq 1 ]; then
     echo -e "${YELLOW}[!] Missing GTK4 or Libadwaita Python bindings.${NC}"
@@ -49,7 +49,7 @@ if [ "$MISSING_DEPS" -eq 1 ]; then
     if [ -f /etc/fedora-release ]; then
         echo -e "  ${BOLD}Fedora:${NC} sudo dnf install -y python3-gobject libadwaita gtk4"
     elif [ -f /etc/arch-release ]; then
-        echo -e "  ${BOLD}Arch Linux:${NC} sudo pacman -S --needed python-gobject libadwaita gtk4"
+        echo -e "  ${BOLD}Arch Linux:${NC} sudo pacman -S --needed python-gobject python-cairo libadwaita gtk4"
     elif [ -f /etc/debian_version ] || [ -f /etc/ubuntu-release ]; then
         echo -e "  ${BOLD}Ubuntu/Debian:${NC} sudo apt install -y python3-gi python3-gi-cairo gir1.2-adw-1 gir1.2-gtk-4.0"
     else

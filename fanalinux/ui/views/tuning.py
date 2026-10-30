@@ -1,6 +1,6 @@
 """
 Tuning Menu View: 1:1 Hardware Motor & Steering Tuning Controls.
-Includes Preset Management (Save, Load, Export/Import JSON).
+Includes Preset Management (Save, Load, Delete).
 """
 
 import gi
@@ -26,7 +26,7 @@ class TuningView(Adw.PreferencesPage):
         self,
         device,
         on_toast_requested: Callable[[str], None] | None = None,
-        on_presets_changed: Callable[[], None] | None = None
+        on_presets_changed: Callable[[str, str], None] | None = None
     ):
         super().__init__()
         self.device = device
@@ -334,6 +334,8 @@ class TuningView(Adw.PreferencesPage):
         name = model.get_string(idx)
         if delete_preset(name):
             self.refresh_presets()
+            if self.on_presets_changed:
+                self.on_presets_changed("delete", name)
             if self.on_toast_requested:
                 self.on_toast_requested(f"Deleted preset '{name}'")
         elif self.on_toast_requested:
@@ -369,15 +371,12 @@ class TuningView(Adw.PreferencesPage):
 
         if save_preset(preset_name, self.profile):
             self.refresh_presets()
+            if self.on_presets_changed:
+                self.on_presets_changed("save", preset_name)
             if self.on_toast_requested:
                 self.on_toast_requested(f"Saved preset '{preset_name}' to disk")
         elif self.on_toast_requested:
             self.on_toast_requested(f"Save failed for '{preset_name}' — see log")
-            if self.on_presets_changed:
-                self.on_presets_changed()
-        else:
-            if self.on_toast_requested:
-                self.on_toast_requested(f"Failed to save preset '{preset_name}'")
 
     def refresh_presets(self):
         presets = list_presets()

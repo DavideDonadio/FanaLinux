@@ -70,14 +70,25 @@ class DynamicFFBEngine:
 
                 target_damping = int(self.settings.damper_effect_strength * speed_factor * angle_factor)
 
-        # Apply target damping to hardware if changed
+        # Apply target damping to hardware if changed. Only record the value
+        # when output is actually live: an inhibited/disconnected write is
+        # discarded, and caching it would suppress the re-apply forever.
         target_damping = max(0, min(100, target_damping))
         if target_damping != self._last_applied_damping:
-            self._last_applied_damping = target_damping
-            try:
-                self.device.send_damper_friction(target_damping)
-            except Exception as e:
-                logger.debug(f"Could not apply dynamic damping: {e}")
+            if self.device and self.device.connected and not getattr(self.device, "output_inhibited", False):
+                try:
+                    self.device.send_damper_friction(target_damping)
+                except Exception as e:
+                    logger.debug(f"Could not apply dynamic damping: {e}")
+                self._last_applied_damping = target_damping
+            else:
+                self._last_applied_damping = -1
+
+    def invalidate_cache(self):
+        """Forget the last applied value so the next frame re-applies.
+        Call after emergency stops, disconnects and output re-arms: the
+        hardware was zeroed behind this engine's back."""
+        self._last_applied_damping = -1
 
     def reset(self):
         """Reset applied damping back to zero."""

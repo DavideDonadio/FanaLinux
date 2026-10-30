@@ -33,6 +33,11 @@ def match_game_process(comm: str, argv: list[str], target_exe: str) -> bool:
 CONFIG_PATH = Path.home() / ".config" / "fanalinux" / "game_profiles.json"
 OLD_CONFIG_PATH = Path.home() / ".config" / "open-fanactrl" / "game_profiles.json"
 
+# Games whose FFB/LEDs/display run natively through the kernel driver
+# (FanatecSDK over hidraw). Our telemetry never starts for these, and manual
+# LED controls must yield while one is active.
+NATIVE_DRIVER_IDS = {"acc", "assetto_corsa_evo", "rfactor2", "lmu"}
+
 BUILTIN_GAMES: list[dict[str, Any]] = [
     {
         "id": "assetto_corsa",
@@ -293,6 +298,24 @@ class GameDetector:
                 needs_migration_save = True
 
         if needs_migration_save:
+            self.save_config()
+
+    def reconcile_deleted_preset(self, name: str):
+        """Point mappings off a deleted preset back to Default (and save)."""
+        changed = False
+        for mapping in self.game_mappings.values():
+            if isinstance(mapping, dict) and mapping.get("preset") == name:
+                mapping["preset"] = "Default"
+                changed = True
+        for game in self.custom_games:
+            if isinstance(game, dict) and game.get("preset") == name:
+                game["preset"] = "Default"
+                changed = True
+        if self.fallback_preset == name:
+            self.fallback_preset = "Default"
+            changed = True
+        if changed:
+            logger.info(f"Reconciled deleted preset '{name}' back to Default")
             self.save_config()
 
     def save_config(self):

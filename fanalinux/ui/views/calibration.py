@@ -17,10 +17,11 @@ from fanalinux.ui.widgets.wheel_dial import WheelDialWidget
 
 
 class CalibrationView(Adw.PreferencesPage):
-    def __init__(self, device, on_toast_requested=None):
+    def __init__(self, device, on_toast_requested=None, on_output_rearmed=None):
         super().__init__()
         self.device = device
         self.on_toast_requested = on_toast_requested
+        self.on_output_rearmed = on_output_rearmed
         self.evdev_listener = None
         self._last_raw_steering = 32768
         self._abort_self_test = False
@@ -158,6 +159,8 @@ class CalibrationView(Adw.PreferencesPage):
         if state:
             strength = int(self.spring_adj.get_value())
             self.device.output_inhibited = False  # explicit re-arm after cutoff
+            if self.on_output_rearmed:
+                self.on_output_rearmed()
             self.device.send_centering_spring(strength)
             if self.on_toast_requested:
                 self.on_toast_requested(f"Centering spring engaged ({strength}%)")
@@ -174,6 +177,8 @@ class CalibrationView(Adw.PreferencesPage):
         if state:
             fric = int(self.friction_adj.get_value())
             self.device.output_inhibited = False  # explicit re-arm after cutoff
+            if self.on_output_rearmed:
+                self.on_output_rearmed()
             self.device.send_damper_friction(fric)
             if self.on_toast_requested:
                 self.on_toast_requested(f"Motor friction resistance applied ({fric}%)")
@@ -221,6 +226,8 @@ class CalibrationView(Adw.PreferencesPage):
         gen = self._self_test_gen
         if self.device:
             self.device.output_inhibited = False  # deliberate force run re-arms
+            if self.on_output_rearmed:
+                self.on_output_rearmed()
         self._self_test_running = True
         self.self_test_btn.set_sensitive(False)
         self.self_test_btn.set_label("Running (10s)...")

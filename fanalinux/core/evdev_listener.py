@@ -183,6 +183,7 @@ class EvdevListener:
     def stop(self):
         """Stop the background polling thread."""
         self._running = False
+        self.device_node = None
         if self._thread:
             self._thread.join(timeout=1.0)
             self._thread = None

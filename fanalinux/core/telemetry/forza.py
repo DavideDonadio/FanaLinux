@@ -20,7 +20,6 @@ class ForzaTelemetry(UdpTelemetryClient):
     """
     UDP_IP = "127.0.0.1"
     UDP_PORT = 5300
-    UDP_PORT = 5300
     STREAM_LABEL = "Forza UDP"
     RECV_SIZE = 1024
 
@@ -127,13 +126,14 @@ class ForzaTelemetry(UdpTelemetryClient):
             tc_active = False
 
             if speed_kmh > 5.0:
-                # Brake lockup: braking hard and any wheel slip magnitude exceeds lock threshold
-                # In Forza slip ratio is normalized: ~1.0 means 100% slip
-                if brake > 0.25 and any(abs(s) > 0.35 for s in wheel_slip):
+                # Brake lockup: negative slip only — positive spin under braking
+                # is wheelspin, not lockup. In Forza slip is normalized: ~1.0 = 100%.
+                if brake > 0.25 and any(s < -0.35 for s in wheel_slip):
                     abs_active = True
 
-                # Traction loss: throttle applied and driven wheels spinning significantly
-                if throttle > 0.35 and any(s > 0.40 for s in wheel_slip[2:]):  # rear wheels or all
+                # Traction loss: any driven wheel spinning under throttle.
+                # Drivetrain is unknown here, so all four count (covers FWD/AWD).
+                if throttle > 0.35 and any(s > 0.40 for s in wheel_slip):
                     tc_active = True
 
             self._dispatch_telemetry(

@@ -16,7 +16,6 @@ logger = logging.getLogger("fanalinux.telemetry.f1")
 class F1Telemetry(UdpTelemetryClient):
     UDP_IP = "127.0.0.1"
     UDP_PORT = 20777
-    UDP_PORT = 20777
     STREAM_LABEL = "F1"
     MIN_PACKET_SIZE = 24
 

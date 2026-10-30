@@ -235,10 +235,17 @@ class TestGameSwitchTelemetry(unittest.TestCase):
             sr.return_value.stdout = ""
             self.assertEqual(driver_setup._dkms_versions(), [])
 
-    def test_car_database_loads(self):
-        """The packaged car database must be present and non-empty."""
-        from fanalinux.core.telemetry.manager import CAR_DATABASE
-        self.assertTrue(len(CAR_DATABASE) > 0)
+    def test_car_heuristics_seed_redline(self):
+        """Car class seeds the redline; guarded learning refines it upward."""
+        from fanalinux.core.telemetry.manager import TelemetryManager
+        mgr = TelemetryManager.__new__(TelemetryManager)
+        mgr.peak_rpm_seen = 9999
+        mgr.max_rpm = 6500
+        mgr.set_car_name("ks_ferrari_sf15t")
+        self.assertEqual(mgr.max_rpm, 13500)
+        self.assertEqual(mgr.peak_rpm_seen, 0)
+        mgr.set_car_name("someUnknownCar")
+        self.assertEqual(mgr.max_rpm, 6500)
 
     def test_emergency_gate_is_atomic(self):
         """A send blocked on the device lock must observe a gate set meanwhile.
@@ -387,6 +394,9 @@ class TestEvdevWatchdog(unittest.TestCase):
 
                 def is_running(self):
                     return self.running
+
+                def find_device_node(self):
+                    return self.device_node
 
                 def start(self):
                     self.calls += 1

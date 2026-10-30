@@ -15,7 +15,6 @@ logger = logging.getLogger("fanalinux.telemetry.beamng")
 class BeamNGTelemetry(UdpTelemetryClient):
     UDP_IP = "127.0.0.1"
     UDP_PORT = 4444
-    UDP_PORT = 4444
     STREAM_LABEL = "BeamNG OutGauge"
     RECV_SIZE = 512
 

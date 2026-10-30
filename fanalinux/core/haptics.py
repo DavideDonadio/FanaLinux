@@ -72,14 +72,27 @@ class HapticEngine:
             except Exception:
                 pass
 
+    def zero_outputs(self):
+        """Clear stuck motor outputs without stopping the worker.
+        Stream-loss path: the loop keeps running, so just drop the levels
+        it re-drives from and zero the hardware once."""
+        with self._lock:
+            self._pulse_active = False
+            self._pulse_intensity = 0
+            self._engine_vibration_level = 0
+        self._zero_forces()
+
     def trigger_pulse(self, intensity_pct: int, duration_sec: float):
         """Request a high-priority vibration pulse (e.g. ABS, TC, Rev Limiter)."""
         now = time.time()
+        bounded = max(10, min(100, int(intensity_pct)))
         with self._lock:
-            # Overwrite or extend current pulse if higher or new
-            target_end = now + max(0.02, duration_sec)
-            self._pulse_intensity = max(10, min(100, int(intensity_pct)))
-            self._pulse_end_time = max(self._pulse_end_time, target_end)
+            # A weaker event must not dilute a stronger pulse already running.
+            if self._pulse_active and now < self._pulse_end_time:
+                self._pulse_intensity = max(self._pulse_intensity, bounded)
+            else:
+                self._pulse_intensity = bounded
+            self._pulse_end_time = max(self._pulse_end_time, now + max(0.02, duration_sec))
             self._pulse_active = True
 
     def update_telemetry(self, rpm: int, max_rpm: int, abs_active: bool, tc_active: bool, speed_kmh: float = 0.0,

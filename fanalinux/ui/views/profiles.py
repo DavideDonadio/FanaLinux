@@ -13,7 +13,7 @@ from typing import Any
 
 from gi.repository import Adw, Gtk
 
-from fanalinux.core.detector import GameDetector
+from fanalinux.core.detector import NATIVE_DRIVER_IDS, GameDetector
 from fanalinux.core.presets import list_presets, load_preset
 
 
@@ -104,7 +104,7 @@ class ProfilesView(Adw.PreferencesPage):
         self.add(self.games_group)
 
     # Games whose FFB/LEDs/display run natively through the kernel driver.
-    NATIVE_DRIVER_IDS = {"acc", "assetto_corsa_evo", "rfactor2", "lmu"}
+    NATIVE_DRIVER_IDS = NATIVE_DRIVER_IDS
 
     def _populate_games(self):
         # Notice card first: same in-group spacing as the calibration shortcut
@@ -159,9 +159,10 @@ class ProfilesView(Adw.PreferencesPage):
                 row.set_icon_name("input-gaming-symbolic")
             if gid in self.NATIVE_DRIVER_IDS:
                 if gid == "lmu":
+                    row.set_subtitle_lines(2)
                     row.set_subtitle(
-                        "Requires the <a href=\"https://steamcommunity.com/sharedfiles/filedetails/?id=3536726840\"" 
-                        "title=\"Community Linux setup guide\">GE-Proton10-34-LMU-hid_fixes</a> "
+                        'Requires the <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3536726840">'
+                        '<span underline="none">GE-Proton10-34-LMU-hid_fixes</span></a> '
                         "Proton build with inverted FFB in the game settings.")
                 badge = Gtk.Label(label="Via driver")
                 badge.set_valign(Gtk.Align.CENTER)

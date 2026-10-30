@@ -122,9 +122,10 @@ class FanatecDevice:
             return False
 
         try:
-            self._fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
-            self.hidraw_path = path
-            self.connected = True
+            with self._lock:
+                self._fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+                self.hidraw_path = path
+                self.connected = True
             # Propagate the real wheelbase identity (uevent HID_ID=bus:vend:prod).
             try:
                 with open(f"/sys/class/hidraw/{os.path.basename(path)}/device/uevent") as f:
@@ -140,8 +141,9 @@ class FanatecDevice:
             return self.connected
         except Exception as e:
             logger.error(f"Failed to open hidraw node {path}: {e}")
-            self.connected = False
-            self._fd = None
+            with self._lock:
+                self.connected = False
+                self._fd = None
             return False
 
     def disconnect(self):
@@ -150,14 +152,16 @@ class FanatecDevice:
         Note: Callers should ensure telemetry is stopped and best-effort display/LED
         blanking is performed prior to calling disconnect().
         """
-        self.connected = False
-        fd = self._fd
-        self._fd = None
-        if fd is not None:
-            try:
-                os.close(fd)
-            except Exception:
-                pass
+        # Under the same lock writers hold: no close mid-write, no double-close.
+        with self._lock:
+            self.connected = False
+            fd = self._fd
+            self._fd = None
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except Exception:
+                    pass
 
     def check_connection(self) -> bool:
         """

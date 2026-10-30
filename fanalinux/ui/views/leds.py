@@ -32,6 +32,7 @@ class LedsView(Adw.PreferencesPage):
         self.device = device
         self.on_toast_requested = on_toast_requested
         self._led_dots = []
+        self._manual_led_widgets = []
 
         # Initialize In-Game Telemetry Manager
         self.telemetry_mgr = telemetry_mgr if telemetry_mgr is not None else TelemetryManager(self.device)
@@ -95,6 +96,7 @@ class LedsView(Adw.PreferencesPage):
         sim_row.set_subtitle("Runs a realistic 12-second acceleration, shifting, and braking sequence without needing pedals")
 
         sim_btn = Gtk.Button(label="Simulate Race Lap")
+        self._manual_led_widgets.append(sim_btn)
         sim_btn.set_size_request(160, 42)
         sim_btn.set_valign(Gtk.Align.CENTER)
         sim_btn.add_css_class("suggested-action")
@@ -126,6 +128,8 @@ class LedsView(Adw.PreferencesPage):
         disp_box.append(self.disp_entry)
 
         send_btn = Gtk.Button(label="Send")
+        self._manual_led_widgets.append(send_btn)
+        self._manual_led_widgets.append(self.disp_entry)
         send_btn.set_size_request(80, 38)
         send_btn.set_valign(Gtk.Align.CENTER)
         send_btn.add_css_class("suggested-action")
@@ -133,6 +137,7 @@ class LedsView(Adw.PreferencesPage):
         disp_box.append(send_btn)
 
         clear_btn = Gtk.Button(label="Clear")
+        self._manual_led_widgets.append(clear_btn)
         clear_btn.set_size_request(80, 38)
         clear_btn.set_valign(Gtk.Align.CENTER)
         clear_btn.connect("clicked", self._on_clear_display)
@@ -165,6 +170,7 @@ class LedsView(Adw.PreferencesPage):
         rev_box.append(dots_box)
 
         test_rev_btn = Gtk.Button(label="Test RPM Climb")
+        self._manual_led_widgets.append(test_rev_btn)
         test_rev_btn.set_size_request(140, 38)
         test_rev_btn.set_valign(Gtk.Align.CENTER)
         test_rev_btn.add_css_class("pill")
@@ -188,21 +194,25 @@ class LedsView(Adw.PreferencesPage):
         btn_box.set_valign(Gtk.Align.CENTER)
 
         yellow_btn = Gtk.Button(label="Yellow Flag")
+        self._manual_led_widgets.append(yellow_btn)
         yellow_btn.set_size_request(105, 38)
         yellow_btn.connect("clicked", lambda b: self._flash_flags((255, 255, 0), "Yellow Flag"))
         btn_box.append(yellow_btn)
 
         blue_btn = Gtk.Button(label="Blue Flag")
+        self._manual_led_widgets.append(blue_btn)
         blue_btn.set_size_request(105, 38)
         blue_btn.connect("clicked", lambda b: self._flash_flags((0, 100, 255), "Blue Flag"))
         btn_box.append(blue_btn)
 
         red_btn = Gtk.Button(label="Red Flag")
+        self._manual_led_widgets.append(red_btn)
         red_btn.set_size_request(105, 38)
         red_btn.connect("clicked", lambda b: self._flash_flags((255, 0, 0), "Red Flag"))
         btn_box.append(red_btn)
 
         off_btn = Gtk.Button(label="All Off")
+        self._manual_led_widgets.append(off_btn)
         off_btn.set_size_request(90, 38)
         off_btn.connect("clicked", lambda b: self._turn_off_all_leds())
         btn_box.append(off_btn)
@@ -211,8 +221,15 @@ class LedsView(Adw.PreferencesPage):
         flag_group.add(flag_row)
         self.add(flag_group)
 
-    def set_telemetry_active(self, active: bool):
-        """Telemetry engine state is managed autonomously by Auto-Profile."""
+    def set_native_game_active(self, active: bool):
+        """Yield manual LED controls while a native-driver game owns the wheel.
+        The game drives LEDs/display itself; our clicks would fight it."""
+        for widget in self._manual_led_widgets:
+            widget.set_sensitive(not active)
+            if isinstance(widget, Gtk.Button):
+                widget.set_tooltip_text(
+                    "Disabled: the running game drives the LEDs natively" if active else None)
+
 
     def _on_redline_auto_toggled(self, btn):
         if btn.get_active():
