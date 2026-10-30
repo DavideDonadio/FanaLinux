@@ -7,6 +7,8 @@ import json
 import os
 import urllib.request
 
+from fanalinux.core.persistence import load_json_dict, save_json_dict
+
 REPO = "DavideDonadio/fanalinux"
 API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 STATE_PATH = os.path.expanduser("~/.config/fanalinux/update_state.json")
@@ -50,21 +52,12 @@ def check_latest(timeout: int = 8):
 
 def load_update_state() -> dict:
     """Last known release from a previous check ({} when never checked)."""
-    try:
-        with open(STATE_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, dict) and data.get("tag"):
-                return data
-    except Exception:
-        pass
+    data = load_json_dict(STATE_PATH)
+    if data and data.get("tag"):
+        return data
     return {}
 
 
 def save_update_state(tag: str, url: str) -> None:
     """Persist latest release so the update button survives restarts."""
-    try:
-        os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
-        with open(STATE_PATH, "w", encoding="utf-8") as f:
-            json.dump({"tag": tag, "url": url}, f, indent=2)
-    except Exception:
-        pass
+    save_json_dict(STATE_PATH, {"tag": tag, "url": url})

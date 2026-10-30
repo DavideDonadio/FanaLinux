@@ -3,10 +3,11 @@ Hardware Profile Detection & Management for Fanatec Wheelbases and Steering Whee
 Handles auto-detection from USB Vendor/Product IDs and user-selected rim hardware.
 """
 
-import json
 import logging
 import os
 from dataclasses import asdict, dataclass
+
+from fanalinux.core.persistence import load_json_dict, save_json_dict
 
 logger = logging.getLogger("fanalinux.hardware")
 
@@ -179,25 +180,19 @@ class HardwareConfig:
 
 def load_hardware_config() -> HardwareConfig:
     """Load hardware configuration from ~/.config/fanalinux/hardware.json."""
-    if os.path.exists(CONFIG_PATH):
+    data = load_json_dict(CONFIG_PATH)
+    if data is not None:
         try:
-            with open(CONFIG_PATH, "r") as f:
-                data = json.load(f)
-                return HardwareConfig(**data)
+            return HardwareConfig(**data)
         except Exception as e:
-            logger.warning(f"Could not load hardware config: {e}")
+            logger.warning(f"Could not parse hardware config: {e}")
     return HardwareConfig(rim_id="formula_v2")
 
 
 def save_hardware_config(config: HardwareConfig):
     """Save hardware configuration to ~/.config/fanalinux/hardware.json."""
-    try:
-        os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-        with open(CONFIG_PATH, "w") as f:
-            json.dump(asdict(config), f, indent=4)
+    if save_json_dict(CONFIG_PATH, asdict(config)):
         logger.info(f"Saved hardware config: rim_id={config.rim_id}")
-    except Exception as e:
-        logger.error(f"Could not save hardware config: {e}")
 
 
 def get_base_info(product_id: int) -> dict[str, str]:

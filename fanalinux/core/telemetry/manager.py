@@ -4,6 +4,7 @@ Includes Adaptive Peak RPM Auto-Calibration and Car Database.
 """
 
 import logging
+import time
 from typing import Any
 
 from fanalinux.core.dynamic_ffb_engine import DynamicFFBEngine
@@ -50,6 +51,7 @@ class TelemetryManager:
         self._last_flag_state = None
         self._limiter_strobe = False
         self._stream_was_alive = False
+        self._last_frame_at = 0.0
 
     def _get_client(self, telem_type: str):
         if telem_type not in self._clients:
@@ -67,16 +69,21 @@ class TelemetryManager:
         except Exception:
             pass
 
+    # Health is measured by dispatched telemetry frames, not UDP datagrams:
+    # parsers silently drop short/wrong-type packets, so a junk stream must
+    # not count as alive. Matches the SCS frozen-buffer timeout.
+    STREAM_LOST_AFTER = 4.0
+
     def check_stream_health(self):
-        """Zero stuck motor outputs if the stream died silently.
-        Polled from the UI heartbeat: on the connected->lost transition,
+        """Zero stuck motor outputs if the stream dies silently.
+        Polled from the UI heartbeat: on the alive->lost transition,
         clear haptic levels and the damper overlay (timeout path never
         calls stop(), so without this the last forces stick on the wheel).
         Also covers a game exit while Auto-Profile is disabled."""
         if not self.enabled:
             self._stream_was_alive = False
             return
-        alive = bool(self.active_client and getattr(self.active_client, "is_connected", False))
+        alive = (time.monotonic() - self._last_frame_at) < self.STREAM_LOST_AFTER
         if self._stream_was_alive and not alive:
             logger.warning("Telemetry stream lost: clearing haptic and damper outputs")
             try:
@@ -136,7 +143,10 @@ class TelemetryManager:
             self.device.clear_display()
 
     def set_car_name(self, car_name: str):
-        """Seed the redline from the car class; live learning refines it."""
+        """Seed the redline from the car class; live learning refines it.
+        Deliberately no per-car database: the shipped one held unverified
+        values (e.g. wrong-high entries, which learning can never correct
+        downward), so heuristics + guarded learning + manual entry win."""
         cleaned = car_name.lower().strip()
         self.peak_rpm_seen = 0
         # Heuristics for common car classes
@@ -156,6 +166,8 @@ class TelemetryManager:
                           steer_angle=0.0):
         if not self.enabled or not self.device or not self.device.connected:
             return
+
+        self._last_frame_at = time.monotonic()
 
         # Adaptive Peak Tracking: learn the car's actual rev ceiling live.
         # Over-rev guard: a real pull climbs gradually, a downshift money-shift

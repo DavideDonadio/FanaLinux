@@ -5,10 +5,11 @@ Replicates FanaLab's 'FFB Dynamique' / 'Surcouche d'Amortissement':
 - Reverse Driving Safety Damper
 """
 
-import json
 import logging
 import os
 from dataclasses import asdict, dataclass, fields
+
+from fanalinux.core.persistence import load_json_dict, save_json_dict
 
 logger = logging.getLogger("fanalinux.dynamic_ffb_settings")
 
@@ -50,22 +51,13 @@ class DynamicFFBSettings:
 
 def load_dynamic_ffb_settings() -> DynamicFFBSettings:
     """Load dynamic FFB settings from ~/.config/fanalinux/dynamic_ffb.json."""
-    if os.path.exists(SETTINGS_PATH):
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    return DynamicFFBSettings.from_dict(data)
-        except Exception as e:
-            logger.warning(f"Error loading dynamic FFB settings: {e}")
+    data = load_json_dict(SETTINGS_PATH)
+    if data is not None:
+        return DynamicFFBSettings.from_dict(data)
     return DynamicFFBSettings()
 
 
 def save_dynamic_ffb_settings(settings: DynamicFFBSettings):
     """Save dynamic FFB settings to ~/.config/fanalinux/dynamic_ffb.json."""
-    try:
-        os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
-        with open(SETTINGS_PATH, "w") as f:
-            json.dump(asdict(settings), f, indent=4)
-    except Exception as e:
-        logger.error(f"Error saving dynamic FFB settings to disk: {e}")
+    if not save_json_dict(SETTINGS_PATH, asdict(settings)):
+        logger.error("Error saving dynamic FFB settings to disk")

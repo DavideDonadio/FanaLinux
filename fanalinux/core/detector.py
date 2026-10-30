@@ -4,13 +4,14 @@ Monitors running processes for racing simulators and automatically switches
 hardware tuning presets and telemetry engines.
 """
 
-import json
 import logging
 import os
 import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+from fanalinux.core.persistence import load_json_dict, save_json_dict
 
 logger = logging.getLogger("fanalinux.detector")
 
@@ -238,21 +239,20 @@ class GameDetector:
                 pass
 
         self.config_version = 2
-        if CONFIG_PATH.exists():
+        data = load_json_dict(CONFIG_PATH)
+        if data is not None:
             try:
-                with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    self.config_version = int(data.get("config_version", 1))
-                    self.enabled = bool(data.get("enabled", True))
-                    self.poll_interval = data.get("poll_interval", 1.5)
-                    self.fallback_preset = str(data.get("fallback_preset", "Default"))
-                    self.game_mappings = data.get("game_mappings", {})
-                    # Migrate legacy f1 keys if present
-                    if "f1_24" in self.game_mappings and "ea_sports_f1" not in self.game_mappings:
-                        self.game_mappings["ea_sports_f1"] = self.game_mappings["f1_24"]
-                    elif "f1_23" in self.game_mappings and "ea_sports_f1" not in self.game_mappings:
-                        self.game_mappings["ea_sports_f1"] = self.game_mappings["f1_23"]
-                    self.custom_games = data.get("custom_games", [])
+                self.config_version = int(data.get("config_version", 1))
+                self.enabled = bool(data.get("enabled", True))
+                self.poll_interval = data.get("poll_interval", 1.5)
+                self.fallback_preset = str(data.get("fallback_preset", "Default"))
+                self.game_mappings = data.get("game_mappings", {})
+                # Migrate legacy f1 keys if present
+                if "f1_24" in self.game_mappings and "ea_sports_f1" not in self.game_mappings:
+                    self.game_mappings["ea_sports_f1"] = self.game_mappings["f1_24"]
+                elif "f1_23" in self.game_mappings and "ea_sports_f1" not in self.game_mappings:
+                    self.game_mappings["ea_sports_f1"] = self.game_mappings["f1_23"]
+                self.custom_games = data.get("custom_games", [])
             except Exception as e:
                 logger.error(f"Error loading game profiles config: {e}")
 
@@ -319,7 +319,6 @@ class GameDetector:
             self.save_config()
 
     def save_config(self):
-        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "config_version": self.config_version,
             "enabled": self.enabled,
@@ -329,8 +328,7 @@ class GameDetector:
             "custom_games": self.custom_games
         }
         try:
-            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+            save_json_dict(CONFIG_PATH, data)
         except Exception as e:
             logger.error(f"Error saving game profiles config: {e}")
 

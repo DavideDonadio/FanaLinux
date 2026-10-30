@@ -3,11 +3,12 @@ Fanatec Telemetry-Driven Vibration & Haptics Configuration Model.
 Matches Fanatec App / FanaLab vibration settings.
 """
 
-import json
 import logging
 import os
 from dataclasses import asdict, dataclass
 from typing import Any
+
+from fanalinux.core.persistence import load_json_dict, save_json_dict
 
 logger = logging.getLogger("fanalinux.vibration")
 
@@ -78,21 +79,16 @@ class VibrationSettings:
 
 def load_vibration_settings() -> VibrationSettings:
     """Load user vibration preferences from disk or return factory defaults."""
-    if os.path.exists(VIBRATION_CONFIG_PATH):
+    data = load_json_dict(VIBRATION_CONFIG_PATH)
+    if data is not None:
         try:
-            with open(VIBRATION_CONFIG_PATH, "r") as f:
-                data = json.load(f)
-                return VibrationSettings.from_dict(data)
+            return VibrationSettings.from_dict(data)
         except Exception as e:
-            logger.warning(f"Failed to load {VIBRATION_CONFIG_PATH}: {e}, using defaults")
+            logger.warning(f"Failed to parse {VIBRATION_CONFIG_PATH}: {e}, using defaults")
     return VibrationSettings()
 
 
 def save_vibration_settings(settings: VibrationSettings):
     """Save user vibration preferences to disk."""
-    try:
-        os.makedirs(CONFIG_DIR, exist_ok=True)
-        with open(VIBRATION_CONFIG_PATH, "w") as f:
-            json.dump(settings.to_dict(), f, indent=2)
-    except Exception as e:
-        logger.error(f"Failed to save vibration settings to {VIBRATION_CONFIG_PATH}: {e}")
+    if not save_json_dict(VIBRATION_CONFIG_PATH, settings.to_dict()):
+        logger.error(f"Failed to save vibration settings to {VIBRATION_CONFIG_PATH}")
