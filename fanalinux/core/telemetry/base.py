@@ -115,8 +115,9 @@ class BaseTelemetryClient:
 
 class UdpTelemetryClient(BaseTelemetryClient):
     """Bind-style UDP telemetry: open, select-loop, dispatch, reconnect.
-    Subclasses provide endpoint constants and process_packet(); packets below
-    MIN_PACKET_SIZE go to _handle_short_packet() (default: ignored)."""
+    Subclasses provide endpoint constants and process_packet(), which returns
+    True when a valid frame was dispatched. Packets below MIN_PACKET_SIZE go
+    to _handle_short_packet() (default: ignored)."""
 
     UDP_IP = "127.0.0.1"
     UDP_PORT = 0
@@ -161,15 +162,23 @@ class UdpTelemetryClient(BaseTelemetryClient):
                                 self.is_connected = False
                         continue
 
-                    timeout_count = 0
                     data, _ = self._sock.recvfrom(self.RECV_SIZE)
-                    if len(data) >= self.MIN_PACKET_SIZE:
+                    # Only a successfully parsed frame counts as alive: junk
+                    # datagrams must neither connect nor sustain the flag.
+                    valid = (len(data) >= self.MIN_PACKET_SIZE
+                             and bool(self.process_packet(data)))
+                    if not valid and len(data) < self.MIN_PACKET_SIZE:
+                        self._handle_short_packet(data)
+                    if valid:
+                        timeout_count = 0
                         if not self.is_connected:
                             self.is_connected = True
                             logger.info(f"Connected to {self.STREAM_LABEL} telemetry stream")
-                        self.process_packet(data)
-                    else:
-                        self._handle_short_packet(data)
+                    elif self.is_connected:
+                        timeout_count += 1
+                        if timeout_count > 6:
+                            logger.info(f"{self.STREAM_LABEL} telemetry stream timed out")
+                            self.is_connected = False
 
             except Exception as e:
                 if self._running:

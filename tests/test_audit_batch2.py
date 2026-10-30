@@ -123,6 +123,22 @@ class TestAuditBatch2(unittest.TestCase):
         eng.trigger_pulse(30, 5.0)
         self.assertEqual(eng._pulse_intensity, 90)
 
+    def test_trigger_happy_range_matches_kernel(self):
+        """Button mapping must agree with the kernel header, not comments.
+        BTN_TRIGGER_HAPPY1..40 = codes 704..743 -> buttons 17..56."""
+        from evdev import ecodes
+        from fanalinux.core.evdev_listener import EvdevListener, EV_KEY
+        got = []
+        listener = EvdevListener(on_button=lambda b, p: got.append((b, p)))
+        self.assertEqual(ecodes.BTN_TRIGGER_HAPPY40 - ecodes.BTN_TRIGGER_HAPPY1, 39)
+        listener._process_event(EV_KEY, 704, 1)
+        listener._process_event(EV_KEY, 743, 1)
+        listener._process_event(EV_KEY, 744, 1)  # beyond the real range
+        by_code = {b: p for b, p in got}
+        self.assertEqual(by_code[17], True)
+        self.assertEqual(by_code[56], True)
+        self.assertEqual(by_code[744], True)  # passes through raw, never mapped
+
     def test_disconnect_serialized_with_writes(self):
         """Concurrent writes during disconnect must not raise or double-close."""
         from fanalinux.core.device import FanatecDevice

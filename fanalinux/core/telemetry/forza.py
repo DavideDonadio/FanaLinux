@@ -82,7 +82,7 @@ class ForzaTelemetry(UdpTelemetryClient):
                     abs_active=False,
                     tc_active=False
                 )
-                return
+                return True
 
             # Suspension travel FL, FR, RL, RR at offset 68
             susp_fl, susp_fr, susp_rl, susp_rr = struct.unpack_from("<4f", data, 68)
@@ -147,5 +147,6 @@ class ForzaTelemetry(UdpTelemetryClient):
                 suspension=suspension,
                 steer_angle=steer_angle
             )
+            return True
         except Exception as e:
             logger.error(f"Error parsing Forza packet: {e}")

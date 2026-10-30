@@ -75,5 +75,6 @@ class BeamNGTelemetry(UdpTelemetryClient):
                 abs_active=abs_active,
                 tc_active=tc_active
             )
+            return True
         except Exception as e:
             logger.error(f"Error parsing BeamNG packet: {e}")

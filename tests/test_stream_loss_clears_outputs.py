@@ -43,23 +43,45 @@ class TestStreamLossClearsOutputs(unittest.TestCase):
         mgr.haptic_engine.zero_outputs.assert_called_once()
 
     def test_junk_datagrams_do_not_count_as_alive(self):
-        """Parsers drop short/wrong-type packets without dispatching: the
-        frame clock must not advance, so the fail-safe still fires."""
+        """End to end: AMS2 parser wired to a live manager. Junk packets
+        leave the manager's frame clock untouched, so the fail-safe fires."""
         from fanalinux.core.telemetry.ams2 import AMS2Telemetry
-        dispatched = []
-        client = AMS2Telemetry(on_telemetry=lambda *a, **k: dispatched.append(a))
-        # Short + wrong-type packets: arrive, get dropped, dispatch nothing.
-        client.process_packet(bytes(20))
+        from fanalinux.core.telemetry.manager import TelemetryManager
+        mgr = TelemetryManager.__new__(TelemetryManager)
+        mgr.enabled = True
+        mgr.device = MagicMock()
+        mgr.device.connected = True
+        mgr.device.active_sen = 450
+        mgr.haptic_engine = MagicMock()
+        mgr.dynamic_ffb_engine = MagicMock()
+        mgr.auto_detect_rpm = False
+        mgr.display_mode = "gear"
+        mgr._last_gear = None
+        mgr._last_flag_state = None
+        mgr._limiter_strobe = False
+        mgr._last_speed_txt = None
+        mgr.peak_rpm_seen = 0
+        mgr.max_rpm = 6500
+        mgr._stream_was_alive = False
+        mgr._last_frame_at = 0.0
+        client = AMS2Telemetry(on_telemetry=mgr._handle_telemetry)
+        # Junk: short + wrong-type. Neither may advance the frame clock.
+        self.assertFalse(bool(client.process_packet(bytes(20))))
         wrong_type = bytearray(600)
         wrong_type[10] = 2  # not eCarPhysics
-        client.process_packet(bytes(wrong_type))
-        self.assertEqual(dispatched, [])
-        mgr = _manager()
-        mgr._last_frame_at = time.monotonic()
-        mgr._stream_was_alive = True
-        mgr._last_frame_at = time.monotonic() - 10.0
+        self.assertFalse(bool(client.process_packet(bytes(wrong_type))))
+        self.assertEqual(mgr._last_frame_at, 0.0)
+        mgr._stream_was_alive = True  # pretend a stream was live
         mgr.check_stream_health()
         mgr.haptic_engine.zero_outputs.assert_called_once()
+        # A valid physics frame revives the clock and clears the flag.
+        mgr.haptic_engine.reset_mock()
+        mgr.dynamic_ffb_engine.reset_mock()
+        physics = bytearray(556)  # type 0 + long enough
+        self.assertTrue(bool(client.process_packet(bytes(physics))))
+        self.assertGreater(mgr._last_frame_at, 0.0)
+        mgr.check_stream_health()
+        mgr.haptic_engine.zero_outputs.assert_not_called()
 
     def test_disabled_session_never_zeroes(self):
         mgr = _manager()

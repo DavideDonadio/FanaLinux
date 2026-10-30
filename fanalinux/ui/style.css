@@ -64,8 +64,8 @@ window {
 }
 
 .status-pill-running {
-    background-color: #2ec27e;
-    color: #ffffff;
+    background-color: alpha(@success_color, 0.15);
+    color: @success_color;
     font-weight: bold;
     border-radius: 9999px;
     padding: 3px 12px;
@@ -82,8 +82,8 @@ window {
 }
 
 .status-pill-unsupported {
-    background-color: #e5a50a;
-    color: #ffffff;
+    background-color: alpha(@warning_color, 0.15);
+    color: @warning_color;
     font-weight: bold;
     border-radius: 9999px;
     padding: 3px 12px;
@@ -91,8 +91,8 @@ window {
 }
 
 .status-pill-native {
-    background-color: #2ec27e;
-    color: #ffffff;
+    background-color: alpha(@success_color, 0.15);
+    color: @success_color;
     font-weight: bold;
     border-radius: 9999px;
     padding: 3px 12px;

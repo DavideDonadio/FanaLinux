@@ -87,6 +87,7 @@ class F1Telemetry(UdpTelemetryClient):
                         tc_active=self._last_tc,
                         steer_angle=steer
                     )
+                    return True
 
             # Packet 7: Car Status
             elif packet_id == self.PACKET_ID_CAR_STATUS:

@@ -109,5 +109,6 @@ class DirtRallyTelemetry(UdpTelemetryClient):
                 suspension=suspension,
                 steer_angle=steer_angle
             )
+            return True
         except Exception as e:
             logger.error(f"Error parsing DiRT Rally packet: {e}")

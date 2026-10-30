@@ -127,5 +127,6 @@ class AMS2Telemetry(UdpTelemetryClient):
                 suspension=suspension,
                 steer_angle=steer_angle
             )
+            return True
         except Exception as e:
             logger.error(f"Error parsing AMS2 packet: {e}")

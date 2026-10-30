@@ -282,8 +282,8 @@ class EvdevListener:
             # Map Linux evdev joystick key codes to 1-based button numbers
             if 288 <= code <= 303:
                 btn_num = code - 288 + 1      # Buttons 1..16 (BTN_TRIGGER..BTN_TOP2)
-            elif 704 <= code <= 767:
-                btn_num = code - 704 + 17     # Buttons 17..80 (BTN_TRIGGER_HAPPY1..64)
+            elif 704 <= code <= 743:
+                btn_num = code - 704 + 17     # Buttons 17..56 (BTN_TRIGGER_HAPPY1..40)
             elif 304 <= code <= 319:
                 btn_num = code - 304 + 81     # Gamepad buttons mapped to 81..96 (non-overlapping)
             else:
