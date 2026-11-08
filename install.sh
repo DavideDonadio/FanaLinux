@@ -155,6 +155,19 @@ if [ -f "$UDEV_RULE_SRC" ]; then
     fi
 fi
 
+# Standalone USB pedal mapper: update these rules even on an existing install.
+echo ""
+echo "USB ClubSport V3 brake-force mapping needs input and uinput permissions."
+read -rp "Install/update pedal permissions and enable uinput with sudo? (Y/n): " INSTALL_PEDALS
+if [[ ! "$INSTALL_PEDALS" =~ ^[Nn]$ ]]; then
+    sudo install -m 644 "$SRC_DIR/udev/70-fanalinux-pedals.rules" /etc/udev/rules.d/70-fanalinux-pedals.rules
+    sudo install -m 644 "$SRC_DIR/udev/fanalinux-pedals.conf" /etc/modules-load.d/fanalinux-pedals.conf
+    sudo modprobe uinput
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger --subsystem-match=input
+    sudo udevadm trigger --subsystem-match=misc
+fi
+
 # 10. Check PATH
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
     echo -e "\n${YELLOW}[NOTE] '$BIN_DIR' is not in your current PATH.${NC}"

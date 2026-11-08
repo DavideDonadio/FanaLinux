@@ -92,6 +92,7 @@ class TestSmoke(unittest.TestCase):
         self.assertIsNotNone(win)
         self.assertIsNotNone(win.overview_view)
         self.assertIsNotNone(win.tuning_view)
+        self.assertIsNotNone(win.pedals_view)
         self.assertIsNotNone(win.vibration_view)
         self.assertIsNotNone(win.leds_view)
         self.assertIsNotNone(win.profiles_view)

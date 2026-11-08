@@ -29,6 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "hidapi>=0.14.0",
+    "evdev>=1.7.0",
 ]
 
 [project.urls]

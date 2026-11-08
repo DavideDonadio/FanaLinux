@@ -1,0 +1,4 @@
+# Apply before 73-seat-late.rules so logind grants the active desktop user access.
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="0eb7", ATTRS{idProduct}=="183b", TAG+="uaccess"
+SUBSYSTEM=="input", ATTRS{name}=="FanaLinux Pedals", ENV{ID_INPUT_JOYSTICK}="1", TAG+="uaccess"
+SUBSYSTEM=="misc", KERNEL=="uinput", OPTIONS+="static_node=uinput", TAG+="uaccess"
