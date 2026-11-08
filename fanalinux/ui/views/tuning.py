@@ -427,7 +427,7 @@ class TuningView(Adw.PreferencesPage):
             self.device.apply_tuning_profile(self.profile)
             self._clear_dirty()
             if self.on_toast_requested:
-                self.on_toast_requested(f"Tuning parameters flashed to CSL DD (Slot {self.profile.slot})!")
+                self.on_toast_requested(f"Tuning parameters written to CSL DD (Slot {self.profile.slot})!")
         else:
             if self.on_toast_requested:
                 self.on_toast_requested("Device not connected!")

@@ -72,6 +72,30 @@ ICON_DIR="$HOME/.local/share/icons/hicolor"
 
 mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$APP_DIR"
 
+# 4.5. Check Build Dependencies (hidapi compiles against libusb + libudev headers).
+# System upgrades love to prune -devel packages, so fail fast here with the
+# exact fix instead of dying halfway through the pip install.
+echo -e "${BLUE}[*] Checking build dependencies (libusb, libudev headers)...${NC}"
+MISSING_BUILD_DEPS=""
+for pc in libusb-1.0 libudev; do
+    pkg-config --exists "$pc" 2>/dev/null || MISSING_BUILD_DEPS="$MISSING_BUILD_DEPS $pc"
+done
+if [ -n "$MISSING_BUILD_DEPS" ]; then
+    echo -e "${RED}[!] Missing build dependencies:$MISSING_BUILD_DEPS${NC}" >&2
+    if [ -f /etc/fedora-release ]; then
+        echo -e "  ${BOLD}Fedora:${NC} sudo dnf install -y libusb1-devel systemd-devel" >&2
+    elif [ -f /etc/arch-release ]; then
+        echo -e "  ${BOLD}Arch Linux:${NC} sudo pacman -S --needed libusb systemd-libs" >&2
+    elif [ -f /etc/debian_version ] || [ -f /etc/ubuntu-release ]; then
+        echo -e "  ${BOLD}Ubuntu/Debian:${NC} sudo apt install -y libusb-1.0-0-dev libudev-dev" >&2
+    else
+        echo -e "  Install the libusb-1.0 and libudev development headers from your package manager." >&2
+    fi
+    echo -e "${YELLOW}Re-run ./install.sh after installing them.${NC}" >&2
+    exit 1
+fi
+echo -e "${GREEN}[✓] Build dependencies present.${NC}"
+
 # 5. Create Isolated Virtual Environment (PEP 668 compliant across modern distros)
 echo -e "${BLUE}[*] Setting up isolated application environment in $INSTALL_DIR...${NC}"
 python3 -m venv --system-site-packages "$INSTALL_DIR/venv"
