@@ -33,4 +33,3 @@ sudo udevadm trigger --subsystem-match=misc
 Replug the pedals after changing permissions. On NixOS, the optional
 [FanaLinux module](NIX.md#nixos) installs the rules and enables `uinput`.
 Run FanaLinux as your desktop user. The Pedals status row reports mapper errors.
-
