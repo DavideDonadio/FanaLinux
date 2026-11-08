@@ -39,7 +39,7 @@ Flow: **Tuning** → adjust → **Apply to Wheelbase**. \
 **Remember to long-press the Tuning button for the full Advanced menu** (all 14 parameters). \
 Game force feedback needs the [hid-fanatecff](https://github.com/gotzl/hid-fanatecff) kernel module — You can install it from inside FanaLinux.
 
-For Nix, run `nix run .` from a checkout. See [Nix installation](NIX.md)
+For Nix, run `nix run .` from a checkout. See [Nix installation](docs/NIX.md)
 for persistent installation, permissions and NixOS setup.
 
 ## Features
@@ -48,7 +48,7 @@ for persistent installation, permissions and NixOS setup.
 |---|---|
 | Overview | Hardware status, kernel FFB driver install/update + version, live inputs, about and version |
 | Tuning | Full parameter set (SEN/FF/FFS/NDP/NFR/NIN/INT/FEI/FOR/SPR/DPR/SHO/BLI/BRF/FUL), slots 1–5, disk presets with exact numeric entry + SEN quick-chips |
-| [Pedals](PEDALS.md) | Software brake force (1–100%) for USB ClubSport V3 / V3 Inverted, with live input/output meters |
+| [Pedals](docs/PEDALS.md) | Software brake force (1–100%) for USB ClubSport V3 / V3 Inverted, with live input/output meters |
 | Profiles | Per-game auto-switching via `/proc` scan (Steam/Proton/Wine), auto telemetry start, fallback preset |
 | Dyn FFB | Speed-sensitive + reverse-safety damping overlays |
 | Vibration | ABS/engine/rev/suspension/TC/lock/spin/under-oversteer haptics with preview |
