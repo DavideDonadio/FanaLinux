@@ -165,12 +165,26 @@ else
     INSTALL_PEDALS=n
 fi
 if [[ ! "$INSTALL_PEDALS" =~ ^[Nn]$ ]]; then
-    sudo install -m 644 "$SRC_DIR/udev/70-fanalinux-pedals.rules" /etc/udev/rules.d/70-fanalinux-pedals.rules
-    sudo install -m 644 "$SRC_DIR/udev/fanalinux-pedals.conf" /etc/modules-load.d/fanalinux-pedals.conf
-    sudo modprobe uinput
-    sudo udevadm control --reload-rules
-    sudo udevadm trigger --subsystem-match=input
-    sudo udevadm trigger --subsystem-match=misc
+    PEDALS_OK=1
+    for f in "$SRC_DIR/udev/70-fanalinux-pedals.rules" "$SRC_DIR/udev/fanalinux-pedals.conf"; do
+        if [ ! -f "$f" ]; then
+            echo -e "${RED}[!] Missing source file: $f${NC}" >&2
+            PEDALS_OK=0
+        fi
+    done
+    [ "$PEDALS_OK" -eq 1 ] && sudo install -m 644 "$SRC_DIR/udev/70-fanalinux-pedals.rules" /etc/udev/rules.d/70-fanalinux-pedals.rules || PEDALS_OK=0
+    [ "$PEDALS_OK" -eq 1 ] && sudo install -m 644 "$SRC_DIR/udev/fanalinux-pedals.conf" /etc/modules-load.d/fanalinux-pedals.conf || PEDALS_OK=0
+    [ "$PEDALS_OK" -eq 1 ] && sudo modprobe uinput || PEDALS_OK=0
+    [ "$PEDALS_OK" -eq 1 ] && sudo udevadm control --reload-rules || PEDALS_OK=0
+    if [ "$PEDALS_OK" -eq 1 ]; then
+        sudo udevadm trigger --subsystem-match=input \
+            || echo -e "${YELLOW}[!] Input trigger failed; replug the pedals to apply rules.${NC}" >&2
+        sudo udevadm trigger --subsystem-match=misc \
+            || echo -e "${YELLOW}[!] Misc trigger failed; a reboot may be needed to apply remaining rules.${NC}" >&2
+        echo -e "${GREEN}[✓] Pedal configuration installed and uinput enabled.${NC}"
+    else
+        echo -e "${RED}[!] Pedal setup failed; see docs/PEDALS.md for manual steps.${NC}" >&2
+    fi
 fi
 
 # 10. Check PATH

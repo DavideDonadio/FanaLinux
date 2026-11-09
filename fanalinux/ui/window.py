@@ -122,7 +122,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.tuning_view, "tuning", "Tuning Menu", "preferences-system-symbolic"
         )
         self.view_stack.add_titled_with_icon(
-            self.pedals_view, "pedals", "Pedals", "input-gaming-symbolic"
+            self.pedals_view, "pedals", "USB Pedals", "input-gaming-symbolic"
         )
         self.view_stack.add_titled_with_icon(
             self.vibration_view, "vibration", "Vibration", "audio-volume-high-symbolic"
