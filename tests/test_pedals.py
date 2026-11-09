@@ -62,6 +62,13 @@ class PedalTests(unittest.TestCase):
         }
         return device
 
+    def test_discovery_matches_all_supported_sets(self):
+        for product, name in pedals.PEDAL_SETS.items():
+            device = self.make_device(product=product, name=name)
+            with patch.object(pedals, "list_devices", return_value=["a"]), \
+                    patch.object(pedals, "InputDevice", return_value=device):
+                self.assertIs(pedals.PedalMapper._find_pedals(), device)
+
     def test_discovery_excludes_wheelbases_and_own_output(self):
         devices = [self.make_device(product=0x0005),
                    self.make_device(name=pedals.VIRTUAL_NAME),

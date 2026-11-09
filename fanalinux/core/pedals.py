@@ -1,4 +1,4 @@
-"""Software brake force for USB ClubSport V3 pedals, as in BrakeTune.
+"""Software brake force for standalone USB Fanatec pedals, as in BrakeTune.
 
 Only the standalone USB pedal device is grabbed; wheelbases are never mapped.
 The worker owns all descriptors and releases them on disable, exit or unplug.
@@ -21,6 +21,17 @@ logger = logging.getLogger("fanalinux.pedals")
 SETTINGS_PATH = os.path.join(CONFIG_DIR, "pedals.json")
 VIRTUAL_NAME = "FanaLinux Pedals"
 BRAKE_AXIS = ecodes.ABS_Y
+
+# Standalone USB pedal sets. Product IDs from the Linux kernel driver
+# (hid-fanatecff hid-ftec.h: identical FTEC_PEDALS handling for all four,
+# no per-model axis remapping anywhere in its input or raw-event paths).
+# 0x183B is hardware-verified; the CSL rows await owner confirmation.
+PEDAL_SETS = {
+    0x183B: "ClubSport V3 / V3 Inverted",
+    0x6204: "CSL Elite",
+    0x6205: "CSL Pedals Loadcell V1",
+    0x6206: "CSL Pedals Loadcell V2",
+}
 
 
 def clamp_force(value):
@@ -66,7 +77,7 @@ class PedalMapper:
         if self._thread and self._thread.is_alive():
             return
         self._stop.clear()
-        self.status = "Waiting for USB ClubSport V3 pedals"
+        self.status = "Waiting for USB pedals"
         self._thread = threading.Thread(target=self._worker, daemon=True)
         self._thread.start()
 
@@ -85,7 +96,7 @@ class PedalMapper:
             try:
                 device = InputDevice(path)
                 if (device.info.vendor == 0x0EB7
-                        and device.info.product == 0x183B
+                        and device.info.product in PEDAL_SETS
                         and device.info.bustype == ecodes.BUS_USB
                         and device.name != VIRTUAL_NAME
                         and BRAKE_AXIS in device.capabilities(absinfo=False).get(ecodes.EV_ABS, [])):
@@ -101,7 +112,7 @@ class PedalMapper:
             try:
                 device = self._find_pedals()
                 if device is None:
-                    self.status = "Waiting for USB ClubSport V3 pedals (check input permissions)"
+                    self.status = "Waiting for USB pedals (check input permissions)"
                 else:
                     with device:
                         self._session(device)

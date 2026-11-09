@@ -1,7 +1,10 @@
 # USB pedal brake force
 
-The **Pedals** page provides software brake-force adjustment for ClubSport V3 /
-V3 Inverted pedals connected directly over USB (Fanatec `0eb7:183b`). It works
+The **Pedals** page provides software brake-force adjustment for standalone USB
+Fanatec pedals connected directly over USB. Supported sets (`0eb7` vendor):
+ClubSport V3 / V3 Inverted (`183b`, hardware-verified), CSL Elite (`6204`),
+CSL Loadcell V1 (`6205`) and CSL Loadcell V2 (`6206`, the CSL rows await owner
+confirmation). It works
 independently of a wheelbase connection. Pedals connected through a wheelbase
 use the existing hardware BRF setting instead.
 

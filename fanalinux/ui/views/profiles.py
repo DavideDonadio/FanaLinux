@@ -147,7 +147,7 @@ class ProfilesView(Adw.PreferencesPage):
     PULSE_IDS = {"rfactor2": "rF2", "lmu": "LMU"}
 
     FEEDLESS_NOTES = {
-        "assetto_corsa_evo": "No telemetry on Linux — the game exposes shared memory only.",
+        "assetto_corsa_evo": "No telemetry on Linux — the game exposes shared memory only, for now.",
     }
 
     @staticmethod
@@ -362,6 +362,11 @@ class ProfilesView(Adw.PreferencesPage):
             badge.set_valign(Gtk.Align.CENTER)
             badge.add_css_class("status-pill-nodash")
             expander.add_suffix(badge)
+        if gid == "assetto_corsa_evo":
+            wait = Gtk.Label(label="Waiting Kunos UDP")
+            wait.set_valign(Gtk.Align.CENTER)
+            wait.add_css_class("status-pill-wait")
+            expander.add_suffix(wait)
         elif gid == "acc":
             badge = Gtk.Label(label="No RPM")
             badge.set_valign(Gtk.Align.CENTER)

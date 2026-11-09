@@ -99,18 +99,27 @@ window {
     font-size: 0.85rem;
 }
 
-.status-pill-na {
-    background-color: alpha(currentColor, 0.18);
-    color: alpha(currentColor, 0.85);
+.status-pill-nodash {
+    background-color: alpha(@error_color, 0.15);
+    color: @error_color;
     font-weight: bold;
     border-radius: 9999px;
     padding: 3px 12px;
     font-size: 0.85rem;
 }
 
-.status-pill-nodash {
-    background-color: alpha(@error_color, 0.15);
-    color: @error_color;
+.status-pill-wait {
+    background-color: alpha(@accent_color, 0.15);
+    color: @accent_color;
+    font-weight: bold;
+    border-radius: 9999px;
+    padding: 3px 12px;
+    font-size: 0.85rem;
+}
+
+.status-pill-na {
+    background-color: alpha(currentColor, 0.18);
+    color: alpha(currentColor, 0.85);
     font-weight: bold;
     border-radius: 9999px;
     padding: 3px 12px;

@@ -16,12 +16,20 @@ class PedalsView(Adw.PreferencesPage):
         self._toast = on_toast_requested
         self.settings = PedalSettings.load()
         self.mapper = PedalMapper(self.settings.brake_force)
-        group = Adw.PreferencesGroup(title="USB ClubSport V3 Pedals")
+        group = Adw.PreferencesGroup(title="USB Pedals")
         group.set_description(
-            "Software brake force for ClubSport V3 / V3 Inverted connected directly over USB. "
-            "Select FanaLinux Pedals in your game. Keep FanaLinux open while playing; "
+            "Software brake force for ClubSport V3, CSL Elite and CSL Loadcell pedals connected directly over USB. "
+            "Pedals wired to the wheelbase use the Tuning tab's BRF instead.")
+        banner = Adw.ActionRow()
+        banner.set_title("How mapping works")
+        banner.set_subtitle(
+            "Select FanaLinux Pedals in your game and keep FanaLinux open while playing — "
             "disabling mapping or closing the app restores the physical device. "
-            "Quit BrakeTune before enabling this mapper.")
+            "Disable any other pedal mapper first.")
+        banner.set_subtitle_lines(3)
+        banner.set_icon_name("help-about-symbolic")
+        banner.set_activatable(False)
+        group.add(banner)
         row = Adw.ActionRow(title="Enable pedal mapping")
         row.set_subtitle("Hide physical pedal input while the virtual controller is active")
         toggle = Gtk.Switch(valign=Gtk.Align.CENTER)
