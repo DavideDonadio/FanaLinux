@@ -158,9 +158,17 @@ echo "FanaLinux needs non-root permission to communicate with Fanatec hardware v
 UDEV_RULE_SRC="$SRC_DIR/udev/99-fanatec-fanalinux.rules"
 UDEV_TARGET="/etc/udev/rules.d/99-fanatec-fanalinux.rules"
 
+udev_manual_hint() {
+    echo -e "${YELLOW}[!] Skipped udev installation. You can install it manually later with:${NC}"
+    echo "    sudo cp $UDEV_RULE_SRC /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger"
+}
+
 if [ -f "$UDEV_RULE_SRC" ]; then
     if [ -f "$UDEV_TARGET" ]; then
         echo -e "${GREEN}[✓] Udev rules already installed at $UDEV_TARGET${NC}"
+    elif [ ! -t 0 ]; then
+        echo -e "${YELLOW}[!] No terminal: skipping udev installation (needs sudo).${NC}"
+        udev_manual_hint
     else
         echo -e "${YELLOW}Installing udev rule requires sudo access:${NC}"
         echo "  sudo cp $UDEV_RULE_SRC $UDEV_TARGET"
@@ -168,13 +176,16 @@ if [ -f "$UDEV_RULE_SRC" ]; then
         echo ""
         read -rp "Install udev rule now with sudo? (Y/n): " INSTALL_UDEV
         if [[ ! "$INSTALL_UDEV" =~ ^[Nn]$ ]]; then
-            sudo cp "$UDEV_RULE_SRC" "$UDEV_TARGET"
-            sudo udevadm control --reload-rules
-            sudo udevadm trigger
-            echo -e "${GREEN}[✓] Udev rule installed and reloaded!${NC}"
+            if sudo cp "$UDEV_RULE_SRC" "$UDEV_TARGET" \
+                && sudo udevadm control --reload-rules \
+                && sudo udevadm trigger; then
+                echo -e "${GREEN}[✓] Udev rule installed and reloaded!${NC}"
+            else
+                echo -e "${RED}[!] Udev installation failed; hardware access may need the manual steps below.${NC}" >&2
+                udev_manual_hint
+            fi
         else
-            echo -e "${YELLOW}[!] Skipped udev installation. You can install it manually later with:${NC}"
-            echo "    sudo cp $UDEV_RULE_SRC /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger"
+            udev_manual_hint
         fi
     fi
 fi
