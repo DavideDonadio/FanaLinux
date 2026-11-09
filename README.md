@@ -64,7 +64,7 @@ for persistent installation, permissions and NixOS setup.
 - Every Apply writes all known registers; DRI/ACP reset to 0/OFF. If you use Drift mode, re-set it on the wheel afterwards.
 - SHO displays On/Off only; granularity unverified beyond that. FFS Linear confirmed by symmetry (Peak verified).
 - BRF can't be validated without load-cell pedals.
-- EVO exposes no Linux-readable telemetry (shared memory only); ACC's broadcast feed carries no RPM by design.
+- AC EVO exposes no Linux-readable telemetry; ACC's broadcast feed carries no RPM by design.
 
 ## Firmware updates
 
