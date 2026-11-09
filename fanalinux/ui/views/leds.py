@@ -221,14 +221,14 @@ class LedsView(Adw.PreferencesPage):
         flag_group.add(flag_row)
         self.add(flag_group)
 
-    def set_native_game_active(self, active: bool):
-        """Yield manual LED controls while a native-driver game owns the wheel.
-        The game drives LEDs/display itself; our clicks would fight it."""
+    def set_game_active(self, active: bool):
+        """Yield manual LED controls while a game profile owns the wheel.
+        Telemetry (or the game's own FFB effects) may be driving the LEDs; our clicks would fight it."""
         for widget in self._manual_led_widgets:
             widget.set_sensitive(not active)
             if isinstance(widget, Gtk.Button):
                 widget.set_tooltip_text(
-                    "Disabled: the running game drives the LEDs natively" if active else None)
+                    "Disabled while a game profile is active" if active else None)
 
 
     def _on_redline_auto_toggled(self, btn):

@@ -14,7 +14,7 @@ gi.require_version('Adw', '1')
 gi.require_version('Gdk', '4.0')
 from gi.repository import Adw, Gdk, GLib, Gtk
 
-from fanalinux.core.detector import NATIVE_DRIVER_IDS, GameDetector
+from fanalinux.core.detector import GameDetector
 from fanalinux.core.device import FanatecDevice
 from fanalinux.core import driver_setup
 from fanalinux.core.evdev_listener import EvdevListener, query_ff_effects
@@ -248,7 +248,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.telemetry_mgr.stop()
             self._telemetry_owner = None
         self._last_game_id = new_game_id
-        self.leds_view.set_native_game_active(new_game_id in NATIVE_DRIVER_IDS)
+        self.leds_view.set_game_active(True)
 
         if auto_telem:
             telem_type = game_info.get("telemetry_type") or "ac_udp"
@@ -273,7 +273,7 @@ class MainWindow(Adw.ApplicationWindow):
             logger.debug(f"Ignoring stale stop event for '{exiting_id}' (active: '{self._last_game_id}')")
             return False
         self._last_game_id = None
-        self.leds_view.set_native_game_active(False)
+        self.leds_view.set_game_active(False)
         if self.telemetry_mgr.enabled and self._telemetry_owner in (None, exiting_id):
             self.telemetry_mgr.stop()
             self._telemetry_owner = None

@@ -8,12 +8,14 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 import os
+import threading
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, GLib, Gtk
 
-from fanalinux.core.detector import NATIVE_DRIVER_IDS, GameDetector
+from fanalinux.core.detector import GameDetector
 from fanalinux.core.presets import list_presets, load_preset
 
 
@@ -34,6 +36,7 @@ class ProfilesView(Adw.PreferencesPage):
         self.on_preset_applied = on_preset_applied
 
         self._preset_dropdowns = []
+        self._game_expanders = []
         self._build_ui()
 
     def _build_ui(self):
@@ -103,16 +106,14 @@ class ProfilesView(Adw.PreferencesPage):
         self._populate_games()
         self.add(self.games_group)
 
-    # Games whose FFB/LEDs/display run natively through the kernel driver.
-    NATIVE_DRIVER_IDS = NATIVE_DRIVER_IDS
 
     def _populate_games(self):
         # Notice card first: same in-group spacing as the calibration shortcut
         # row, visually separate from the game rows below it.
         tip_row = Adw.ActionRow()
-        tip_row.set_title("Natively Supported Games")
+        tip_row.set_title("About Force Feedback")
         tip_row.set_subtitle(
-            "ACC, EVO, rF2 and LMU drive force feedback, LEDs and display through the kernel driver — no app telemetry needed."
+            "Every game drives FFB through the kernel driver. Dashboard and LEDs need a game data feed — present where telemetry is supported, absent for the rest."
         )
         tip_row.set_subtitle_lines(2)
         tip_row.set_icon_name("help-about-symbolic")
@@ -127,15 +128,196 @@ class ProfilesView(Adw.PreferencesPage):
 
         def _rank(game):
             if _is_supported(game):
-                return 0
-            if game["id"] in self.NATIVE_DRIVER_IDS:
-                return 1
-            return 2
+                # ACC closes the supported block, directly above FFB Only.
+                return (0, 1) if game["id"] == "acc" else (0, 0)
+            if game["id"] in self.FEEDLESS_IDS:
+                return (1, 0)
+            return (2, 0)
 
-        # Supported first, native-via-driver next, truly unsupported last.
+        # Supported first (ACC last of them), feed-less next, unsupported last.
         ordered = sorted(all_games, key=_rank)
         for game in ordered:
             self.games_group.add(self._make_game_row(game, presets, supported=_is_supported(game)))
+
+    # Detected games which expose no Linux-readable telemetry: tuning
+    # profiles still apply, dashboard/LEDs stay dark.
+    FEEDLESS_IDS = ("assetto_corsa_evo",)
+
+    # FanaLinux game id -> isiMotor Pulse installer key.
+    PULSE_IDS = {"rfactor2": "rF2", "lmu": "LMU"}
+
+    FEEDLESS_NOTES = {
+        "assetto_corsa_evo": "No telemetry on Linux — the game exposes shared memory only.",
+    }
+
+    @staticmethod
+    def _pulse_status(game_key: str) -> tuple[bool | None, str]:
+        """(installed, detail) for the isiMotor Pulse plugin; None if unavailable."""
+        try:
+            from isimotor_pulse_client.install.steam import detect_game_installations
+        except ImportError:
+            return None, "Plugin support unavailable — reinstall FanaLinux."
+        try:
+            for game_dir in detect_game_installations().get(game_key, []):
+                dll = Path(game_dir) / "Plugins" / "isiMotor_Pulse.dll"
+                if dll.exists():
+                    return True, f"Installed — {dll}"
+            return False, "Not installed — one click installs the open-source isiMotor Pulse DLL."
+        except Exception as e:
+            return None, f"Status check failed: {e}"
+
+    @staticmethod
+    def _expander_subtitle(gid: str, preset: str) -> str:
+        return f"Assigned Profile: {preset}"
+
+    def _on_uninstall_pulse(self, _btn, gid: str, expander, row) -> None:
+        """Remove the Pulse DLL from the game folder off the UI thread."""
+        from fanalinux.core.telemetry.pulse import PulseTelemetry
+        if not PulseTelemetry.is_available():
+            self._toast("Plugin support unavailable — reinstall FanaLinux.")
+            return
+        row.set_subtitle("Uninstalling…")
+
+        def work():
+            try:
+                import json
+                from isimotor_pulse_client.install.dll import uninstall_plugin
+                from isimotor_pulse_client.install.steam import detect_game_installations
+                key = self.PULSE_IDS[gid]
+                dirs = detect_game_installations().get(key, [])
+                if not dirs:
+                    name = {"rF2": "rFactor 2", "LMU": "Le Mans Ultimate"}.get(key, key)
+                    raise RuntimeError(f"No {name} installation found in the Steam libraries.")
+                for game_dir in dirs:
+                    uninstall_plugin(target_dir=Path(game_dir))
+                    # Leave no stale opt-in: the game would warn about it.
+                    json_path = (Path(game_dir) / "UserData" / "player"
+                                 / "CustomPluginVariables.JSON")
+                    try:
+                        data = json.loads(json_path.read_text(encoding="utf-8"))
+                        plugin = data.get("isiMotor_Pulse")
+                        if isinstance(plugin, dict) and plugin.get(" Enabled") != 0:
+                            plugin[" Enabled"] = 0
+                            json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                    except (OSError, ValueError):
+                        pass
+                result = (True, "Plugin uninstalled — wheel dashboard goes dark again.")
+            except Exception as e:
+                result = (False, f"Uninstall failed: {e}")
+            GLib.idle_add(self._on_pulse_uninstalled, gid, expander, row, result)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_pulse_uninstalled(self, gid, expander, row, result) -> bool:
+        ok, message = result
+        installed, detail = self._pulse_status(self.PULSE_IDS[gid])
+        if not ok:
+            detail = message
+        elif not installed:
+            detail = ("No Linux telemetry without it — install to unlock gear, RPM, "
+                      "speed and rev LEDs on your wheel.")
+        row.set_subtitle(detail)
+        pill = getattr(expander, "_pulse_pill", None)
+        if pill is not None:
+            pill.set_label("Installed isiMotor Pulse" if installed else "Missing plugin")
+            pill.remove_css_class("status-pill-running")
+            pill.remove_css_class("status-pill-unsupported")
+            pill.add_css_class("status-pill-running" if installed else "status-pill-unsupported")
+        install_btn = getattr(row, "_install_btn", None)
+        if install_btn is not None:
+            install_btn.set_label("Reinstall plugin" if installed else "Install telemetry plugin")
+        uninstall_btn = getattr(row, "_uninstall_btn", None)
+        if uninstall_btn is not None:
+            uninstall_btn.set_visible(installed)
+        expander._pulse_installed = installed
+        self._toast(message)
+        return False
+
+    def _on_install_pulse(self, _btn, gid: str, expander, row) -> None:
+        """Copy the Pulse DLL into the game folder off the UI thread."""
+        from fanalinux.core.telemetry.pulse import PulseTelemetry
+        if not PulseTelemetry.is_available():
+            self._toast("Plugin support unavailable — reinstall FanaLinux.")
+            return
+        row.set_subtitle("Installing…")
+
+        def work():
+            try:
+                from isimotor_pulse_client.install.dll import copy_and_install_dll
+                from isimotor_pulse_client.install.steam import detect_game_installations
+                # The pip package ships no DLL: fetch the prebuilt one once.
+                dll_path = PulseTelemetry.ensure_plugin_dll()
+                key = self.PULSE_IDS[gid]
+                dirs = detect_game_installations().get(key, [])
+                if not dirs:
+                    name = {"rF2": "rFactor 2", "LMU": "Le Mans Ultimate"}.get(key, key)
+                    raise RuntimeError(f"No {name} installation found in the Steam libraries.")
+                for game_dir in dirs:
+                    ok, message, _paths = copy_and_install_dll(
+                        custom_dll=Path(dll_path), target_dir=str(game_dir))
+                    if not ok:
+                        raise RuntimeError(message)
+                result = (True, "Plugin installed — restart the game to light up the dashboard.")
+            except Exception as e:
+                result = (False, f"Install failed: {e}")
+            GLib.idle_add(self._on_pulse_installed, gid, expander, row, result)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_pulse_installed(self, gid, expander, row, result) -> bool:
+        ok, message = result
+        installed, detail = self._pulse_status(self.PULSE_IDS[gid])
+        if not ok:
+            # Hold the failure in the row, not just the toast.
+            detail = message
+        elif installed:
+            detail = "Installed — gear, RPM, speed and rev LEDs live on your wheel."
+        row.set_subtitle(
+            'Open-source plugin: '
+            '<a href="https://github.com/marcgardent/isiMotor-Pulse-Plugin">'
+            '<span underline="none">marcgardent/isiMotor-Pulse-Plugin</span></a>\n' + detail)
+        if ok:
+            # Fresh plugin: telemetry is now useful, so auto-start it.
+            self.detector.game_mappings.setdefault(gid, {})["auto_telemetry"] = True
+            self.detector.save_config()
+            telem_sw = getattr(expander, "_telem_sw", None)
+            if telem_sw is not None:
+                telem_sw.set_active(True)
+        # Refresh main-row subtitle + Install button label.
+        current = self.detector.game_mappings.get(gid, {}).get("preset")
+        if not current:
+            for game in self.detector.get_all_games():
+                if game.get("id") == gid:
+                    current = game.get("default_preset", "Default")
+                    break
+        expander.set_subtitle(self._expander_subtitle(gid, current or "Default"))
+        pill = getattr(expander, "_pulse_pill", None)
+        if pill is not None:
+            pill.set_label("Installed isiMotor Pulse" if installed else "Missing plugin")
+            pill.remove_css_class("status-pill-running")
+            pill.remove_css_class("status-pill-unsupported")
+            pill.add_css_class("status-pill-running" if installed else "status-pill-unsupported")
+        plug_btn = getattr(row, "_install_btn", None)
+        if plug_btn is not None:
+            plug_btn.set_label("Reinstall plugin" if installed else "Install telemetry plugin")
+        uninstall_btn = getattr(row, "_uninstall_btn", None)
+        if uninstall_btn is not None:
+            uninstall_btn.set_visible(installed)
+        expander._pulse_installed = installed
+        self._toast(message)
+        return False
+
+    def _toast(self, message: str) -> None:
+        if self.on_toast_requested:
+            self.on_toast_requested(message)
+
+    def _on_expander_expanded(self, expanded_row, _param) -> None:
+        """Single-open accordions: opening one closes the rest."""
+        if not expanded_row.get_expanded():
+            return
+        for row in self._game_expanders:
+            if row is not expanded_row:
+                row.set_expanded(False)
 
     def _make_game_row(self, game, presets, supported: bool = True):
         gid = game["id"]
@@ -144,9 +326,7 @@ class ProfilesView(Adw.PreferencesPage):
         is_enabled = mapping.get("enabled", True)
         auto_telem = mapping.get("auto_telemetry", game.get("has_telemetry", False))
 
-        # Natively supported through the kernel driver: the game drives
-        # FFB, LEDs and display itself, profiles still auto-apply tuning.
-        if not supported:
+        if not supported and gid not in self.FEEDLESS_IDS:
             # Flat row: no expander arrow, nothing to open.
             row = Adw.ActionRow()
             row.set_title(game["name"])
@@ -157,26 +337,36 @@ class ProfilesView(Adw.PreferencesPage):
                 row.add_prefix(flat_img)
             else:
                 row.set_icon_name("input-gaming-symbolic")
-            if gid in self.NATIVE_DRIVER_IDS:
-                if gid == "lmu":
-                    row.set_subtitle_lines(2)
-                    row.set_subtitle(
-                        'Requires the <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3536726840">'
-                        '<span underline="none">GE-Proton10-34-LMU-hid_fixes</span></a> '
-                        "Proton build with inverted FFB in the game settings.")
-                badge = Gtk.Label(label="Via driver")
-                badge.set_valign(Gtk.Align.CENTER)
-                badge.add_css_class("status-pill-native")
-            else:
-                badge = Gtk.Label(label="Not supported")
-                badge.set_valign(Gtk.Align.CENTER)
-                badge.add_css_class("status-pill-unsupported")
+            badge = Gtk.Label(label="Not supported")
+            badge.set_valign(Gtk.Align.CENTER)
+            badge.add_css_class("status-pill-na")
             row.add_suffix(badge)
             return row
 
         expander = Adw.ExpanderRow()
+        expander.connect("notify::expanded", self._on_expander_expanded)
+        self._game_expanders.append(expander)
         expander.set_title(game["name"])
-        expander.set_subtitle(f"Assigned Profile: {current_preset}")
+        expander.set_subtitle(self._expander_subtitle(gid, current_preset))
+        if gid in self.PULSE_IDS:
+            # Status pill always on the main row; install lives in the dropdown.
+            installed, _detail = self._pulse_status(self.PULSE_IDS[gid])
+            pill = Gtk.Label(label="Installed isiMotor Pulse" if installed else "Missing plugin")
+            pill.set_valign(Gtk.Align.CENTER)
+            pill.add_css_class("status-pill-running" if installed else "status-pill-unsupported")
+            expander.add_suffix(pill)
+            expander._pulse_pill = pill
+            expander._pulse_installed = installed
+        if gid in self.FEEDLESS_IDS:
+            badge = Gtk.Label(label="FFB Only")
+            badge.set_valign(Gtk.Align.CENTER)
+            badge.add_css_class("status-pill-nodash")
+            expander.add_suffix(badge)
+        elif gid == "acc":
+            badge = Gtk.Label(label="No RPM")
+            badge.set_valign(Gtk.Align.CENTER)
+            badge.add_css_class("status-pill-unsupported")
+            expander.add_suffix(badge)
 
         icon_path = self.detector.get_game_icon_path(gid)
         if icon_path and os.path.exists(icon_path):
@@ -202,7 +392,9 @@ class ProfilesView(Adw.PreferencesPage):
         enable_row.add_suffix(enable_sw)
         expander.add_row(enable_row)
 
-        if supported:
+        # Every expander game gets a preset: tuning applies over hidraw
+        # whether or not a telemetry feed exists. (Only flat rows lack one.)
+        if supported or gid in self.FEEDLESS_IDS:
             # Assigned Tuning Preset Dropdown
             preset_row = Adw.ActionRow()
             preset_row.set_title("Assigned Hardware Preset")
@@ -219,7 +411,7 @@ class ProfilesView(Adw.PreferencesPage):
                     chosen = dd.get_model().get_string(idx)
                     self.detector.game_mappings.setdefault(g_id, {})["preset"] = chosen
                     self.detector.save_config()
-                    exp.set_subtitle(f"Assigned Profile: {chosen}")
+                    exp.set_subtitle(self._expander_subtitle(g_id, chosen))
 
             preset_dd.connect("notify::selected", _on_preset_picked)
             preset_row.add_suffix(preset_dd)
@@ -257,6 +449,7 @@ class ProfilesView(Adw.PreferencesPage):
             telem_sw = Gtk.Switch()
             telem_sw.set_active(auto_telem)
             telem_sw.set_valign(Gtk.Align.CENTER)
+            expander._telem_sw = telem_sw
 
             def _on_telem_toggle(sw, state, g_id=gid):
                 entry = self.detector.game_mappings.setdefault(g_id, {})
@@ -267,6 +460,64 @@ class ProfilesView(Adw.PreferencesPage):
             telem_sw.connect("state-set", _on_telem_toggle)
             telem_row.add_suffix(telem_sw)
             expander.add_row(telem_row)
+
+            if gid == "acc":
+                # One-time game-side setup + the feed's known limit.
+                acc_note = Adw.ActionRow()
+                acc_note.set_title("Broadcast Setup (one-time)")
+                acc_note.set_subtitle(
+                    "Enable broadcasting in Documents/Assetto Corsa Competizione/Config/broadcasting.json. "
+                    "This feed carries gear + speed only — no RPM, so the rev LEDs stay dark.")
+                acc_note.set_subtitle_lines(2)
+                acc_note.set_activatable(False)
+                expander.add_row(acc_note)
+
+        if gid in self.PULSE_IDS:
+            # One-click plugin install; the DLL never ships with FanaLinux.
+            _installed, detail = self._pulse_status(self.PULSE_IDS[gid])
+            plug_row = Adw.ActionRow()
+            plug_row.set_title("isiMotor Pulse Telemetry Plugin")
+            if not expander._pulse_installed:
+                detail = ("No Linux telemetry without it — install to unlock gear, RPM, "
+                          "speed and rev LEDs on your wheel.")
+            plug_row.set_subtitle(
+                'Open-source plugin: '
+                '<a href="https://github.com/marcgardent/isiMotor-Pulse-Plugin">'
+                '<span underline="none">marcgardent/isiMotor-Pulse-Plugin</span></a>\n' + detail)
+            plug_row.set_subtitle_lines(3)
+            plug_row.set_activatable(False)
+            install_btn = Gtk.Button(
+                label="Reinstall plugin" if expander._pulse_installed else "Install telemetry plugin")
+            install_btn.set_valign(Gtk.Align.CENTER)
+            install_btn.connect("clicked", self._on_install_pulse, gid, expander, plug_row)
+            plug_row.add_suffix(install_btn)
+            plug_row._install_btn = install_btn
+            uninstall_btn = Gtk.Button(label="Uninstall")
+            uninstall_btn.set_valign(Gtk.Align.CENTER)
+            uninstall_btn.connect("clicked", self._on_uninstall_pulse, gid, expander, plug_row)
+            uninstall_btn.set_visible(expander._pulse_installed)
+            plug_row.add_suffix(uninstall_btn)
+            plug_row._uninstall_btn = uninstall_btn
+            expander.add_row(plug_row)
+
+        if gid in self.FEEDLESS_IDS:
+            # Tuning still applies; explain why the wheel stays dark.
+            note = Adw.ActionRow()
+            note.set_title("Telemetry unavailable")
+            note.set_subtitle(self.FEEDLESS_NOTES[gid])
+            note.set_activatable(False)
+            expander.add_row(note)
+
+        if gid == "lmu":
+            proton = Adw.ActionRow()
+            proton.set_title("Proton setup")
+            proton.set_subtitle_lines(2)
+            proton.set_subtitle(
+                'Requires the <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3536726840">'
+                '<span underline="none">GE-Proton10-34-LMU-hid_fixes</span></a> '
+                "Proton build with inverted FFB in the game settings.")
+            proton.set_activatable(False)
+            expander.add_row(proton)
 
         return expander
 

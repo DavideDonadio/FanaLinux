@@ -101,8 +101,26 @@ echo -e "${BLUE}[*] Setting up isolated application environment in $INSTALL_DIR.
 python3 -m venv --system-site-packages "$INSTALL_DIR/venv"
 
 echo -e "${BLUE}[*] Installing FanaLinux and Python dependencies...${NC}"
-"$INSTALL_DIR/venv/bin/pip" install --upgrade pip setuptools wheel --quiet
-"$INSTALL_DIR/venv/bin/pip" install "$SRC_DIR" --quiet
+PIP_BIN="$INSTALL_DIR/venv/bin/pip"
+"$PIP_BIN" install --upgrade pip setuptools wheel --quiet
+# The isiMotor Pulse telemetry packages are not on PyPI (uv workspace
+# siblings), so pre-install them with --no-deps; the main install then
+# sees them satisfied and resolves everything else normally.
+if ! command -v git &>/dev/null; then
+    echo -e "${RED}[!] git is required to fetch the telemetry plugin client.${NC}" >&2
+    if [ -f /etc/fedora-release ]; then
+        echo -e "  ${BOLD}Fedora:${NC} sudo dnf install -y git" >&2
+    elif [ -f /etc/arch-release ]; then
+        echo -e "  ${BOLD}Arch Linux:${NC} sudo pacman -S --needed git" >&2
+    elif [ -f /etc/debian_version ] || [ -f /etc/ubuntu-release ]; then
+        echo -e "  ${BOLD}Ubuntu/Debian:${NC} sudo apt install -y git" >&2
+    fi
+    exit 1
+fi
+PULSE_BASE="git+https://github.com/marcgardent/isiMotor-Pulse-Plugin.git#subdirectory=binding/python"
+"$PIP_BIN" install --no-deps "isimotor-pulse-types @ $PULSE_BASE/isimotor-pulse-types" --quiet
+"$PIP_BIN" install --no-deps "isimotor-pulse-client @ $PULSE_BASE/isimotor-pulse-client" --quiet
+"$PIP_BIN" install "$SRC_DIR" --quiet
 
 # 6. Symlink Executable
 ln -sf "$INSTALL_DIR/venv/bin/fanalinux" "$BIN_DIR/fanalinux"

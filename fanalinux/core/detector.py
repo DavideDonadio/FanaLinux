@@ -34,11 +34,8 @@ def match_game_process(comm: str, argv: list[str], target_exe: str) -> bool:
 CONFIG_PATH = Path.home() / ".config" / "fanalinux" / "game_profiles.json"
 OLD_CONFIG_PATH = Path.home() / ".config" / "open-fanactrl" / "game_profiles.json"
 
-# Games whose FFB/LEDs/display run natively through the kernel driver
-# (FanatecSDK over hidraw). Our telemetry never starts for these, and manual
-# LED controls must yield while one is active.
-NATIVE_DRIVER_IDS = {"acc", "assetto_corsa_evo", "rfactor2", "lmu"}
-
+# All games drive FFB through the kernel driver; dashboard/LEDs additionally
+# need a game data feed (telemetry_type) where one exists on Linux.
 BUILTIN_GAMES: list[dict[str, Any]] = [
     {
         "id": "assetto_corsa",
@@ -57,8 +54,8 @@ BUILTIN_GAMES: list[dict[str, Any]] = [
         "name": "Assetto Corsa Competizione",
         "executables": ["acc.exe"],
         "default_preset": "Assetto Corsa - GT3",
-        "has_telemetry": False,
-        "telemetry_type": None,
+        "has_telemetry": True,
+        "telemetry_type": "acc_broadcast",
         "description": "Official Fanatec GT World Challenge Simulator",
         "icon": "acc.svg"
     },
@@ -142,8 +139,8 @@ BUILTIN_GAMES: list[dict[str, Any]] = [
         "name": "rFactor 2",
         "executables": ["rfactor2.exe"],
         "default_preset": "Default",
-        "has_telemetry": False,
-        "telemetry_type": None,
+        "has_telemetry": True,
+        "telemetry_type": "pulse",
         "description": "Studio 397 rFactor 2",
         "icon": "rfactor2.svg"
     },
@@ -152,8 +149,8 @@ BUILTIN_GAMES: list[dict[str, Any]] = [
         "name": "Le Mans Ultimate",
         "executables": ["lemansultimate.exe"],
         "default_preset": "Default",
-        "has_telemetry": False,
-        "telemetry_type": None,
+        "has_telemetry": True,
+        "telemetry_type": "pulse",
         "description": "Official FIA WEC / 24 Hours of Le Mans game",
         "icon": "lmu.svg"
     },

@@ -10,22 +10,26 @@ from typing import Any
 from fanalinux.core.dynamic_ffb_engine import DynamicFFBEngine
 from fanalinux.core.haptics import HapticEngine
 from fanalinux.core.telemetry.ac import AssettoCorsaTelemetry
+from fanalinux.core.telemetry.acc_broadcast import ACCBroadcastTelemetry
 from fanalinux.core.telemetry.ams2 import AMS2Telemetry
 from fanalinux.core.telemetry.beamng import BeamNGTelemetry
 from fanalinux.core.telemetry.dirt import DirtRallyTelemetry
 from fanalinux.core.telemetry.f1 import F1Telemetry
 from fanalinux.core.telemetry.forza import ForzaTelemetry
+from fanalinux.core.telemetry.pulse import PulseTelemetry
 from fanalinux.core.telemetry.scs import SCSTelemetry
 
 logger = logging.getLogger("fanalinux.telemetry.manager")
 
 TELEMETRY_FACTORIES = {
     "ac_udp": AssettoCorsaTelemetry,
+    "acc_broadcast": ACCBroadcastTelemetry,
     "ams2_udp": AMS2Telemetry,
     "beamng_outgauge": BeamNGTelemetry,
     "dirt_udp": DirtRallyTelemetry,
     "f1_udp": F1Telemetry,
     "forza_udp": ForzaTelemetry,
+    "pulse": PulseTelemetry,
     "scs_shm": SCSTelemetry,
 }
 

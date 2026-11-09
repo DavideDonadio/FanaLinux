@@ -99,6 +99,24 @@ window {
     font-size: 0.85rem;
 }
 
+.status-pill-na {
+    background-color: alpha(currentColor, 0.18);
+    color: alpha(currentColor, 0.85);
+    font-weight: bold;
+    border-radius: 9999px;
+    padding: 3px 12px;
+    font-size: 0.85rem;
+}
+
+.status-pill-nodash {
+    background-color: alpha(@error_color, 0.15);
+    color: @error_color;
+    font-weight: bold;
+    border-radius: 9999px;
+    padding: 3px 12px;
+    font-size: 0.85rem;
+}
+
 
 .status-indicator-box {
     padding: 6px 14px;
