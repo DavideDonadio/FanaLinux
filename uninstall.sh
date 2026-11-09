@@ -63,4 +63,7 @@ if [ -f /etc/udev/rules.d/70-fanalinux-pedals.rules ]; then
     fi
 fi
 
-echo -e "\n${BOLD}${GREEN}FanaLinux has been successfully uninstalled from your system.${NC}\n"
+echo -e "\n${BOLD}${GREEN}FanaLinux has been successfully uninstalled from your system.${NC}"
+echo -e "${BLUE}Note:${NC} the optional isiMotor Pulse plugin (isiMotor_Pulse.dll +"
+echo -e "CustomPluginVariables.JSON opt-in) stays in your rF2/LMU game folders."
+echo -e "It is inert without FanaLinux; delete the DLL to remove it fully.\n"
