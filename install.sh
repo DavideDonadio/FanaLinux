@@ -158,7 +158,12 @@ fi
 # Standalone USB pedal mapper: update these rules even on an existing install.
 echo ""
 echo "USB ClubSport V3 brake-force mapping needs input and uinput permissions."
-read -rp "Install/update pedal permissions and enable uinput with sudo? (Y/n): " INSTALL_PEDALS
+if [ -t 0 ]; then
+    read -rp "Install/update pedal permissions and enable uinput with sudo? (Y/n): " INSTALL_PEDALS
+else
+    echo "Non-interactive install: skipping pedal udev setup (see docs/PEDALS.md)."
+    INSTALL_PEDALS=n
+fi
 if [[ ! "$INSTALL_PEDALS" =~ ^[Nn]$ ]]; then
     sudo install -m 644 "$SRC_DIR/udev/70-fanalinux-pedals.rules" /etc/udev/rules.d/70-fanalinux-pedals.rules
     sudo install -m 644 "$SRC_DIR/udev/fanalinux-pedals.conf" /etc/modules-load.d/fanalinux-pedals.conf
