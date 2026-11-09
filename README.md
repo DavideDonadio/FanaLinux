@@ -49,13 +49,13 @@ for persistent installation, permissions and NixOS setup.
 | Overview | Hardware status, kernel FFB driver install/update + version, live inputs, about and version |
 | Tuning | Full parameter set (SEN/FF/FFS/NDP/NFR/NIN/INT/FEI/FOR/SPR/DPR/SHO/BLI/BRF/FUL), slots 1–5, disk presets with exact numeric entry + SEN quick-chips |
 | [Pedals](docs/PEDALS.md) | Software brake force (1–100%) for USB ClubSport V3 / V3 Inverted, with live input/output meters |
-| Profiles | Per-game auto-switching via `/proc` scan (Steam/Proton/Wine), auto telemetry start, fallback preset |
+| Profiles | Per-game auto-switching via `/proc` scan (Steam/Proton/Wine), auto telemetry start, fallback preset, one-click telemetry plugin install where needed |
 | Dyn FFB | Speed-sensitive + reverse-safety damping overlays |
 | Vibration | ABS/engine/rev/suspension/TC/lock/spin/under-oversteer haptics with preview |
 | Display | RevLEDs, flag LEDs, OLED gear/speed |
 | Calibration | Center calibration, motor self-test, emergency cutoff |
 
-**Telemetry in:** AC, BeamNG OutGauge, DiRT/WRC, F1, Forza (FM7 + FH/FM23), AMS2, SCS shm. \
+**Telemetry in:** AC, ACC (gear + speed, no RPM), BeamNG OutGauge, DiRT/WRC, F1, Forza (FM7 + FH/FM23), AMS2, SCS shm, rF2/LMU via one-click isiMotor Pulse plugin. \
 **Out:** live RevLEDs, OLED gear/speed, ABS/TC flags, haptics, damping.
 
 ## Known limitations
@@ -64,6 +64,7 @@ for persistent installation, permissions and NixOS setup.
 - Every Apply writes all known registers; DRI/ACP reset to 0/OFF. If you use Drift mode, re-set it on the wheel afterwards.
 - SHO displays On/Off only; granularity unverified beyond that. FFS Linear confirmed by symmetry (Peak verified).
 - BRF can't be validated without load-cell pedals.
+- EVO exposes no Linux-readable telemetry (shared memory only); ACC's broadcast feed carries no RPM by design.
 
 ## Firmware updates
 
