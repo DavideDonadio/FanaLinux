@@ -25,6 +25,7 @@ from fanalinux.ui.views.calibration import CalibrationView
 from fanalinux.ui.views.dynamic_ffb import DynamicFFBView
 from fanalinux.ui.views.leds import LedsView
 from fanalinux.ui.views.overview import OverviewView
+from fanalinux.ui.views.pedals import PedalsView
 from fanalinux.ui.views.profiles import ProfilesView
 from fanalinux.ui.views.tuning import TuningView
 from fanalinux.ui.views.vibration import VibrationView
@@ -82,6 +83,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Create Views (All are Adw.PreferencesPage with built-in scrolling & clamping)
         self.overview_view = OverviewView(self.device, on_rim_changed=self._on_rim_changed)
+        self.pedals_view = PedalsView(on_toast_requested=self.show_toast)
         self.tuning_view = TuningView(
             self.device,
             on_toast_requested=self.show_toast,
@@ -118,6 +120,9 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self.view_stack.add_titled_with_icon(
             self.tuning_view, "tuning", "Tuning Menu", "preferences-system-symbolic"
+        )
+        self.view_stack.add_titled_with_icon(
+            self.pedals_view, "pedals", "USB Pedals", "input-gaming-symbolic"
         )
         self.view_stack.add_titled_with_icon(
             self.vibration_view, "vibration", "Vibration", "audio-volume-high-symbolic"
@@ -175,6 +180,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _widen_all_clamps(self):
         views = [
             self.overview_view,
+            self.pedals_view,
             self.tuning_view,
             self.vibration_view,
             self.leds_view,
@@ -354,6 +360,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.tuning_view.set_active_profile(profile)
 
     def _on_close(self, *args):
+        self.pedals_view.stop()
         if self.detector:
             self.detector.stop()
         if self.telemetry_mgr:

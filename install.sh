@@ -179,6 +179,38 @@ if [ -f "$UDEV_RULE_SRC" ]; then
     fi
 fi
 
+# Standalone USB pedal mapper: update these rules even on an existing install.
+echo ""
+echo "USB ClubSport V3 brake-force mapping needs input and uinput permissions."
+if [ -t 0 ]; then
+    read -rp "Install/update pedal permissions and enable uinput with sudo? (Y/n): " INSTALL_PEDALS
+else
+    echo "Non-interactive install: skipping pedal udev setup (see docs/PEDALS.md)."
+    INSTALL_PEDALS=n
+fi
+if [[ ! "$INSTALL_PEDALS" =~ ^[Nn]$ ]]; then
+    PEDALS_OK=1
+    for f in "$SRC_DIR/udev/70-fanalinux-pedals.rules" "$SRC_DIR/udev/fanalinux-pedals.conf"; do
+        if [ ! -f "$f" ]; then
+            echo -e "${RED}[!] Missing source file: $f${NC}" >&2
+            PEDALS_OK=0
+        fi
+    done
+    [ "$PEDALS_OK" -eq 1 ] && sudo install -m 644 "$SRC_DIR/udev/70-fanalinux-pedals.rules" /etc/udev/rules.d/70-fanalinux-pedals.rules || PEDALS_OK=0
+    [ "$PEDALS_OK" -eq 1 ] && sudo install -m 644 "$SRC_DIR/udev/fanalinux-pedals.conf" /etc/modules-load.d/fanalinux-pedals.conf || PEDALS_OK=0
+    [ "$PEDALS_OK" -eq 1 ] && sudo modprobe uinput || PEDALS_OK=0
+    [ "$PEDALS_OK" -eq 1 ] && sudo udevadm control --reload-rules || PEDALS_OK=0
+    if [ "$PEDALS_OK" -eq 1 ]; then
+        sudo udevadm trigger --subsystem-match=input \
+            || echo -e "${YELLOW}[!] Input trigger failed; replug the pedals to apply rules.${NC}" >&2
+        sudo udevadm trigger --subsystem-match=misc \
+            || echo -e "${YELLOW}[!] Misc trigger failed; a reboot may be needed to apply remaining rules.${NC}" >&2
+        echo -e "${GREEN}[✓] Pedal configuration installed and uinput enabled.${NC}"
+    else
+        echo -e "${RED}[!] Pedal setup failed; see docs/PEDALS.md for manual steps.${NC}" >&2
+    fi
+fi
+
 # 10. Check PATH
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
     echo -e "\n${YELLOW}[NOTE] '$BIN_DIR' is not in your current PATH.${NC}"

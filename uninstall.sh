@@ -53,4 +53,14 @@ if [ -f "$UDEV_FILE" ]; then
     fi
 fi
 
+if [ -f /etc/udev/rules.d/70-fanalinux-pedals.rules ]; then
+    read -rp "Remove FanaLinux pedal permissions and uinput startup configuration? (y/N): " REMOVE_PEDALS
+    if [[ "$REMOVE_PEDALS" =~ ^[Yy]$ ]]; then
+        sudo rm -f /etc/udev/rules.d/70-fanalinux-pedals.rules /etc/modules-load.d/fanalinux-pedals.conf
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --subsystem-match=input
+        sudo udevadm trigger --subsystem-match=misc
+    fi
+fi
+
 echo -e "\n${BOLD}${GREEN}FanaLinux has been successfully uninstalled from your system.${NC}\n"
