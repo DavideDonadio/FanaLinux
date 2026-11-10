@@ -235,53 +235,27 @@ class GameDetector:
             except Exception:
                 pass
 
-        self.config_version = 2
+        # Baseline config version 3: pre-0.5.1 migrations are dropped —
+        # no public installs predate them, and fill-defaults below covers
+        # every game that matters.
+        self.config_version = 3
         data = load_json_dict(CONFIG_PATH)
         if data is not None:
             try:
-                self.config_version = int(data.get("config_version", 1))
+                self.config_version = max(3, int(data.get("config_version", 3)))
                 self.enabled = bool(data.get("enabled", True))
                 self.poll_interval = data.get("poll_interval", 1.5)
                 self.fallback_preset = str(data.get("fallback_preset", "Default"))
                 self.game_mappings = data.get("game_mappings", {})
-                # Migrate legacy f1 keys if present
-                if "f1_24" in self.game_mappings and "ea_sports_f1" not in self.game_mappings:
-                    self.game_mappings["ea_sports_f1"] = self.game_mappings["f1_24"]
-                elif "f1_23" in self.game_mappings and "ea_sports_f1" not in self.game_mappings:
-                    self.game_mappings["ea_sports_f1"] = self.game_mappings["f1_23"]
                 self.custom_games = data.get("custom_games", [])
             except Exception as e:
                 logger.error(f"Error loading game profiles config: {e}")
 
-        # Migration to v2: Enable auto_telemetry for builtins with newly supported telemetry
-        needs_migration_save = False
-        if self.config_version < 2:
-            new_telemetry_games = {"ea_sports_f1", "dirt_rally_2", "ea_wrc", "beamng"}
-            for gid in new_telemetry_games:
-                if gid in self.game_mappings:
-                    mapping = self.game_mappings[gid]
-                    # Only enable if user didn't explicitly opt out
-                    if not mapping.get("auto_telemetry_explicit", False):
-                        mapping["auto_telemetry"] = True
-                        logger.info(f"Migrated game telemetry default for '{gid}' -> enabled")
-                    else:
-                        logger.info(f"Preserved user explicit telemetry preference for '{gid}'")
-            self.config_version = 2
-            needs_migration_save = True
-
-        # Migration to v3: Enable auto_telemetry for forza_motorsport, ams2, ets2, ats
-        if self.config_version < 3:
-            v3_telemetry_games = {"forza_motorsport", "ams2", "ets2", "ats"}
-            for gid in v3_telemetry_games:
-                if gid in self.game_mappings:
-                    mapping = self.game_mappings[gid]
-                    if not mapping.get("auto_telemetry_explicit", False):
-                        mapping["auto_telemetry"] = True
-                        logger.info(f"Migrated game telemetry default for '{gid}' -> enabled")
-                    else:
-                        logger.info(f"Preserved user explicit telemetry preference for '{gid}'")
-            self.config_version = 3
-            needs_migration_save = True
+        # Stamp up to the baseline, never down: a newer config from the
+        # future keeps its version (forward compatibility). Pre-baseline
+        # configs only need the stamp — fill-defaults below does the work.
+        needs_migration_save = self.config_version < 3
+        self.config_version = max(3, self.config_version)
 
         # Fill default mappings for builtins if not present
         for game in BUILTIN_GAMES:

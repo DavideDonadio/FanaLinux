@@ -46,7 +46,6 @@ class TelemetryManager:
         self._clients: dict[str, Any] = {}
         self.active_telemetry_type = "ac_udp"
         self.active_client = self._get_client("ac_udp")
-        self.ac_client = self.active_client  # Backwards compatibility
 
         self.haptic_engine = HapticEngine(self.device)
         self.dynamic_ffb_engine = DynamicFFBEngine(self.device)
@@ -124,7 +123,6 @@ class TelemetryManager:
 
         self.active_telemetry_type = target_type
         self.active_client = self._get_client(target_type)
-        self.ac_client = self.active_client  # Backwards compatibility
         self.active_client.start()
         self.haptic_engine.start()
 
