@@ -48,7 +48,7 @@ for persistent installation, permissions and NixOS setup.
 |---|---|
 | Overview | Hardware status, kernel FFB driver install/update + version, live inputs, about and version |
 | Tuning | Full parameter set (SEN/FF/FFS/NDP/NFR/NIN/INT/FEI/FOR/SPR/DPR/SHO/BLI/BRF/FUL), slots 1–5, disk presets with exact numeric entry + SEN quick-chips |
-| [Pedals](docs/PEDALS.md) | Software brake force (1–100%) for USB ClubSport V3 / V3 Inverted, with live input/output meters |
+| [Pedals](docs/PEDALS.md) | Software brake force (1–100%) for USB ClubSport V3, CSL Elite and CSL Loadcell pedals, with live input/output meters |
 | Profiles | Per-game auto-switching via `/proc` scan (Steam/Proton/Wine), auto telemetry start, fallback preset, one-click telemetry plugin install where needed |
 | Dyn FFB | Speed-sensitive + reverse-safety damping overlays |
 | Vibration | ABS/engine/rev/suspension/TC/lock/spin/under-oversteer haptics with preview |
@@ -64,7 +64,7 @@ for persistent installation, permissions and NixOS setup.
 - Every Apply writes all known registers; DRI/ACP reset to 0/OFF. If you use Drift mode, re-set it on the wheel afterwards.
 - SHO displays On/Off only; granularity unverified beyond that. FFS Linear confirmed by symmetry (Peak verified).
 - BRF can't be validated without load-cell pedals.
-- AC EVO exposes no Linux-readable telemetry; ACC's broadcast feed carries no RPM.
+- AC EVO exposes no Linux-readable telemetry yet (waiting on Kunos UDP); ACC's broadcast feed carries no RPM by design.
 
 ## Firmware updates
 
