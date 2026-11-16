@@ -131,7 +131,8 @@ class CalibrationView(Adw.PreferencesPage):
 
         # Embedded 360° Circular Steering Visualizer Dial (Screenshot 2)
         self.wheel_dial = WheelDialWidget(
-            on_calibrate_clicked=self._on_calibrate_clicked,
+            on_app_zero_clicked=self._on_app_zero_clicked,
+            on_base_reindex_clicked=self._on_base_reindex_clicked,
             on_reset_clicked=self._on_reset_clicked
         )
         center_group.add(self.wheel_dial)
@@ -464,15 +465,17 @@ class CalibrationView(Adw.PreferencesPage):
         if self.on_toast_requested:
             self.on_toast_requested("Emergency Cutoff: All forces, springs, and vibrations zeroed!")
 
-    def _on_calibrate_clicked(self, btn=None):
-        # 1. Update persistent software calibration offset in evdev listener
+    def _on_app_zero_clicked(self, btn=None):
+        # Software zero only: zeroes the dial where the wheel sits NOW.
+        # Games read raw evdev and ignore this — it must match the base.
         if self.evdev_listener:
             self.evdev_listener.set_center_raw(self._last_raw_steering)
-
-        # 2. Immediately snap visual dial to 0.0
         GLib.idle_add(self.wheel_dial.set_angle, 0.0)
+        if self.on_toast_requested:
+            self.on_toast_requested("App zero set here — games still use the base center!")
 
-        # 3. Physical visual confirmation on the wheel rim LEDs
+    def _on_base_reindex_clicked(self, btn=None):
+        # Hardware zero only: re-indexes the base to the CURRENT position.
         if self.device and self.device.connected:
             def _feedback():
                 try:
@@ -488,7 +491,7 @@ class CalibrationView(Adw.PreferencesPage):
             self.device.calibrate_center()
 
         if self.on_toast_requested:
-            self.on_toast_requested(f"Wheel center calibrated to 0.0° (Raw: {self._last_raw_steering})!")
+            self.on_toast_requested("Base center re-indexed to the current wheel position!")
 
     def _on_reset_clicked(self, btn=None):
         if self.evdev_listener:

@@ -26,10 +26,12 @@ RESOURCES_RIMS_DIR = os.path.join(
 
 
 class WheelDialWidget(Gtk.Box):
-    def __init__(self, on_calibrate_clicked: Callable[[], None] | None = None,
+    def __init__(self, on_app_zero_clicked: Callable[[], None] | None = None,
+                 on_base_reindex_clicked: Callable[[], None] | None = None,
                  on_reset_clicked: Callable[[], None] | None = None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        self.on_calibrate_clicked = on_calibrate_clicked
+        self.on_app_zero_clicked = on_app_zero_clicked
+        self.on_base_reindex_clicked = on_base_reindex_clicked
         self.on_reset_clicked = on_reset_clicked
         self.angle_deg = 0.0
 
@@ -62,11 +64,24 @@ class WheelDialWidget(Gtk.Box):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         btn_box.set_halign(Gtk.Align.CENTER)
 
-        self.cal_btn = Gtk.Button(label="Calibrate Center")
-        self.cal_btn.set_size_request(160, 40)
+        self.app_zero_btn = Gtk.Button(label="Set app zero here")
+        self.app_zero_btn.set_size_request(150, 40)
+        self.app_zero_btn.set_halign(Gtk.Align.CENTER)
+        self.app_zero_btn.add_css_class("pill")
+        self.app_zero_btn.set_tooltip_text(
+            "App display only: zeroes the dial at the current position. "
+            "Games ignore this — use it only to match an already-correct base.")
+        self.app_zero_btn.connect("clicked", self._on_app_zero_btn_clicked)
+        btn_box.append(self.app_zero_btn)
+
+        self.cal_btn = Gtk.Button(label="Re-index base center")
+        self.cal_btn.set_size_request(170, 40)
         self.cal_btn.set_halign(Gtk.Align.CENTER)
         self.cal_btn.add_css_class("suggested-action")
         self.cal_btn.add_css_class("pill")
+        self.cal_btn.set_tooltip_text(
+            "Hardware: re-indexes the base zero to the CURRENT physical position. "
+            "Center the wheel first or games will pull.")
         self.cal_btn.connect("clicked", self._on_btn_clicked)
         btn_box.append(self.cal_btn)
 
@@ -98,11 +113,16 @@ class WheelDialWidget(Gtk.Box):
                 self.angle_deg = float(degrees)
                 self.drawing_area.queue_draw()
 
+    def _on_app_zero_btn_clicked(self, btn):
+        self._start_calibration_animation()
+        if self.on_app_zero_clicked:
+            self.on_app_zero_clicked()
+
     def _on_btn_clicked(self, btn):
         # Trigger the smooth calibration animation and device command
         self._start_calibration_animation()
-        if self.on_calibrate_clicked:
-            self.on_calibrate_clicked()
+        if self.on_base_reindex_clicked:
+            self.on_base_reindex_clicked()
 
     def _on_reset_btn_clicked(self, btn):
         self._start_calibration_animation()
