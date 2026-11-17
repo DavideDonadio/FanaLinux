@@ -129,12 +129,13 @@ class CalibrationView(Adw.PreferencesPage):
             "Ensure your steering wheel is physically centered (0.0°) before triggering."
         )
 
-        # Embedded 360° Circular Steering Visualizer Dial (Screenshot 2)
+        # Embedded 360° Circular Steering Visualizer Dial (Screenshot 2).
+        # Single center button: base re-index first, app zero follows from the
+        # first fresh post-calibration frame, so the two can never disagree.
         self.wheel_dial = WheelDialWidget(
-            on_app_zero_clicked=self._on_app_zero_clicked,
-            on_base_reindex_clicked=self._on_base_reindex_clicked,
-            on_reset_clicked=self._on_reset_clicked
+            on_set_center_clicked=self._on_set_center_clicked
         )
+        self._settle_pending = False
         center_group.add(self.wheel_dial)
 
         # Hardware shortcut helper row
@@ -437,6 +438,15 @@ class CalibrationView(Adw.PreferencesPage):
 
     def update_steering(self, norm_val: float, raw_val: int):
         self._last_raw_steering = raw_val
+        if self._settle_pending:
+            # First fresh frame after the base re-index: stamp the app zero
+            # from this reading, not from the pre-calibration one.
+            self._settle_pending = False
+            if self.evdev_listener:
+                self.evdev_listener.set_center_raw(raw_val)
+            GLib.idle_add(self.wheel_dial.set_angle, 0.0)
+            if self.on_toast_requested:
+                self.on_toast_requested("Wheel center set: base and dial agree!")
         active_sen = getattr(self.device, "active_sen", 900)
         max_deg = (active_sen / 2.0) if active_sen > 0 else 450.0
         deg = norm_val * max_deg
@@ -465,17 +475,11 @@ class CalibrationView(Adw.PreferencesPage):
         if self.on_toast_requested:
             self.on_toast_requested("Emergency Cutoff: All forces, springs, and vibrations zeroed!")
 
-    def _on_app_zero_clicked(self, btn=None):
-        # Software zero only: zeroes the dial where the wheel sits NOW.
-        # Games read raw evdev and ignore this — it must match the base.
-        if self.evdev_listener:
-            self.evdev_listener.set_center_raw(self._last_raw_steering)
-        GLib.idle_add(self.wheel_dial.set_angle, 0.0)
-        if self.on_toast_requested:
-            self.on_toast_requested("App zero set here — games still use the base center!")
-
-    def _on_base_reindex_clicked(self, btn=None):
-        # Hardware zero only: re-indexes the base to the CURRENT position.
+    def _on_set_center_clicked(self, btn=None):
+        # One click, both zeros: re-index the base to the current position,
+        # then stamp the app zero from the first fresh post-calibration frame.
+        # The settle flag is consumed in update_steering — never the stale
+        # pre-calibration reading, which is what caused the old ±6° split.
         if self.device and self.device.connected:
             def _feedback():
                 try:
@@ -489,26 +493,19 @@ class CalibrationView(Adw.PreferencesPage):
 
             threading.Thread(target=_feedback, daemon=True).start()
             self.device.calibrate_center()
+            self._settle_pending = True
+            GLib.timeout_add_seconds(4, self._settle_timeout)
+            if self.on_toast_requested:
+                self.on_toast_requested("Base re-indexed — nudge the wheel slightly to settle the dial!")
+        else:
+            if self.on_toast_requested:
+                self.on_toast_requested("Device not connected!")
 
-        if self.on_toast_requested:
-            self.on_toast_requested("Base center re-indexed to the current wheel position!")
-
-    def _on_reset_clicked(self, btn=None):
-        if self.evdev_listener:
-            self.evdev_listener.reset_center()
-
-        GLib.idle_add(self.wheel_dial.set_angle, 0.0)
-
-        if self.device and self.device.connected:
-            def _feedback():
-                try:
-                    self.device.set_display_text("RST")
-                    time.sleep(0.6)
-                    self.device.clear_display()
-                except Exception:
-                    pass
-
-            threading.Thread(target=_feedback, daemon=True).start()
-
-        if self.on_toast_requested:
-            self.on_toast_requested("Steering center reset to factory default (32768)!")
+    def _settle_timeout(self):
+        # No fresh frame arrived (wheel perfectly still): don't stamp stale
+        # data — ask for a nudge instead of re-creating the split.
+        if self._settle_pending:
+            self._settle_pending = False
+            if self.on_toast_requested:
+                self.on_toast_requested("No fresh reading yet — wiggle the wheel and press again!")
+        return False
