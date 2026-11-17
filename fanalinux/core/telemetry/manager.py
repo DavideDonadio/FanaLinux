@@ -172,11 +172,16 @@ class TelemetryManager:
         self._last_frame_at = time.monotonic()
 
         # Adaptive Peak Tracking: learn the car's actual rev ceiling live.
-        # Over-rev guard: a real pull climbs gradually, a downshift money-shift
-        # arrives as a huge single-frame jump — ignore jumps over 500 rpm so a
-        # spike can't ratchet the redline up and silence the shift lights.
+        # Over-rev guard is time-aware: a real pull climbs at most ~12000 rpm/s,
+        # while a downshift money-shift arrives as a near-instant jump (tens of
+        # thousands of rpm/s). A flat per-frame cap stalls learning entirely on
+        # slow feeds (e.g. AC UDP), where legitimate frames climb >500 rpm.
         if self.auto_detect_rpm:
-            if rpm > self.peak_rpm_seen and (self.peak_rpm_seen == 0 or rpm - self.peak_rpm_seen <= 500):
+            now = time.monotonic()
+            dt = max(0.001, now - getattr(self, "_last_rpm_at", now))
+            self._last_rpm_at = now
+            allowed_jump = max(500.0, 15000.0 * dt)
+            if rpm > self.peak_rpm_seen and (self.peak_rpm_seen == 0 or rpm - self.peak_rpm_seen <= allowed_jump):
                 self.peak_rpm_seen = rpm
                 if self.peak_rpm_seen > 4000:
                     self.max_rpm = self.peak_rpm_seen

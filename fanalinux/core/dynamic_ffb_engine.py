@@ -78,7 +78,7 @@ class DynamicFFBEngine:
             if self.device and self.device.connected and not getattr(self.device, "output_inhibited", False):
                 try:
                     self.device.send_damper_friction(target_damping)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.debug(f"Could not apply dynamic damping: {e}")
                 self._last_applied_damping = target_damping
             else:

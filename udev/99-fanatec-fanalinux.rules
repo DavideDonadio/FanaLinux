@@ -5,3 +5,6 @@
 KERNEL=="hidraw*", ATTRS{idVendor}=="0eb7", TAG+="uaccess"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="0eb7", TAG+="uaccess"
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0eb7", TAG+="uaccess"
+# Keep the wheel's USB link out of autosuspend: selective suspend has been
+# implicated in mid-session rim disconnects (buttons latch, FFB drops).
+ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="0eb7", ATTR{power/control}="on"
