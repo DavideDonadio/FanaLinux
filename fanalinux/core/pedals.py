@@ -33,6 +33,30 @@ PEDAL_SETS = {
     0x6206: "CSL Pedals Loadcell V2",
 }
 
+HID_DEVICES_DIR = "/sys/bus/hid/devices"
+
+
+def detect_usb_pedals(hid_dir: str = HID_DEVICES_DIR) -> int | None:
+    """Product ID of a connected standalone USB pedal set, or None.
+
+    Reads sysfs names only (BUS:VENDOR:PRODUCT.INSTANCE, e.g.
+    0003:0EB7:183B.0006), so it never opens or grabs the device."""
+    try:
+        names = sorted(os.listdir(hid_dir))
+    except OSError:
+        return None
+    for name in names:
+        parts = name.split(".")[0].split(":")
+        if len(parts) != 3:
+            continue
+        try:
+            bus, vendor, product = (int(p, 16) for p in parts)
+        except ValueError:
+            continue
+        if bus == 0x0003 and vendor == 0x0EB7 and product in PEDAL_SETS:
+            return product
+    return None
+
 
 def clamp_force(value):
     try:
@@ -114,8 +138,12 @@ class PedalMapper:
                 if device is None:
                     self.status = "Waiting for USB pedals (check input permissions)"
                 else:
-                    with device:
+                    # python-evdev's InputDevice is not a context manager
+                    # (no __exit__ as of 1.9), so close it explicitly.
+                    try:
                         self._session(device)
+                    finally:
+                        device.close()
             except (OSError, UInputError) as exc:
                 self.status = f"Pedals unavailable: {exc}. Check udev permissions and uinput."
                 logger.warning(self.status)
