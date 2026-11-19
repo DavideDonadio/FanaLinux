@@ -203,6 +203,17 @@ class PedalTests(unittest.TestCase):
             device.close.assert_called_once()
 
 
+    def test_detect_usb_pedals_reads_sysfs_names(self):
+        with tempfile.TemporaryDirectory() as hid_dir:
+            self.assertIsNone(pedals.detect_usb_pedals(hid_dir))
+            for name in ("0003:046D:C52B.0001", "0003:0EB7:0020.0002", "junk"):
+                os.mkdir(os.path.join(hid_dir, name))
+            self.assertIsNone(pedals.detect_usb_pedals(hid_dir))
+            os.mkdir(os.path.join(hid_dir, "0003:0EB7:183B.0006"))
+            self.assertEqual(pedals.detect_usb_pedals(hid_dir), 0x183B)
+        self.assertIsNone(pedals.detect_usb_pedals("/nonexistent"))
+
+
 @unittest.skipUnless(os.environ.get("FANALINUX_UINPUT_TESTS") == "1",
                      "set FANALINUX_UINPUT_TESTS=1 to test synthetic kernel input devices")
 class KernelPedalTests(unittest.TestCase):

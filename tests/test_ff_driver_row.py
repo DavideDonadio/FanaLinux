@@ -43,5 +43,22 @@ class TestDriverRowLabel(unittest.TestCase):
         self.assertIn("Not detected", view.ff_lbl.get_text())
 
 
+class TestPedalRow(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        Adw.init()
+
+    def test_pedal_row_tracks_detection(self):
+        device = MagicMock()
+        device.product_id = 0x0020
+        view = OverviewView(device)
+        self.assertFalse(view.pedal_row.get_visible())
+        view.set_pedals(0x183B)
+        self.assertTrue(view.pedal_row.get_visible())
+        self.assertIn("ClubSport V3", view.pedal_row.get_title())
+        view.set_pedals(None)
+        self.assertFalse(view.pedal_row.get_visible())
+
+
 if __name__ == "__main__":
     unittest.main()
