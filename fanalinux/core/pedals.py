@@ -33,7 +33,6 @@ PEDAL_SETS = {
     0x6206: "CSL Pedals Loadcell V2",
 }
 
-
 def clamp_force(value):
     try:
         return max(1, min(100, int(value)))
@@ -114,8 +113,12 @@ class PedalMapper:
                 if device is None:
                     self.status = "Waiting for USB pedals (check input permissions)"
                 else:
-                    with device:
+                    # python-evdev's InputDevice is not a context manager
+                    # (no __exit__ as of 1.9), so close it explicitly.
+                    try:
                         self._session(device)
+                    finally:
+                        device.close()
             except (OSError, UInputError) as exc:
                 self.status = f"Pedals unavailable: {exc}. Check udev permissions and uinput."
                 logger.warning(self.status)

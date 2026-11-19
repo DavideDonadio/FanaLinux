@@ -180,7 +180,6 @@ class PedalTests(unittest.TestCase):
     def test_uinput_permission_errors_are_reported_and_retried(self):
         mapper = pedals.PedalMapper()
         device = self.make_device()
-        device.__enter__.return_value = device
         mapper._stop = MagicMock()
         mapper._stop.is_set.side_effect = [False, True]
         with patch.object(mapper, "_find_pedals", return_value=device), \
@@ -189,13 +188,11 @@ class PedalTests(unittest.TestCase):
         self.assertIn("no access", mapper.status)
         self.assertIn("uinput", mapper.status)
         mapper._stop.wait.assert_called_once_with(1.0)
-        device.__exit__.assert_called_once()
+        device.close.assert_called_once()
 
     def test_worker_reconnects_after_unplug(self):
         mapper = pedals.PedalMapper()
         devices = [self.make_device(), self.make_device()]
-        for device in devices:
-            device.__enter__.return_value = device
         mapper._stop = MagicMock()
         mapper._stop.is_set.side_effect = [False, False, True]
         with patch.object(mapper, "_find_pedals", side_effect=devices), \
@@ -203,7 +200,7 @@ class PedalTests(unittest.TestCase):
             mapper._worker()
         self.assertEqual(session.call_count, 2)
         for device in devices:
-            device.__exit__.assert_called_once()
+            device.close.assert_called_once()
 
 
 @unittest.skipUnless(os.environ.get("FANALINUX_UINPUT_TESTS") == "1",
