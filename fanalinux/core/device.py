@@ -76,14 +76,14 @@ class FanatecDevice:
                 return os.path.realpath(non_pedal[0])
 
         known_pids = (
-            f"{PID_CSL_DD:04X}",
-            f"{PID_DD_PRO:04X}",
-            f"{PID_PODIUM_DD1:04X}",
-            f"{PID_PODIUM_DD2:04X}",
-            f"{PID_CLUBSPORT_V2:04X}",
-            f"{PID_CLUBSPORT_V25:04X}",
-            f"{PID_CSL_ELITE:04X}",
-            f"{PID_CSL_ELITE_PS4:04X}",
+            PID_CSL_DD,
+            PID_DD_PRO,
+            PID_PODIUM_DD1,
+            PID_PODIUM_DD2,
+            PID_CLUBSPORT_V2,
+            PID_CLUBSPORT_V25,
+            PID_CSL_ELITE,
+            PID_CSL_ELITE_PS4,
         )
 
         candidates = []
@@ -93,13 +93,16 @@ class FanatecDevice:
                 try:
                     with open(uevent_path, "r") as f:
                         content = f.read().upper()
-                        if f"{self.vendor_id:04X}" in content:
+                        ids = parse_hid_ids(content)
+                        if ids and ids[0] == self.vendor_id:
                             dev_name = os.path.basename(entry)
                             dev_path = f"/dev/{dev_name}"
                             score = 1
                             if not any(x in content for x in ("PEDAL", "SHIFTER", "HANDBRAKE")):
                                 score = 2
-                            if any(pid in content for pid in known_pids):
+                            # Compare the parsed product ID: a substring match on the
+                            # raw uevent also hits the bus type (HID_ID=0003:...).
+                            if ids[1] in known_pids:
                                 score = 3
                             candidates.append((score, dev_path))
                 except Exception:
