@@ -20,6 +20,9 @@ from fanalinux.core.persistence import CONFIG_DIR, load_json_dict, save_json_dic
 logger = logging.getLogger("fanalinux.pedals")
 SETTINGS_PATH = os.path.join(CONFIG_DIR, "pedals.json")
 VIRTUAL_NAME = "FanaLinux Pedals"
+# Keep the virtual joystick out of games' vendor-specific Fanatec input paths.
+VIRTUAL_VENDOR = 0x0001
+VIRTUAL_PRODUCT = 0xFA01
 BRAKE_AXIS = ecodes.ABS_Y
 
 # Standalone USB pedal sets. Product IDs from the Linux kernel driver
@@ -183,8 +186,8 @@ class PedalMapper:
             # Create output before taking exclusive input ownership. Closing the
             # source also releases EVIOCGRAB if explicit ungrab ever fails.
             virtual = stack.enter_context(UInput.from_device(
-                device, name=VIRTUAL_NAME, vendor=device.info.vendor,
-                product=device.info.product, version=device.info.version,
+                device, name=VIRTUAL_NAME, vendor=VIRTUAL_VENDOR,
+                product=VIRTUAL_PRODUCT, version=1,
                 bustype=ecodes.BUS_VIRTUAL))
             device.grab()
             stack.callback(device.ungrab)

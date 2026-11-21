@@ -83,9 +83,12 @@ class PedalTests(unittest.TestCase):
     def run_session(self, mapper, device, poll):
         virtual = MagicMock()
         virtual.__enter__.return_value = virtual
-        with patch.object(pedals.UInput, "from_device", return_value=virtual), \
+        with patch.object(pedals.UInput, "from_device", return_value=virtual) as factory, \
                 patch.object(pedals.select, "select", side_effect=poll):
             mapper._session(device)
+        factory.assert_called_once_with(
+            device, name=pedals.VIRTUAL_NAME, vendor=pedals.VIRTUAL_VENDOR,
+            product=pedals.VIRTUAL_PRODUCT, version=1, bustype=ecodes.BUS_VIRTUAL)
         return virtual
 
     def test_snapshot_passthrough_and_grab_cleanup(self):
