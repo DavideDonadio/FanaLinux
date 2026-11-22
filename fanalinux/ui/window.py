@@ -18,6 +18,7 @@ from fanalinux.core.detector import GameDetector
 from fanalinux.core.device import FanatecDevice
 from fanalinux.core import driver_setup
 from fanalinux.core.evdev_listener import EvdevListener, query_ff_effects
+from fanalinux.core.pedals import detect_usb_pedals
 from fanalinux.core.presets import load_preset
 from fanalinux.core.telemetry.manager import TelemetryManager
 from fanalinux.ui.helpers import widen_page_clamp
@@ -170,6 +171,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._hardware_online = self.device.connected if self.device else False
         self._last_evdev_retry = 0.0
         self.overview_view.set_connection_status(self._hardware_online)
+        self.overview_view.set_pedals(detect_usb_pedals())
         GLib.timeout_add_seconds(1, self._check_hardware_connection)
 
         # Ensure all preference pages utilize the full window width (1040px)
@@ -311,6 +313,7 @@ class MainWindow(Adw.ApplicationWindow):
         was_online = self._hardware_online
         is_online = self.device.check_connection() if self.device else False
         self._hardware_online = is_online
+        self.overview_view.set_pedals(detect_usb_pedals())
 
         # Kernel FFB driver: live effects if wheel present, else module presence
         module_present = driver_setup.driver_module_present()

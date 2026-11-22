@@ -20,6 +20,9 @@ from fanalinux.core.persistence import CONFIG_DIR, load_json_dict, save_json_dic
 logger = logging.getLogger("fanalinux.pedals")
 SETTINGS_PATH = os.path.join(CONFIG_DIR, "pedals.json")
 VIRTUAL_NAME = "FanaLinux Pedals"
+# Keep the virtual joystick out of games' vendor-specific Fanatec input paths.
+VIRTUAL_VENDOR = 0x0001
+VIRTUAL_PRODUCT = 0xFA01
 BRAKE_AXIS = ecodes.ABS_Y
 
 # Standalone USB pedal sets. Product IDs from the Linux kernel driver
@@ -32,6 +35,30 @@ PEDAL_SETS = {
     0x6205: "CSL Pedals Loadcell V1",
     0x6206: "CSL Pedals Loadcell V2",
 }
+
+HID_DEVICES_DIR = "/sys/bus/hid/devices"
+
+
+def detect_usb_pedals(hid_dir: str = HID_DEVICES_DIR) -> int | None:
+    """Product ID of a connected standalone USB pedal set, or None.
+
+    Reads sysfs names only (BUS:VENDOR:PRODUCT.INSTANCE, e.g.
+    0003:0EB7:183B.0006), so it never opens or grabs the device."""
+    try:
+        names = sorted(os.listdir(hid_dir))
+    except OSError:
+        return None
+    for name in names:
+        parts = name.split(".")[0].split(":")
+        if len(parts) != 3:
+            continue
+        try:
+            bus, vendor, product = (int(p, 16) for p in parts)
+        except ValueError:
+            continue
+        if bus == 0x0003 and vendor == 0x0EB7 and product in PEDAL_SETS:
+            return product
+    return None
 
 
 def clamp_force(value):
@@ -114,8 +141,12 @@ class PedalMapper:
                 if device is None:
                     self.status = "Waiting for USB pedals (check input permissions)"
                 else:
-                    with device:
+                    # python-evdev's InputDevice is not a context manager
+                    # (no __exit__ as of 1.9), so close it explicitly.
+                    try:
                         self._session(device)
+                    finally:
+                        device.close()
             except (OSError, UInputError) as exc:
                 self.status = f"Pedals unavailable: {exc}. Check udev permissions and uinput."
                 logger.warning(self.status)
@@ -155,8 +186,8 @@ class PedalMapper:
             # Create output before taking exclusive input ownership. Closing the
             # source also releases EVIOCGRAB if explicit ungrab ever fails.
             virtual = stack.enter_context(UInput.from_device(
-                device, name=VIRTUAL_NAME, vendor=device.info.vendor,
-                product=device.info.product, version=device.info.version,
+                device, name=VIRTUAL_NAME, vendor=VIRTUAL_VENDOR,
+                product=VIRTUAL_PRODUCT, version=1,
                 bustype=ecodes.BUS_VIRTUAL))
             device.grab()
             stack.callback(device.ungrab)

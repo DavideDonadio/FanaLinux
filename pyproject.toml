@@ -49,4 +49,4 @@ where = ["."]
 include = ["fanalinux*"]
 
 [tool.setuptools.package-data]
-fanalinux = ["ui/*.css", "resources/icons/*", "resources/rims/*", "resources/bases/*", "core/telemetry/*.json"]
+fanalinux = ["ui/*.css", "resources/icons/*", "resources/rims/*", "resources/bases/*", "resources/pedals/*", "core/telemetry/*.json"]

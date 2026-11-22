@@ -83,9 +83,12 @@ class PedalTests(unittest.TestCase):
     def run_session(self, mapper, device, poll):
         virtual = MagicMock()
         virtual.__enter__.return_value = virtual
-        with patch.object(pedals.UInput, "from_device", return_value=virtual), \
+        with patch.object(pedals.UInput, "from_device", return_value=virtual) as factory, \
                 patch.object(pedals.select, "select", side_effect=poll):
             mapper._session(device)
+        factory.assert_called_once_with(
+            device, name=pedals.VIRTUAL_NAME, vendor=pedals.VIRTUAL_VENDOR,
+            product=pedals.VIRTUAL_PRODUCT, version=1, bustype=ecodes.BUS_VIRTUAL)
         return virtual
 
     def test_snapshot_passthrough_and_grab_cleanup(self):
@@ -180,7 +183,6 @@ class PedalTests(unittest.TestCase):
     def test_uinput_permission_errors_are_reported_and_retried(self):
         mapper = pedals.PedalMapper()
         device = self.make_device()
-        device.__enter__.return_value = device
         mapper._stop = MagicMock()
         mapper._stop.is_set.side_effect = [False, True]
         with patch.object(mapper, "_find_pedals", return_value=device), \
@@ -189,13 +191,11 @@ class PedalTests(unittest.TestCase):
         self.assertIn("no access", mapper.status)
         self.assertIn("uinput", mapper.status)
         mapper._stop.wait.assert_called_once_with(1.0)
-        device.__exit__.assert_called_once()
+        device.close.assert_called_once()
 
     def test_worker_reconnects_after_unplug(self):
         mapper = pedals.PedalMapper()
         devices = [self.make_device(), self.make_device()]
-        for device in devices:
-            device.__enter__.return_value = device
         mapper._stop = MagicMock()
         mapper._stop.is_set.side_effect = [False, False, True]
         with patch.object(mapper, "_find_pedals", side_effect=devices), \
@@ -203,7 +203,18 @@ class PedalTests(unittest.TestCase):
             mapper._worker()
         self.assertEqual(session.call_count, 2)
         for device in devices:
-            device.__exit__.assert_called_once()
+            device.close.assert_called_once()
+
+
+    def test_detect_usb_pedals_reads_sysfs_names(self):
+        with tempfile.TemporaryDirectory() as hid_dir:
+            self.assertIsNone(pedals.detect_usb_pedals(hid_dir))
+            for name in ("0003:046D:C52B.0001", "0003:0EB7:0020.0002", "junk"):
+                os.mkdir(os.path.join(hid_dir, name))
+            self.assertIsNone(pedals.detect_usb_pedals(hid_dir))
+            os.mkdir(os.path.join(hid_dir, "0003:0EB7:183B.0006"))
+            self.assertEqual(pedals.detect_usb_pedals(hid_dir), 0x183B)
+        self.assertIsNone(pedals.detect_usb_pedals("/nonexistent"))
 
 
 @unittest.skipUnless(os.environ.get("FANALINUX_UINPUT_TESTS") == "1",

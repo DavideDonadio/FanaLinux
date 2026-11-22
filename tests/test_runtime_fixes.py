@@ -470,5 +470,30 @@ class TestUdevRule(unittest.TestCase):
         self.assertIn("uaccess", text)
 
 
+class TestWheelbaseDiscovery(unittest.TestCase):
+    def _find(self, uevent):
+        from unittest import mock
+        from fanalinux.core.device import FanatecDevice
+        sysfs = "/sys/class/hidraw/hidraw4"
+
+        def fake_glob(pattern):
+            return [sysfs] if pattern.startswith("/sys/class/hidraw") else []
+
+        with mock.patch("fanalinux.core.device.glob.glob", side_effect=fake_glob), \
+                mock.patch("fanalinux.core.device.os.path.exists", return_value=True), \
+                mock.patch("builtins.open", mock.mock_open(read_data=uevent)):
+            return FanatecDevice().find_hidraw_path()
+
+    def test_usb_pedals_are_not_a_wheelbase(self):
+        """The bus type 0003 in HID_ID must not match PID_CLUBSPORT_V2."""
+        uevent = ("DRIVER=fanatec\nHID_ID=0003:00000EB7:0000183B\n"
+                  "HID_NAME=FANATEC ClubSportPedal\n")
+        self.assertIsNone(self._find(uevent))
+
+    def test_known_wheelbase_is_found(self):
+        uevent = "HID_ID=0003:00000EB7:00000020\nHID_NAME=FANATEC CSL DD\n"
+        self.assertEqual(self._find(uevent), "/dev/hidraw4")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -20,6 +20,7 @@ from fanalinux.core.hardware import (
     load_hardware_config,
     save_hardware_config,
 )
+from fanalinux.core.pedals import PEDAL_SETS
 from fanalinux.core.updates import (
     check_latest,
     get_local_version,
@@ -29,6 +30,8 @@ from fanalinux.core.updates import (
 )
 
 RESOURCES_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", "resources"))
+# Pedal set thumbnails by USB Product ID (resources/pedals); others use an icon.
+PEDAL_IMAGES = {0x183B: "clubsport_v3.png"}
 
 
 class OverviewView(Adw.PreferencesPage):
@@ -151,6 +154,26 @@ class OverviewView(Adw.PreferencesPage):
 
         self.status_row.add_suffix(status_box)
         info_group.add(self.status_row)
+
+        # Standalone USB pedals: shown only while a pedal set is plugged in
+        self._pedal_pid = None
+        self.pedal_row = Adw.ActionRow()
+        pedal_box, self.pedal_thumbnail = self._create_thumbnail("", "input-gaming-symbolic", size=64, box_width=128, box_height=108)
+        self.pedal_row.add_prefix(pedal_box)
+        pedal_status = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        pedal_status.set_valign(Gtk.Align.CENTER)
+        pedal_status.add_css_class("status-indicator-box")
+        pedal_dot = Gtk.Image.new_from_icon_name("media-record-symbolic")
+        pedal_dot.set_pixel_size(10)
+        pedal_dot.add_css_class("status-dot-online")
+        pedal_status.append(pedal_dot)
+        pedal_badge = Gtk.Label(label="Connected")
+        pedal_badge.add_css_class("success")
+        pedal_badge.add_css_class("heading")
+        pedal_status.append(pedal_badge)
+        self.pedal_row.add_suffix(pedal_status)
+        self.pedal_row.set_visible(False)
+        info_group.add(self.pedal_row)
 
         # Rim Row
         self.rim_row = Adw.ActionRow()
@@ -542,6 +565,25 @@ class OverviewView(Adw.PreferencesPage):
         elif self.on_toast_requested:
             last = tail.splitlines()[-1] if tail else "unknown error"
             self.on_toast_requested(f"Driver install failed: {last}")
+
+    def set_pedals(self, product_id: int | None):
+        """Show the standalone USB pedal set, or hide the row when none is plugged in."""
+        if product_id == self._pedal_pid:
+            return
+        self._pedal_pid = product_id
+        if product_id is None:
+            self.pedal_row.set_visible(False)
+            return
+        self.pedal_row.set_title(f"Fanatec {PEDAL_SETS.get(product_id, 'USB Pedals')}")
+        self.pedal_row.set_subtitle(f"Vendor ID: 0x0EB7 | Product ID: 0x{product_id:04X} | USB Pedals")
+        image = os.path.join(RESOURCES_DIR, "pedals", PEDAL_IMAGES.get(product_id, ""))
+        if os.path.isfile(image):
+            self.pedal_thumbnail.set_from_paintable(Gdk.Texture.new_from_file(Gio.File.new_for_path(image)))
+            self.pedal_thumbnail.set_pixel_size(112)
+        else:
+            self.pedal_thumbnail.set_from_icon_name("input-gaming-symbolic")
+            self.pedal_thumbnail.set_pixel_size(64)
+        self.pedal_row.set_visible(True)
 
     def set_connection_status(self, is_online: bool):
         """Update hardware status badge and cards based on connection state."""
