@@ -177,16 +177,6 @@ class MainWindow(Adw.ApplicationWindow):
         # Ensure all preference pages utilize the full window width (1040px)
         GLib.idle_add(self._widen_all_clamps)
 
-        # Freeze recorder: passive input timeline for the whole session.
-        # Local-only module (git-excluded): stay up without it.
-        self._freeze_recorder = None
-        try:
-            from fanalinux.core.freeze_watch import FreezeRecorder
-            self._freeze_recorder = FreezeRecorder()
-            self._freeze_recorder.start()
-        except ImportError:
-            pass
-
         self.connect("close-request", self._on_close)
 
     def _widen_all_clamps(self):
@@ -373,10 +363,6 @@ class MainWindow(Adw.ApplicationWindow):
             self.tuning_view.set_active_profile(profile)
 
     def _on_close(self, *args):
-        try:
-            self._freeze_recorder.stop()
-        except Exception:
-            pass
         self.pedals_view.stop()
         if self.detector:
             self.detector.stop()
