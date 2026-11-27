@@ -12,7 +12,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from fanalinux.core.device import FanatecDevice
+from fanalinux.core.device import FanatecBase
 from fanalinux.core.protocol import TUNING_REGISTERS
 from fanalinux.core.tuning import TUNING_METADATA, TuningProfile
 
@@ -33,7 +33,7 @@ def reg(buf, name):
 
 class TestTuningTransfer(unittest.TestCase):
     def setUp(self):
-        self.dev = FanatecDevice()
+        self.dev = FanatecBase()
 
     def sen_byte(self, sen):
         return reg(capture_full_buffer(self.dev, TuningProfile(slot=1, sen=sen)), "SEN")
@@ -84,8 +84,8 @@ class TestOfficialDefaults(unittest.TestCase):
         self.assertEqual((prof.for_mult, prof.spr_mult, prof.dpr_mult), (100, 100, 100))
 
     def test_default_profile_encodes_official_values(self):
-        from fanalinux.core.device import FanatecDevice
-        dev = FanatecDevice()
+        from fanalinux.core.device import FanatecBase
+        dev = FanatecBase()
         buf = capture_full_buffer(dev, TuningProfile(slot=1))
         self.assertEqual(reg(buf, "SEN"), 129)  # AUT
         self.assertEqual(reg(buf, "NDP"), 50)

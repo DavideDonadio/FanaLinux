@@ -259,25 +259,41 @@ class CalibrationView(Adw.PreferencesPage):
                 return live()
 
             try:
+                # Capability snapshot: rim counts drive phase 1, never hardcoded.
+                # Unknown/undetected rim -> full 9/6/display sweep, labeled as such.
+                rim = getattr(self.device, "rim", None)
+                rev_count = rim.rev_leds if rim else 9
+                flag_count = rim.flag_leds if rim else 6
+                has_display = rim.display if rim else True
+                rim_verified = rim is not None and getattr(rim, "type_id", -1) != -1
                 # -------------------------------------------------------------
                 # PHASE 1: Displays & Multi-Color LEDs (0.0s - 3.2s)
                 # -------------------------------------------------------------
                 if self.on_toast_requested:
-                    GLib.idle_add(self.on_toast_requested, "Self-Test (1/3): Testing RevLEDs, Flag clusters & OLED...")
+                    if not rim_verified:
+                        GLib.idle_add(self.on_toast_requested, "Rim unverified — running full sweep...")
+                    else:
+                        skips = []
+                        if not rev_count:
+                            skips.append("no rev LEDs")
+                        if not flag_count:
+                            skips.append("no flag LEDs")
+                        if not has_display:
+                            skips.append("no display")
+                        note = f" (skipping {', '.join(skips)})" if skips else ""
+                        GLib.idle_add(self.on_toast_requested, f"Self-Test (1/3): Testing RevLEDs, Flag clusters & OLED{note}...")
 
-                dev.set_display_text("TST")
+                if has_display:
+                    dev.set_display_text("TST")
                 if not sleep_check(0.4):
                     return
 
-                color_palette = [
-                    (0, 255, 0), (0, 255, 0), (0, 255, 0),       # Green
-                    (255, 200, 0), (255, 200, 0), (255, 200, 0), # Yellow
-                    (255, 0, 0), (255, 0, 0), (0, 100, 255)      # Red / Blue
-                ]
+                color_wheel = [(0, 255, 0)] * 3 + [(255, 200, 0)] * 3 + [(255, 0, 0)] * 2 + [(0, 100, 255)]
+                color_palette = (color_wheel * ((rev_count // len(color_wheel)) + 1))[:rev_count]
 
-                # Sweep in 9 RevLEDs
-                current_leds = [(0, 0, 0)] * 9
-                for i in range(9):
+                # Sweep RevLEDs
+                current_leds = [(0, 0, 0)] * rev_count
+                for i in range(rev_count):
                     if self._abort_self_test:
                         return
                     current_leds[i] = color_palette[i]
@@ -285,26 +301,32 @@ class CalibrationView(Adw.PreferencesPage):
                     if not sleep_check(0.12):
                         return
 
-                # Flag LEDs cycle (3 left, 3 right)
-                dev.set_display_text("LED")
-                for c in [(255, 0, 0), (255, 200, 0), (0, 120, 255)]:
-                    if self._abort_self_test:
-                        return
-                    dev.set_flagleds([c] * 6)
-                    if not sleep_check(0.35):
-                        return
+                # Flag LEDs cycle
+                if flag_count:
+                    if has_display:
+                        dev.set_display_text("LED")
+                    for c in [(255, 0, 0), (255, 200, 0), (0, 120, 255)]:
+                        if self._abort_self_test:
+                            return
+                        dev.set_flagleds([c] * flag_count)
+                        if not sleep_check(0.35):
+                            return
 
                 # All LEDs full bright white flash
                 if self._abort_self_test:
                     return
-                dev.set_revleds([(255, 255, 255)] * 9)
-                dev.set_flagleds([(255, 255, 255)] * 6)
+                if rev_count:
+                    dev.set_revleds([(255, 255, 255)] * rev_count)
+                if flag_count:
+                    dev.set_flagleds([(255, 255, 255)] * flag_count)
                 if not sleep_check(0.4):
                     return
 
                 # Clear LEDs
-                dev.set_revleds([(0, 0, 0)] * 9)
-                dev.set_flagleds([(0, 0, 0)] * 6)
+                if rev_count:
+                    dev.set_revleds([(0, 0, 0)] * rev_count)
+                if flag_count:
+                    dev.set_flagleds([(0, 0, 0)] * flag_count)
 
                 # -------------------------------------------------------------
                 # PHASE 2: Direct Drive Motor Torque & Centering (3.2s - 6.8s)
@@ -315,7 +337,8 @@ class CalibrationView(Adw.PreferencesPage):
                 if self.on_toast_requested:
                     GLib.idle_add(self.on_toast_requested, "Self-Test (2/3): Direct Drive motor test: Left sweep, Right sweep & Centering...")
 
-                dev.set_display_text("DD")
+                if has_display:
+                    dev.set_display_text("DD")
 
                 # Smooth ramp Left (up to ~20% torque)
                 for step in range(1, 11):
@@ -376,7 +399,8 @@ class CalibrationView(Adw.PreferencesPage):
                 if self.on_toast_requested:
                     GLib.idle_add(self.on_toast_requested, "Self-Test (3/3): Testing rim grip rumble & pedal haptic motors...")
 
-                dev.set_display_text("VIB")
+                if has_display:
+                    dev.set_display_text("VIB")
 
                 # Left grip rumble (1.0s)
                 dev.send_handle_vibration(180, 0)
@@ -412,10 +436,12 @@ class CalibrationView(Adw.PreferencesPage):
                 dev.send_constant_force(0)
                 dev.send_handle_vibration(0, 0)
                 dev.send_centering_spring(0)
-                dev.set_display_text("OK")
+                if has_display:
+                    dev.set_display_text("OK")
                 if not sleep_check(0.6):
                     return
-                dev.clear_display()
+                if has_display:
+                    dev.clear_display()
 
                 if self.on_toast_requested:
                     GLib.idle_add(self.on_toast_requested, "Hardware Self-Test Complete: All displays, LEDs, DD motor, and haptic actuators passed!")

@@ -19,6 +19,18 @@ PID_CLUBSPORT_V25 = 0x0004
 PID_CSL_ELITE = 0x0005
 PID_CSL_ELITE_PS4 = 0x0006
 
+WHEELBASE_PIDS = (frozenset
+    ({
+    PID_CSL_DD,
+    PID_DD_PRO,
+    PID_PODIUM_DD1,
+    PID_PODIUM_DD2,
+    PID_CLUBSPORT_V2,
+    PID_CLUBSPORT_V25,
+    PID_CSL_ELITE,
+    PID_CSL_ELITE_PS4
+}))
+
 # Report IDs
 REPORT_ID_STD_INPUT = 0x01       # 64 bytes: joystick, 16-bit axes, buttons
 REPORT_ID_ALT_INPUT = 0x02       # Alternative input layout
@@ -62,21 +74,36 @@ TUNING_REGISTERS = {
     "FUL":  0x16,   # FullForce (0 - 100%)
 }
 
-# Steering Wheel Rim Type IDs (Extracted from wheel report)
-RIM_TYPES: dict[int, str] = {
-    0x0A: "ClubSport Steering Wheel Formula V2 / V2.5",
-    0x0D: "Podium Button Module Endurance",
-    0x0E: "CSL Elite Steering Wheel WRC",
-    0x0F: "Podium Steering Wheel Bentley GT3",
-    0x10: "Podium Steering Wheel BMW M4 GT3",
-    0x11: "Podium Steering Wheel DD GT",
-    0x12: "CSL Steering Wheel Universal Hub",
-    0x13: "ClubSport Steering Wheel BMW V2",
-    0x14: "ClubSport Steering Wheel RS",
-    0x15: "ClubSport Universal Hub V2",
-    0x16: "ClubSport Steering Wheel F1 Esports V2",
-    0x17: "Podium Steering Wheel DD GT X",
-    0x18: "CSL Elite Steering Wheel McLaren GT3 V2",
+# Rim capability table: type ID -> (name, rev LEDs, flag LEDs, display).
+# LED semantics per the gotzl/hid-fanatec wheel table (hid-ftecff-wheel.c):
+# FLAG_MC/15 = 9 rev + 6 flag RGB; SINGLE_MC/1 = single RGB stripe;
+# (0, 9) = 9 single-color rev, no flags; (0, 0) = no own LEDs (driven
+# via an attached Button Module). Display per-rim verified against
+# official Fanatec product pages/manuals (all True except 0x11: the CSL
+# Universal Hub ships no display and relies on base indicators).
+RIM_SPECS: dict[int, tuple[str, int, int, bool]] = {
+    0x01: ("ClubSport Steering Wheel BMW M3 GT2", 9, 0, True),
+    0x02: ("ClubSport Steering Wheel F1 IS", 9, 0, True),
+    0x03: ("ClubSport Steering Wheel Porsche 918 RSR", 9, 0, True),
+    0x04: ("ClubSport Steering Wheel Universal Hub", 0, 0, True),
+    0x06: ("ClubSport Steering Wheel Universal Hub Xbox One", 0, 0, True),
+    0x07: ("CSL Steering Wheel P1 Xbox One", 1, 0, True),
+    0x08: ("CSL Steering Wheel P1 V2 / BMW", 1, 0, True),
+    0x09: ("CSL Elite Steering Wheel McLaren GT3 V1", 0, 0, True),
+    0x0A: ("ClubSport Steering Wheel Formula V2 / V2.5", 9, 6, True),
+    0x0B: ("CSL Elite Steering Wheel McLaren GT3 V2", 0, 0, True),
+    0x0C: ("Podium Button Module Endurance", 9, 6, True),
+    0x0D: ("CSL Elite Steering Wheel WRC (alt code)", 1, 0, True),
+    0x0E: ("Podium Steering Wheel Bentley GT3", 9, 6, True),
+    0x0F: ("Podium Steering Wheel BMW M4 GT3", 9, 6, True),
+    0x10: ("Podium Steering Wheel DD GT", 9, 0, True),
+    0x11: ("CSL Steering Wheel Universal Hub", 0, 0, False),
+    0x12: ("CSL Elite Steering Wheel WRC", 1, 0, True),
+    0x13: ("ClubSport Steering Wheel BMW V2", 9, 0, True),
+    0x14: ("ClubSport Steering Wheel RS", 9, 0, True),
+    0x15: ("ClubSport Universal Hub V2", 0, 0, True),
+    0x16: ("ClubSport Steering Wheel F1 Esports V2", 9, 6, True),
+    0x18: ("Podium Steering Wheel DD GT X", 9, 6, True),
 }
 
 # 7-Segment / OLED character font mapping table

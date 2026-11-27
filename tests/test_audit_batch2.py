@@ -143,9 +143,9 @@ class TestAuditBatch2(unittest.TestCase):
 
     def test_disconnect_serialized_with_writes(self):
         """Concurrent writes during disconnect must not raise or double-close."""
-        from fanalinux.core.device import FanatecDevice
+        from fanalinux.core.device import FanatecBase
         import os as _os
-        dev = FanatecDevice.__new__(FanatecDevice)
+        dev = FanatecBase.__new__(FanatecBase)
         import threading as _t
         dev._lock = _t.RLock()
         dev.connected = True

@@ -30,6 +30,15 @@ from fanalinux.core.updates import (
 )
 
 RESOURCES_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", "resources"))
+# Detected rim type ID -> KNOWN_RIMS entry id (verified art only).
+# Rims without renders keep the configured image; the name still updates.
+RIM_ART = {
+    0x01: "bmw_m3_gt2", 0x08: "csl_p1_v2", 0x09: "mclaren_v1", 0x0A: "formula_v2", 0x0B: "mclaren_gt3",
+    0x0C: "endurance_gt3", 0x0D: "csl_wrc", 0x0E: "bentley",
+    0x0F: "bmw_gt3", 0x11: "csl_uhub", 0x12: "csl_wrc",
+    0x13: "bmw_v2", 0x14: "rs", 0x15: "uhub_v2",
+    0x16: "formula_v2", 0x18: "dd_gtx",
+}
 # Pedal set thumbnails by USB Product ID (resources/pedals); others use an icon.
 PEDAL_IMAGES = {0x183B: "clubsport_v3.png"}
 
@@ -43,8 +52,7 @@ class OverviewView(Adw.PreferencesPage):
         self.hardware_config = load_hardware_config()
         self.current_rim_info = get_rim_info(self.hardware_config.rim_id)
         self._rim_textures = {}
-        self._pending_rim_idx = -1
-        self._rim_apply_id = 0
+        self._applied_rim_idx = -1
         # Decode every thumbnail once while the UI is idle, so scrolling the
         # rim list never blocks on image loading.
         self._preload_rims = list(KNOWN_RIMS)
@@ -182,20 +190,20 @@ class OverviewView(Adw.PreferencesPage):
         rim_box, self.rim_thumbnail = self._create_thumbnail(rim_img_path, "applications-games-symbolic", size=102, box_width=128, box_height=108)
         self.rim_row.add_prefix(rim_box)
 
-        # Dropdown selector for exact steering wheel model
-        rim_names = [r["name"] for r in KNOWN_RIMS]
-        rim_string_list = Gtk.StringList.new(rim_names)
-        self.rim_dropdown = Gtk.DropDown.new(rim_string_list, None)
-        self.rim_dropdown.set_valign(Gtk.Align.CENTER)
-
-        selected_idx = 0
-        for i, r in enumerate(KNOWN_RIMS):
-            if r["id"] == self.hardware_config.rim_id:
-                selected_idx = i
-                break
-        self.rim_dropdown.set_selected(selected_idx)
-        self.rim_dropdown.connect("notify::selected", self._on_rim_selected)
-        self.rim_row.add_suffix(self.rim_dropdown)
+        # Detection status badge: the wheel is detected or it is not.
+        # No manual selector: the base reports the rim, the UI shows it.
+        rim_status = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        rim_status.set_valign(Gtk.Align.CENTER)
+        rim_status.add_css_class("status-indicator-box")
+        self.rim_dot = Gtk.Image.new_from_icon_name("media-record-symbolic")
+        self.rim_dot.set_pixel_size(10)
+        self.rim_dot.add_css_class("status-dot-offline")
+        rim_status.append(self.rim_dot)
+        self.rim_badge = Gtk.Label(label="Not detected")
+        self.rim_badge.add_css_class("error")
+        self.rim_badge.add_css_class("heading")
+        rim_status.append(self.rim_badge)
+        self.rim_row.add_suffix(rim_status)
 
         info_group.add(self.rim_row)
 
@@ -359,16 +367,27 @@ class OverviewView(Adw.PreferencesPage):
             for hat_id, hat_label in hat_inputs:
                 self._create_and_add_chip(hat_id, hat_label)
 
-    def _on_rim_selected(self, dropdown, param):
-        # Scrolling the popup fires this per highlight step: wait until the
-        # selection settles before the expensive apply (disk + rebuild).
-        idx = dropdown.get_selected()
-        if not (0 <= idx < len(KNOWN_RIMS)):
-            return
-        self._pending_rim_idx = idx
-        if getattr(self, "_rim_apply_id", 0):
-            GLib.source_remove(self._rim_apply_id)
-        self._rim_apply_id = GLib.timeout_add(250, self._apply_pending_rim)
+    def _apply_detected_rim(self, idx):
+        """Apply the wire-detected rim: art, matrix, dial, config follows."""
+        if 0 <= idx < len(KNOWN_RIMS):
+            rim_info = KNOWN_RIMS[idx]
+            self.hardware_config.rim_id = rim_info["id"]
+            save_hardware_config(self.hardware_config)
+            self.current_rim_info = rim_info
+            self.rim_row.set_subtitle(rim_info["subtitle"])
+
+            # Dynamically rebuild button matrix to match detected rim
+            self._rebuild_button_matrix(rim_info)
+
+            # Update prefix image (decoded once per rim, then cached)
+            rim_img_path = os.path.join(RESOURCES_DIR, "rims", rim_info.get("image", "formula_v2.png"))
+            tex = self._rim_texture(rim_img_path)
+            if tex is not None:
+                self.rim_thumbnail.set_from_paintable(tex)
+                self.rim_thumbnail.set_pixel_size(102)
+
+            if self.on_rim_changed:
+                self.on_rim_changed(rim_info)
 
     def _rim_texture(self, rim_img_path):
         cached = self._rim_textures.get(rim_img_path)
@@ -386,30 +405,6 @@ class OverviewView(Adw.PreferencesPage):
         rim = self._preload_rims.pop(0)
         self._rim_texture(os.path.join(RESOURCES_DIR, "rims", rim.get("image", "formula_v2.png")))
         return True
-
-    def _apply_pending_rim(self):
-        self._rim_apply_id = 0
-        idx = getattr(self, "_pending_rim_idx", -1)
-        if 0 <= idx < len(KNOWN_RIMS):
-            rim_info = KNOWN_RIMS[idx]
-            self.hardware_config.rim_id = rim_info["id"]
-            save_hardware_config(self.hardware_config)
-            self.current_rim_info = rim_info
-            self.rim_row.set_subtitle(rim_info["subtitle"])
-
-            # Dynamically rebuild button matrix to match newly selected rim
-            self._rebuild_button_matrix(rim_info)
-
-            # Update prefix image (decoded once per rim, then cached)
-            rim_img_path = os.path.join(RESOURCES_DIR, "rims", rim_info.get("image", "formula_v2.png"))
-            tex = self._rim_texture(rim_img_path)
-            if tex is not None:
-                self.rim_thumbnail.set_from_paintable(tex)
-                self.rim_thumbnail.set_pixel_size(102)
-
-            if self.on_rim_changed:
-                self.on_rim_changed(rim_info)
-        return False
 
     def _refresh_update_row(self):
         state = load_update_state()
@@ -565,6 +560,45 @@ class OverviewView(Adw.PreferencesPage):
         elif self.on_toast_requested:
             last = tail.splitlines()[-1] if tail else "unknown error"
             self.on_toast_requested(f"Driver install failed: {last}")
+
+    def set_rim_detection(self, rim) -> None:
+        """Show the detected rim, or say so when detection failed.
+
+        Mapped art: follow the wire (dropdown, image, dial).
+        Known but unmapped: name from the base, configured image kept.
+        Nothing/Unknown: warning state, never a silent substitution."""
+        type_id = getattr(rim, "type_id", -1) if rim is not None else -1
+        if type_id in RIM_ART:
+            self.rim_row.set_title(rim.name)
+            self.rim_row.set_subtitle(f"Detected — reported by base (ID 0x{type_id:02X})")
+            self._set_rim_badge(True)
+            for i, r in enumerate(KNOWN_RIMS):
+                if r["id"] == RIM_ART[type_id] and i != self._applied_rim_idx:
+                    self._applied_rim_idx = i
+                    self._apply_detected_rim(i)
+                    break
+        elif rim is not None and type_id != -1:
+            self.rim_row.set_title(rim.name)
+            self.rim_row.set_subtitle("Detected, no render yet — showing configured image.")
+            self._set_rim_badge(True)
+        else:
+            self.rim_row.set_title("Steering rim not detected")
+            self.rim_row.set_subtitle("Check the rim connection — showing configured render.")
+            self._set_rim_badge(False)
+
+    def _set_rim_badge(self, detected: bool) -> None:
+        if detected:
+            self.rim_dot.remove_css_class("status-dot-offline")
+            self.rim_dot.add_css_class("status-dot-online")
+            self.rim_badge.set_text("Detected")
+            self.rim_badge.remove_css_class("error")
+            self.rim_badge.add_css_class("success")
+        else:
+            self.rim_dot.remove_css_class("status-dot-online")
+            self.rim_dot.add_css_class("status-dot-offline")
+            self.rim_badge.set_text("Not detected")
+            self.rim_badge.remove_css_class("success")
+            self.rim_badge.add_css_class("error")
 
     def set_pedals(self, product_id: int | None):
         """Show the standalone USB pedal set, or hide the row when none is plugged in."""

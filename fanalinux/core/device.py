@@ -4,16 +4,16 @@ Fanatec Hardware Device Abstraction.
 Native Linux hidraw implementation that does not detach the kernel driver.
 Maintains concurrent compatibility with evdev gaming inputs.
 """
+from __future__ import annotations
 
 import errno
 import glob
 import logging
 import os
 import re
-import select
+from select import select
 import threading
 import time
-
 from fanalinux.core.protocol import (
     CMD_DISPLAY_PREFIX,
     CMD_INIT,
@@ -21,14 +21,9 @@ from fanalinux.core.protocol import (
     FANATEC_VENDOR_ID,
     LED_SUB_FLAGS,
     LED_SUB_RPM,
-    PID_CLUBSPORT_V2,
-    PID_CLUBSPORT_V25,
+    RIM_SPECS,
     PID_CSL_DD,
-    PID_CSL_ELITE,
-    PID_CSL_ELITE_PS4,
-    PID_DD_PRO,
-    PID_PODIUM_DD1,
-    PID_PODIUM_DD2,
+    WHEELBASE_PIDS,
     REPORT_ID_DIRECT_DRIVE,
     REPORT_ID_LEGACY_CMD,
     TUNING_REGISTERS,
@@ -39,7 +34,6 @@ from fanalinux.core.tuning import TuningProfile
 
 logger = logging.getLogger("fanalinux.device")
 
-
 def parse_hid_ids(uevent_text: str) -> tuple | None:
     """Extract (vendor_id, product_id) from a hidraw uevent dump."""
     match = re.search(r"HID_ID=\S+:([0-9A-Fa-f]+):([0-9A-Fa-f]+)", uevent_text)
@@ -47,46 +41,39 @@ def parse_hid_ids(uevent_text: str) -> tuple | None:
         return None
     return int(match.group(1), 16), int(match.group(2), 16)
 
+class FanatecRim:
+    def __init__(self, type_id = 0x0A, name = "ClubSport Steering Wheel Formula V2 / V2.5", rev_leds = 9, flag_leds = 6, display = True):
+        self.type_id = type_id
+        self.name = name
+        self.rev_leds = rev_leds
+        self.flag_leds = flag_leds
+        self.display = display
 
-class FanatecDevice:
-    def __init__(self, vendor_id: int = FANATEC_VENDOR_ID, product_id: int = PID_CSL_DD):
+    @classmethod
+    def from_type_id(cls, type_id) -> FanatecRim:
+
+        rim_spec = RIM_SPECS.get(type_id)
+        if not rim_spec:
+            return cls(-1, "Unknown RIM", 0, 0, False)
+        return cls(type_id, *rim_spec)
+
+class FanatecBase:
+    def __init__(self, product_id: int = PID_CSL_DD, vendor_id: int = FANATEC_VENDOR_ID):
         self.vendor_id = vendor_id
         self.product_id = product_id
+        self.rim = None
         self._fd: int | None = None
         self.hidraw_path: str | None = None
         self.connected = False
         self._abort_vibration = False
         self._vibration_token = 0
-        # Set by the emergency cutoff: force outputs stay silent until an
-        # explicit user action (force switch, self-test) re-arms them.
-        self.output_inhibited = False
+        self.output_inhibited = False # Set by the emergency cutoff, no output until user action re-arms
         self.active_sen = 900
         self._lock = threading.RLock()
 
-    def find_hidraw_path(self) -> str | None:
-        """
-        Locate the Fanatec hidraw device node with intelligent preference for
-        wheelbases over peripheral accessories (e.g. standalone USB pedals/shifters).
-        """
-        by_id_matches = glob.glob("/dev/input/by-id/*Fanatec*-hidraw*")
-        if by_id_matches:
-            # Prioritize wheelbases over pedals / shifters
-            non_pedal = [m for m in by_id_matches if not any(x in m.lower() for x in ("pedal", "shifter", "handbrake"))]
-            if non_pedal:
-                return os.path.realpath(non_pedal[0])
+    def find_hidraw_path(self) -> tuple[str, int] | None:
+        """Locate the Fanatec hidraw device: (devpath, product_id) or None."""
 
-        known_pids = (
-            PID_CSL_DD,
-            PID_DD_PRO,
-            PID_PODIUM_DD1,
-            PID_PODIUM_DD2,
-            PID_CLUBSPORT_V2,
-            PID_CLUBSPORT_V25,
-            PID_CSL_ELITE,
-            PID_CSL_ELITE_PS4,
-        )
-
-        candidates = []
         for entry in glob.glob("/sys/class/hidraw/hidraw*"):
             uevent_path = os.path.join(entry, "device", "uevent")
             if os.path.exists(uevent_path):
@@ -97,51 +84,45 @@ class FanatecDevice:
                         if ids and ids[0] == self.vendor_id:
                             dev_name = os.path.basename(entry)
                             dev_path = f"/dev/{dev_name}"
-                            score = 1
-                            if not any(x in content for x in ("PEDAL", "SHIFTER", "HANDBRAKE")):
-                                score = 2
-                            # Compare the parsed product ID: a substring match on the
-                            # raw uevent also hits the bus type (HID_ID=0003:...).
-                            if ids[1] in known_pids:
-                                score = 3
-                            candidates.append((score, dev_path))
+                            if ids[1] in WHEELBASE_PIDS:
+                                return dev_path, ids[1]
                 except Exception:
                     pass
-
-        if candidates:
-            # Return the highest scored wheelbase node (must score >= 2 to exclude standalone pedals/shifters)
-            candidates.sort(key=lambda c: c[0], reverse=True)
-            if candidates[0][0] >= 2:
-                return candidates[0][1]
-
         return None
+
+    def detect_rim(self) -> FanatecRim | None:
+        if not self._fd:
+            return None
+        try:
+            payload = os.read(self._fd, 64)
+            if len(payload) < 31:
+                return None
+            return FanatecRim.from_type_id(payload[30]) # This is where the Rim Type ID lives
+        except (BlockingIOError, OSError):
+            return None
+
 
     def connect(self) -> bool:
         """Find and open the native Fanatec hidraw node."""
-        path = self.find_hidraw_path()
-        if not path or not os.path.exists(path):
+        match = self.find_hidraw_path()
+        if not match:
             logger.warning("No Fanatec hidraw node found.")
             self.connected = False
             return False
+
+        path, product_id = match
+        self.product_id = product_id
 
         try:
             with self._lock:
                 self._fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
                 self.hidraw_path = path
                 self.connected = True
-            # Propagate the real wheelbase identity (uevent HID_ID=bus:vend:prod).
-            try:
-                with open(f"/sys/class/hidraw/{os.path.basename(path)}/device/uevent") as f:
-                    ids = parse_hid_ids(f.read())
-                if ids and ids[0] == self.vendor_id:
-                    self.product_id = ids[1]
-            except Exception:
-                pass
-            logger.info(f"Connected to Fanatec on {path}")
+                logger.info(f"Connected to Fanatec on {path}")
+                self.FanatecRim = self.detect_rim()
+                self.initialize_hardware()
+                return self.connected
 
-            # Send initialization handshake (may disconnect on fatal HID errors)
-            self.initialize_hardware()
-            return self.connected
         except Exception as e:
             logger.error(f"Failed to open hidraw node {path}: {e}")
             with self._lock:
@@ -173,8 +154,8 @@ class FanatecDevice:
         Automatically reconnects if the hardware is plugged back in.
         """
         if not self.connected or self._fd is None:
-            path = self.find_hidraw_path()
-            if path and os.path.exists(path):
+            match = self.find_hidraw_path()
+            if match:
                 return self.connect()
             return False
 
@@ -183,14 +164,13 @@ class FanatecDevice:
             return False
 
         try:
-            _, _, x = select.select([self._fd], [], [self._fd], 0)
+            _, _, x = select([self._fd], [], [self._fd], 0)
             if x:
                 self.disconnect()
                 return False
         except (OSError, ValueError):
             self.disconnect()
             return False
-
         return True
 
     def write_report(self, data: list[int]) -> int:
@@ -235,12 +215,10 @@ class FanatecDevice:
         time.sleep(0.02)
 
     def set_revleds(self, colors: list[tuple[int, int, int]]):
-        """
-        Set the 9 multi-color RevLEDs on the rim.
-        colors: list of 9 (r, g, b) tuples, each component 0..255.
-        """
+        """Set the multi-color RevLEDs on the rim (count from detected rim)."""
+        count = self.rim.rev_leds if self.rim else 9
         buf = [REPORT_ID_DIRECT_DRIVE, CMD_LED_MC, LED_SUB_RPM]
-        for r, g, b in colors[:9]:
+        for r, g, b in colors[:count]:
             val = encode_bgr565(r, g, b)
             buf.append((val >> 8) & 0xFF)
             buf.append(val & 0xFF)
@@ -248,12 +226,10 @@ class FanatecDevice:
         self.write_report(buf)
 
     def set_flagleds(self, colors: list[tuple[int, int, int]]):
-        """
-        Set the 6 multi-color Flag LEDs on the rim (3 left, 3 right).
-        colors: list of 6 (r, g, b) tuples.
-        """
+        """Set the Flag LEDs on the rim (count from detected rim)."""
+        count = self.rim.flag_leds if self.rim else 6
         buf = [REPORT_ID_DIRECT_DRIVE, CMD_LED_MC, LED_SUB_FLAGS]
-        for r, g, b in colors[:6]:
+        for r, g, b in colors[:count]:
             val = encode_bgr565(r, g, b)
             buf.append((val >> 8) & 0xFF)
             buf.append(val & 0xFF)

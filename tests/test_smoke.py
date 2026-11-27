@@ -32,8 +32,8 @@ class TestSmoke(unittest.TestCase):
 
     def test_device_discovery_cold_path(self):
         """Instantiate FanatecDevice and execute discovery without physical hardware."""
-        from fanalinux.core.device import FanatecDevice
-        dev = FanatecDevice()
+        from fanalinux.core.device import FanatecBase
+        dev = FanatecBase()
         self.assertIsNotNone(dev)
         
         # Must execute cleanly without NameError (e.g. PID definitions) or unhandled exceptions
@@ -63,12 +63,12 @@ class TestSmoke(unittest.TestCase):
 
     def test_telemetry_manager_initialization(self):
         """Instantiate TelemetryManager and verify clients can be retrieved cleanly."""
-        from fanalinux.core.device import FanatecDevice
+        from fanalinux.core.device import FanatecBase
         from fanalinux.core.telemetry.manager import (
             TELEMETRY_FACTORIES,
             TelemetryManager,
         )
-        dev = FanatecDevice()
+        dev = FanatecBase()
         mgr = TelemetryManager(dev)
         self.assertFalse(mgr.is_connected)
         self.assertFalse(mgr.is_running)

@@ -11,9 +11,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 class TestConnectReturnValue(unittest.TestCase):
     def test_init_failure_returns_false(self):
         """connect() must not report success when init disconnects internally."""
-        from fanalinux.core.device import FanatecDevice
-        dev = FanatecDevice()
-        dev.find_hidraw_path = lambda: os.devnull
+        from fanalinux.core.device import FanatecBase
+        dev = FanatecBase()
+        dev.find_hidraw_path = lambda: (os.devnull, 0x0020)
 
         def fatal_write(data):
             dev.disconnect()
@@ -175,11 +175,11 @@ class TestGameSwitchTelemetry(unittest.TestCase):
     def test_haptic_engines_obey_emergency_inhibit(self):
         """Inhibited device must swallow every force output (cutoff is global)."""
         from unittest import mock
-        from fanalinux.core.device import FanatecDevice
-        dev = FanatecDevice()
+        from fanalinux.core.device import FanatecBase
+        dev = FanatecBase()
         dev._fd = 1
         dev.connected = True
-        with mock.patch.object(FanatecDevice, "write_report") as wr:
+        with mock.patch.object(FanatecBase, "write_report") as wr:
             dev.send_constant_force(5000)
             dev.send_centering_spring(50)
             dev.send_damper_friction(50)
@@ -253,11 +253,11 @@ class TestGameSwitchTelemetry(unittest.TestCase):
         import threading
         import time
         from unittest import mock
-        from fanalinux.core.device import FanatecDevice
-        dev = FanatecDevice()
+        from fanalinux.core.device import FanatecBase
+        dev = FanatecBase()
         dev._fd = 1
         dev.connected = True
-        with mock.patch.object(FanatecDevice, "write_report") as wr:
+        with mock.patch.object(FanatecBase, "write_report") as wr:
             dev._lock.acquire()
             try:
                 t = threading.Thread(target=lambda: dev.send_damper_friction(50))
@@ -274,8 +274,8 @@ class TestGameSwitchTelemetry(unittest.TestCase):
         """Hammering force outputs around repeated cutoffs must not deadlock."""
         import threading
         from unittest import mock
-        from fanalinux.core.device import FanatecDevice
-        dev = FanatecDevice()
+        from fanalinux.core.device import FanatecBase
+        dev = FanatecBase()
         dev._fd = 1
         dev.connected = True
         stop = threading.Event()
@@ -285,7 +285,7 @@ class TestGameSwitchTelemetry(unittest.TestCase):
                 dev.send_damper_friction(50)
                 dev.send_centering_spring(50)
                 dev.send_handle_vibration(100, 100)
-        with mock.patch.object(FanatecDevice, "write_report"):
+        with mock.patch.object(FanatecBase, "write_report"):
             workers = [threading.Thread(target=storm) for _ in range(4)]
             for w in workers:
                 w.start()
@@ -473,7 +473,7 @@ class TestUdevRule(unittest.TestCase):
 class TestWheelbaseDiscovery(unittest.TestCase):
     def _find(self, uevent):
         from unittest import mock
-        from fanalinux.core.device import FanatecDevice
+        from fanalinux.core.device import FanatecBase
         sysfs = "/sys/class/hidraw/hidraw4"
 
         def fake_glob(pattern):
@@ -482,7 +482,7 @@ class TestWheelbaseDiscovery(unittest.TestCase):
         with mock.patch("fanalinux.core.device.glob.glob", side_effect=fake_glob), \
                 mock.patch("fanalinux.core.device.os.path.exists", return_value=True), \
                 mock.patch("builtins.open", mock.mock_open(read_data=uevent)):
-            return FanatecDevice().find_hidraw_path()
+            return FanatecBase().find_hidraw_path()
 
     def test_usb_pedals_are_not_a_wheelbase(self):
         """The bus type 0003 in HID_ID must not match PID_CLUBSPORT_V2."""
@@ -492,7 +492,7 @@ class TestWheelbaseDiscovery(unittest.TestCase):
 
     def test_known_wheelbase_is_found(self):
         uevent = "HID_ID=0003:00000EB7:00000020\nHID_NAME=FANATEC CSL DD\n"
-        self.assertEqual(self._find(uevent), "/dev/hidraw4")
+        self.assertEqual(self._find(uevent), ("/dev/hidraw4", 0x0020))
 
 
 if __name__ == "__main__":

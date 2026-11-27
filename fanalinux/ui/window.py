@@ -15,7 +15,7 @@ gi.require_version('Gdk', '4.0')
 from gi.repository import Adw, Gdk, GLib, Gtk
 
 from fanalinux.core.detector import GameDetector
-from fanalinux.core.device import FanatecDevice
+from fanalinux.core.device import FanatecBase
 from fanalinux.core import driver_setup
 from fanalinux.core.evdev_listener import EvdevListener, query_ff_effects
 from fanalinux.core.pedals import detect_usb_pedals
@@ -46,7 +46,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._load_stylesheet()
 
         # Initialize Hardware & Telemetry Engine
-        self.device = FanatecDevice()
+        self.device = FanatecBase()
         self.device.connect()
         self.telemetry_mgr = TelemetryManager(self.device)
 
@@ -172,6 +172,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._last_evdev_retry = 0.0
         self.overview_view.set_connection_status(self._hardware_online)
         self.overview_view.set_pedals(detect_usb_pedals())
+        self.overview_view.set_rim_detection(getattr(self.device, "rim", None))
         GLib.timeout_add_seconds(1, self._check_hardware_connection)
 
         # Ensure all preference pages utilize the full window width (1040px)
@@ -304,6 +305,7 @@ class MainWindow(Adw.ApplicationWindow):
         is_online = self.device.check_connection() if self.device else False
         self._hardware_online = is_online
         self.overview_view.set_pedals(detect_usb_pedals())
+        self.overview_view.set_rim_detection(getattr(self.device, "rim", None))
 
         # Kernel FFB driver: live effects if wheel present, else module presence
         module_present = driver_setup.driver_module_present()
