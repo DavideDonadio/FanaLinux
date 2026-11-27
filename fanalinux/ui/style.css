@@ -144,6 +144,11 @@ window {
     filter: drop-shadow(0 0 4px alpha(#e01b24, 0.4));
 }
 
+.status-dot-warning {
+    color: @warning_color;
+    filter: drop-shadow(0 0 4px alpha(@warning_color, 0.4));
+}
+
 .update-btn {
     background-color: mix(@success_color, black, 0.25);
     color: #ffffff;

@@ -90,6 +90,12 @@ class FanatecBase:
                     pass
         return None
 
+    def refresh_rim(self) -> None:
+        """Re-read the rim from sysfs (cheap, no stream steal). Keeps the
+        UI honest across rim hot-swap; missing/unparseable -> None."""
+        rim_id = self._read_sysfs_rim_id()
+        self.rim = FanatecRim.from_type_id(rim_id) if rim_id is not None else None
+
     def detect_rim(self) -> FanatecRim | None:
         # Primary: kernel driver sysfs (always present, no timing race).
         # Fallback: one-shot hidraw read (driver-less systems, wheel turning).

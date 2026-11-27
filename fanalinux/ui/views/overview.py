@@ -561,7 +561,7 @@ class OverviewView(Adw.PreferencesPage):
             last = tail.splitlines()[-1] if tail else "unknown error"
             self.on_toast_requested(f"Driver install failed: {last}")
 
-    def set_rim_detection(self, rim) -> None:
+    def set_rim_detection(self, rim, driver_present: bool = True) -> None:
         """Show the detected rim, or say so when detection failed.
 
         Mapped art: follow the wire (dropdown, image, dial).
@@ -571,7 +571,7 @@ class OverviewView(Adw.PreferencesPage):
         if type_id in RIM_ART:
             self.rim_row.set_title(rim.name)
             self.rim_row.set_subtitle(f"Detected — reported by base (ID 0x{type_id:02X})")
-            self._set_rim_badge(True)
+            self._set_rim_badge("Detected")
             for i, r in enumerate(KNOWN_RIMS):
                 if r["id"] == RIM_ART[type_id] and i != self._applied_rim_idx:
                     self._applied_rim_idx = i
@@ -580,23 +580,35 @@ class OverviewView(Adw.PreferencesPage):
         elif rim is not None and type_id != -1:
             self.rim_row.set_title(rim.name)
             self.rim_row.set_subtitle("Detected, no render yet — showing configured image.")
-            self._set_rim_badge(True)
+            self._set_rim_badge("Detected")
         else:
             self.rim_row.set_title("Steering rim not detected")
             self.rim_row.set_subtitle("Check the rim connection — showing configured render.")
-            self._set_rim_badge(False)
+            self._set_rim_badge("Requires FFB driver" if not driver_present else "Not detected")
 
-    def _set_rim_badge(self, detected: bool) -> None:
+    def _set_rim_badge(self, text: str) -> None:
+        needs_driver = text == "Requires FFB driver"
+        detected = text == "Detected"
         if detected:
             self.rim_dot.remove_css_class("status-dot-offline")
+            self.rim_dot.remove_css_class("status-dot-warning")
             self.rim_dot.add_css_class("status-dot-online")
-            self.rim_badge.set_text("Detected")
+            self.rim_badge.set_text(text)
             self.rim_badge.remove_css_class("error")
+            self.rim_badge.remove_css_class("warning")
             self.rim_badge.add_css_class("success")
+        elif needs_driver:
+            self.rim_dot.remove_css_class("status-dot-online")
+            self.rim_dot.remove_css_class("status-dot-offline")
+            self.rim_dot.add_css_class("status-dot-warning")
+            self.rim_badge.set_text(text)
+            self.rim_badge.remove_css_class("error")
+            self.rim_badge.remove_css_class("success")
+            self.rim_badge.add_css_class("warning")
         else:
             self.rim_dot.remove_css_class("status-dot-online")
             self.rim_dot.add_css_class("status-dot-offline")
-            self.rim_badge.set_text("Not detected")
+            self.rim_badge.set_text(text)
             self.rim_badge.remove_css_class("success")
             self.rim_badge.add_css_class("error")
 

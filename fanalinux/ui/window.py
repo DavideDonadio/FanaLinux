@@ -305,10 +305,12 @@ class MainWindow(Adw.ApplicationWindow):
         is_online = self.device.check_connection() if self.device else False
         self._hardware_online = is_online
         self.overview_view.set_pedals(detect_usb_pedals())
-        self.overview_view.set_rim_detection(getattr(self.device, "rim", None))
+        if self.device and self._hardware_online:
+            self.device.refresh_rim()
 
         # Kernel FFB driver: live effects if wheel present, else module presence
         module_present = driver_setup.driver_module_present()
+        self.overview_view.set_rim_detection(getattr(self.device, "rim", None), module_present)
         node = self.evdev_listener.device_node if self.evdev_listener else None
         effects = query_ff_effects(node) if is_online else []
         if is_online and not effects and self.evdev_listener:
