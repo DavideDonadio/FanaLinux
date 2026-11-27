@@ -119,7 +119,7 @@ class FanatecBase:
                 self.hidraw_path = path
                 self.connected = True
                 logger.info(f"Connected to Fanatec on {path}")
-                self.FanatecRim = self.detect_rim()
+                self.rim = self.detect_rim()
                 self.initialize_hardware()
                 return self.connected
 
