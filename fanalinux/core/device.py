@@ -91,13 +91,34 @@ class FanatecBase:
         return None
 
     def detect_rim(self) -> FanatecRim | None:
+        # Primary: kernel driver sysfs (always present, no timing race).
+        # Fallback: one-shot hidraw read (driver-less systems, wheel turning).
+        rim_id = self._read_sysfs_rim_id()
+        if rim_id is None:
+            rim_id = self._read_stream_rim_id()
+        if rim_id is None:
+            return None
+        return FanatecRim.from_type_id(rim_id)
+
+    def _read_sysfs_rim_id(self):
+        try:
+            for entry in glob.glob("/sys/bus/hid/devices/*:0EB7:*"):
+                path = os.path.join(entry, "rim_id")
+                if os.path.exists(path):
+                    with open(path) as f:
+                        return int(f.read().strip())
+        except (OSError, ValueError):
+            pass
+        return None
+
+    def _read_stream_rim_id(self):
         if not self._fd:
             return None
         try:
             payload = os.read(self._fd, 64)
             if len(payload) < 31:
                 return None
-            return FanatecRim.from_type_id(payload[30]) # This is where the Rim Type ID lives
+            return payload[30]  # Rim Type ID lives here
         except (BlockingIOError, OSError):
             return None
 
