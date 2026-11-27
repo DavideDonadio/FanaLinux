@@ -25,11 +25,9 @@ WHEELBASE_PIDS = (frozenset
     PID_DD_PRO,
     PID_PODIUM_DD1,
     PID_PODIUM_DD2,
-    PID_CLUBSPORT_V2,
-    PID_CLUBSPORT_V25,
-    PID_CSL_ELITE,
-    PID_CSL_ELITE_PS4
 }))
+# Belt-driven PIDs (V2/V2.5/CSL Elite) stay defined above as reference
+# data but are out of scope: direct-drive only, per README.
 
 # Report IDs
 REPORT_ID_STD_INPUT = 0x01       # 64 bytes: joystick, 16-bit axes, buttons

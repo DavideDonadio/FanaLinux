@@ -35,16 +35,8 @@ KNOWN_BASES: dict[int, dict[str, str]] = {
         "desc": "Direct Drive Wheel Base (High-Torque)",
         "image": "dd2.png",
     },
-    0x0004: {
-        "name": "Fanatec ClubSport Wheel Base V2.5",
-        "desc": "Belt-Driven Wheel Base",
-        "image": "v25.png",
-    },
-    0x0005: {
-        "name": "Fanatec CSL Elite Wheel Base",
-        "desc": "Belt-Driven Wheel Base",
-        "image": "csl_dd.png",
-    },
+    # Belt-driven bases (V2/V2.5/CSL Elite) are out of scope: direct-drive
+    # only, per README. Unknown PIDs fall back to the generic entry.
 }
 
 # Known Steering Wheel Rims with Dedicated Image Assets
